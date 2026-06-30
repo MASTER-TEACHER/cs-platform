@@ -1,57 +1,34 @@
-export default function Home() {
+import WelcomeCard from "@/components/dashboard/WelcomeCard";
+import ContinueLearning from "@/components/dashboard/ContinueLearning";
+import RecentActivity from "@/components/dashboard/RecentActivity";
+
+
+export default function Dashboard() {
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-2xl font-semibold mb-4">
-        Welcome back 👋
-      </h1>
+    <div className="space-y-6">
+      <WelcomeCard />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Progress */}
-        <div className="bg-white rounded-2xl shadow p-5">
-          <h2 className="text-lg mb-4">Progress</h2>
-
-          <div className="mb-3">
-            <p className="text-sm">Algorithms</p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-              <div className="bg-blue-600 h-2 rounded-full w-2/3"></div>
-            </div>
-          </div>
-
-          <div className="mb-3">
-            <p className="text-sm">Binary</p>
-            <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-              <div className="bg-blue-600 h-2 rounded-full w-4/5"></div>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200/70 bg-white/80 px-5 py-6 shadow-sm shadow-slate-900/5">
+          <p className="text-sm font-medium text-slate-500">Overall Progress</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">68%</p>
+          <p className="mt-2 text-sm text-slate-500">Across all topics</p>
         </div>
-
-        {/* Continue Learning */}
-        <div className="bg-white rounded-2xl shadow p-5">
-          <h2 className="text-lg mb-4">Continue Learning</h2>
-
-          <button className="w-full bg-blue-600 text-white py-2 rounded-xl mb-2">
-            Binary Numbers
-          </button>
-
-          <button className="w-full bg-blue-600 text-white py-2 rounded-xl">
-            Sorting Algorithms
-          </button>
+        <div className="rounded-2xl border border-slate-200/70 bg-white/80 px-5 py-6 shadow-sm shadow-slate-900/5">
+          <p className="text-sm font-medium text-slate-500">Daily Streak</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">7</p>
+          <p className="mt-2 text-sm text-slate-500">days active</p>
         </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white rounded-2xl shadow p-5">
-          <h2 className="text-lg mb-4">Quick Actions</h2>
-
-          <button className="w-full bg-green-500 text-white py-2 rounded-xl mb-2">
-            Start Quiz
-          </button>
-
-          <button className="w-full bg-yellow-500 text-white py-2 rounded-xl">
-            Trace Table Practice
-          </button>
+        <div className="rounded-2xl border border-slate-200/70 bg-white/80 px-5 py-6 shadow-sm shadow-slate-900/5">
+          <p className="text-sm font-medium text-slate-500">Predicted Grade</p>
+          <p className="mt-3 text-3xl font-semibold text-slate-900">7</p>
+          <p className="mt-2 text-sm text-slate-500">based on quiz results</p>
         </div>
+      </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <ContinueLearning />
+        <RecentActivity />
       </div>
     </div>
   );
