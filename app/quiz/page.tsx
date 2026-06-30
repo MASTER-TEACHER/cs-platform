@@ -2,8 +2,7 @@
 import { db } from "@/lib/firebase";
 import { collection, addDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-const [timeLeft, setTimeLeft] = useState(60);
-const [examMode, setExamMode] = useState(true);
+
 
 const questions = [
   {
@@ -26,6 +25,8 @@ const questions = [
 ];
 
 export default function Quiz() {
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [examMode, setExamMode] = useState(true);
   const [current, setCurrent] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
