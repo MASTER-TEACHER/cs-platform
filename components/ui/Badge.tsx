@@ -1,23 +1,23 @@
 type BadgeProps = {
-  text: string;
+  children: React.ReactNode;
 };
 
 export default function Badge({
-  text,
+  children,
 }: BadgeProps) {
   return (
-    <span
-      className="
+    <span className="
+      inline-flex
+      items-center
       rounded-full
       bg-blue-100
       px-3
       py-1
-      text-xs
+      text-sm
       font-semibold
       text-blue-700
-      "
-    >
-      {text}
+    ">
+      {children}
     </span>
   );
 }
