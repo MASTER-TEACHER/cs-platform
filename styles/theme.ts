@@ -1,17 +1,41 @@
 export const theme = {
+  colors: {
+    primary: "rgb(235, 166, 37)",
+    primaryLight: "#DBEAFE",
 
-primary: "bg-blue-600",
+    secondary: "#0F172A",
 
-secondary: "bg-slate-900",
+    success: "#16A34A",
 
-success: "bg-emerald-500",
+    warning: "#F59E0B",
 
-warning: "bg-amber-500",
+    danger: "#DC2626",
 
-danger: "bg-red-500",
+    background: "#F8FAFC",
 
-card: "rounded-2xl border bg-white shadow-sm",
+    surface: "#FFFFFF",
 
-pagePadding: "p-8",
+    border: "#E2E8F0",
 
+    text: "#0F172A",
+
+    textMuted: "#64748B",
+  },
+
+  radius: {
+    sm: "rounded-lg",
+    md: "rounded-xl",
+    lg: "rounded-2xl",
+  },
+
+  shadow: {
+    card: "shadow-sm",
+    hover: "hover:shadow-lg",
+  },
+
+  spacing: {
+    page: "p-8",
+    section: "space-y-8",
+    card: "p-6",
+  },
 };

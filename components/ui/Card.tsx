@@ -3,6 +3,22 @@ type CardProps = {
   className?: string;
 };
 
+const theme = {
+  radius: {
+    lg: "rounded-lg",
+  },
+  border: "border",
+  colors: {
+    surface: "bg-white",
+  },
+  spacing: {
+    card: "p-4",
+  },
+  shadow: {
+    card: "shadow-sm",
+  },
+};
+
 export default function Card({
   children,
   className = "",
@@ -10,13 +26,13 @@ export default function Card({
   return (
     <div
       className={`
-        rounded-2xl
-        bg-white
-        shadow-sm
-        border
-        border-slate-200
-        p-6
-        transition
+        ${theme.radius.lg}
+        ${theme.border}
+        ${theme.colors.surface}
+        ${theme.spacing.card}
+        ${theme.shadow.card}
+        transition-all
+        duration-300
         hover:shadow-md
         ${className}
       `}
