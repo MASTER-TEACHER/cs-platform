@@ -1,17 +1,13 @@
-type ProgressProps = {
+type ProgressBarProps = {
   value: number;
 };
 
-export default function ProgressBar({
-  value,
-}: ProgressProps) {
+export default function ProgressBar({ value }: ProgressBarProps) {
   return (
-    <div className="mt-2 h-2 rounded-full bg-slate-200">
+    <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-200">
       <div
-        className="h-2 rounded-full bg-blue-600 transition-all"
-        style={{
-          width: `${value}%`,
-        }}
+        className="h-full rounded-full bg-gradient-to-r from-sky-400 via-blue-500 to-blue-700 transition-all duration-700 ease-out"
+        style={{ width: `${value}%` }}
       />
     </div>
   );
