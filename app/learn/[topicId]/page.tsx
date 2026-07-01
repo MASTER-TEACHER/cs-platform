@@ -6,6 +6,8 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { questions } from "@/data/questions";
 import QuestionCard from "@/components/quiz/QuestionCard";
+import LessonHero from "@/components/lesson/LessonHero";
+import BinarySimulator from "@/components/Simulators/BinarySimulator";
 
 export default async function LessonPage({
   params,
@@ -25,8 +27,18 @@ export default async function LessonPage({
 
   return (
     <div className="space-y-6">
-      <SectionHeader title={topic.title} subtitle={topic.description} />
-
+      <LessonHero
+    title={topic.title}
+    subtitle={topic.description}
+    duration="20 mins"
+    difficulty="Easy"
+    progress={45}
+    lessonNumber={1}
+    totalLessons={topicLessons.length}
+/>
+{topic.id === "binary" && (
+  <BinarySimulator />
+)}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {topicLessons.map((lesson) => (
           <Card key={lesson.id}>
