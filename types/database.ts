@@ -5,7 +5,18 @@ export type UserProfile = {
   name: string;
   email: string;
   role: UserRole;
-  schoolId?: string;
+
+  qualification?: string;
+  examBoard?: string;
+  currentCourse?: string;
+
+  xp?: number;
+  streak?: number;
+
+  completedLessons?: string[];
+  completedTopics?: string[];
+  completedUnits?: string[];
+
   classIds?: string[];
   createdAt: Date;
 };

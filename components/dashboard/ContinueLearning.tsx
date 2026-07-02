@@ -1,32 +1,45 @@
-const topics = [
-  { title: "Binary Numbers", progress: "80%" },
-  { title: "Sorting Algorithms", progress: "65%" },
-  { title: "Trace Tables", progress: "40%" },
-];
+"use client";
+
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import { getNextLesson } from "@/lib/lessonEngine";
 
 export default function ContinueLearning() {
+  const nextLesson = getNextLesson();
+
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">
+    <Card>
+      <h2 className="text-2xl font-bold">
         Continue Learning
       </h2>
 
-      <div className="mt-4 space-y-4">
-        {topics.map((topic) => (
-          <div key={topic.title}>
-            <div className="flex justify-between text-sm">
-              <span>{topic.title}</span>
-              <span>{topic.progress}</span>
-            </div>
-            <div className="mt-2 h-2 rounded-full bg-slate-200">
-              <div
-                className="h-2 rounded-full bg-blue-600"
-                style={{ width: topic.progress }}
-              />
-            </div>
+      {nextLesson ? (
+        <>
+          <p className="mt-6 text-slate-500">
+            Current Topic
+          </p>
+
+          <h3 className="text-xl font-semibold">
+            {nextLesson.topic}
+          </h3>
+
+          <p className="mt-4 text-slate-500">
+            Next Lesson
+          </p>
+
+          <h4 className="text-lg">
+            {nextLesson.lesson}
+          </h4>
+
+          <div className="mt-6">
+            <Button>
+              Continue →
+            </Button>
           </div>
-        ))}
-      </div>
-    </div>
+        </>
+      ) : (
+        <p>🎉 Course Complete!</p>
+      )}
+    </Card>
   );
 }

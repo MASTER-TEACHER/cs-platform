@@ -8,6 +8,7 @@ import { questions } from "@/data/questions";
 import QuestionCard from "@/components/quiz/QuestionCard";
 import LessonHero from "@/components/lesson/LessonHero";
 import BinarySimulator from "@/components/Simulators/BinarySimulator";
+import HexSimulator from "@/components/simulators/HexSimulator";
 
 export default async function LessonPage({
   params,
@@ -37,8 +38,12 @@ export default async function LessonPage({
     totalLessons={topicLessons.length}
 />
 {topic.id === "binary" && (
-  <BinarySimulator />
+  <div className="space-y-6">
+    <BinarySimulator />
+    <HexSimulator />
+  </div>
 )}
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {topicLessons.map((lesson) => (
           <Card key={lesson.id}>
