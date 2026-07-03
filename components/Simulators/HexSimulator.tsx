@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useProgress } from "@/contexts/ProgressContext";
@@ -14,13 +14,18 @@ function randomTarget() {
 export default function HexSimulator() {
   const { addXP } = useProgress();
 
-  const [target, setTarget] = useState(randomTarget());
+  const [target, setTarget] = useState<number | null>(null);
+
+useEffect(() => {
+  setTarget(randomTarget());
+}, []);
+
   const [answer, setAnswer] = useState("");
   const [message, setMessage] = useState("");
   const [correct, setCorrect] = useState(false);
   const [score, setScore] = useState(0);
 
-  const correctHex = target.toString(16).toUpperCase().padStart(2, "0");
+  const correctHex = target !== null ? target.toString(16).toUpperCase().padStart(2, "0") : "";
 
   function addDigit(digit: string) {
     if (answer.length < 2) {
@@ -36,6 +41,8 @@ export default function HexSimulator() {
   }
 
   function checkAnswer() {
+    if (target === null) return;
+
     if (answer === correctHex) {
       setCorrect(true);
       setMessage("🏆 Excellent! +50 XP earned.");
@@ -48,11 +55,11 @@ export default function HexSimulator() {
   }
 
   function nextChallenge() {
-    setTarget(randomTarget());
-    setAnswer("");
-    setMessage("");
-    setCorrect(false);
-  }
+  setTarget(randomTarget());
+  setAnswer("");
+  setMessage("");
+  setCorrect(false);
+}
 
   return (
     <Card>

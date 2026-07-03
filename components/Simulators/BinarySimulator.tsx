@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useProgress } from "@/contexts/ProgressContext";
@@ -15,7 +15,11 @@ export default function BinarySimulator() {
   const { addXP } = useProgress();
 
   const [bits, setBits] = useState<number[]>(Array(8).fill(0));
-  const [target, setTarget] = useState(randomTarget());
+  const [target, setTarget] = useState<number | null>(null);
+
+useEffect(() => {
+  setTarget(randomTarget());
+}, []);
   const [message, setMessage] = useState("");
   const [correct, setCorrect] = useState(false);
   const [score, setScore] = useState(0);
@@ -33,16 +37,18 @@ export default function BinarySimulator() {
   }
 
   function checkAnswer() {
-    if (denary === target) {
-      setCorrect(true);
-      setMessage("🏆 Excellent! +50 XP earned. Keep going!");
-      setScore((prev) => prev + 1);
-      addXP(50);
-    } else {
-      setCorrect(false);
-      setMessage("❌ Not quite. Try again!");
-    }
+  if (target === null) return;
+
+  if (denary === target) {
+    setCorrect(true);
+    setMessage("🏆 Excellent! +50 XP earned. Keep going!");
+    setScore((prev) => prev + 1);
+    addXP(50);
+  } else {
+    setCorrect(false);
+    setMessage("❌ Not quite. Try again!");
   }
+}
 
   function nextChallenge() {
     setBits(Array(8).fill(0));
@@ -66,7 +72,9 @@ export default function BinarySimulator() {
           Build this number
         </p>
 
-        <h1 className="mt-2 text-6xl font-bold text-blue-700">{target}</h1>
+      <h1 className="mt-2 text-6xl font-bold text-blue-700">
+  {target ?? "--"}
+</h1>
       </div>
 
       <div className="mt-6 rounded-xl bg-emerald-50 p-4 text-center">
