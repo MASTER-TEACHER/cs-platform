@@ -8,7 +8,8 @@ import { questions } from "@/data/questions";
 import QuestionCard from "@/components/quiz/QuestionCard";
 import LessonHero from "@/components/lesson/LessonHero";
 import BinarySimulator from "@/components/Simulators/BinarySimulator";
-import HexSimulator from "@/components/simulators/HexSimulator";
+import HexSimulator from "@/components/Simulators/HexSimulator";
+import CompleteLessonButton from "@/components/lesson/CompleteLessonButton";
 
 export default async function LessonPage({
   params,
@@ -72,9 +73,9 @@ export default async function LessonPage({
             </div>
 
 <div className="mt-6">
-  <Button>
-    Start Lesson →
-  </Button>
+  
+    <CompleteLessonButton lessonId={lesson.id} />
+  
 </div>
           </Card>
         ))}

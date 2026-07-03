@@ -3,39 +3,10 @@ type CardProps = {
   className?: string;
 };
 
-const theme = {
-  radius: {
-    lg: "rounded-lg",
-  },
-  border: "border",
-  colors: {
-    surface: "bg-white",
-  },
-  spacing: {
-    card: "p-4",
-  },
-  shadow: {
-    card: "shadow-sm",
-  },
-};
-
-export default function Card({
-  children,
-  className = "",
-}: CardProps) {
+export default function Card({ children, className = "" }: CardProps) {
   return (
     <div
-      className={`
-        ${theme.radius.lg}
-        ${theme.border}
-        ${theme.colors.surface}
-        ${theme.spacing.card}
-        ${theme.shadow.card}
-        transition-all
-        duration-300
-        hover:shadow-md
-        ${className}
-      `}
+      className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:shadow-md ${className}`}
     >
       {children}
     </div>

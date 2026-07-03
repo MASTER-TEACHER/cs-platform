@@ -1,5 +1,4 @@
 import Card from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
 
 type Props = {
   name: string;
@@ -7,15 +6,15 @@ type Props = {
 
 export default function WelcomeBanner({ name }: Props) {
   return (
-    <Card className="bg-gradient-to-r from-blue-600 to-blue-500 text-white border-0">
-      <Badge>🔥 3 Day Streak</Badge>
+    <Card className="border-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+      <div className="inline-flex rounded-full bg-white/20 px-3 py-1 text-sm font-semibold">
+        🔥 3 Day Streak
+      </div>
 
-      <h1 className="mt-5 text-4xl font-bold">
-        Welcome back, {name}!
-      </h1>
+      <h1 className="mt-6 text-4xl font-bold">Welcome back, {name}!</h1>
 
-      <p className="mt-3 text-blue-100 text-lg">
-        Ready to master Computer Science today?
+      <p className="mt-3 text-lg text-blue-100">
+        Keep building your Computer Science mastery today.
       </p>
     </Card>
   );
