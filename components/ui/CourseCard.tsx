@@ -34,7 +34,7 @@ export default function CourseCard({
             {title}
           </h2>
 
-          <Badge text={level} />
+          <Badge>{level}</Badge>
 
         </div>
 

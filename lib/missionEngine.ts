@@ -1,23 +1,22 @@
 import { topicLibrary } from "@/data/curriculum/topics/index";
-import type { Topic } from "@/types/curriculum";
+import { Topic } from "@/types/curriculum";
 
-export function getNextLesson(completedLessons: string[] = []) {
+export function getDailyMission(completedLessons: string[]) {
   const topics = Object.values(topicLibrary) as Topic[];
 
   for (const topic of topics) {
-    const lesson = topic.lessons.find(
+    const nextLesson = topic.lessons.find(
       (lesson) => !completedLessons.includes(lesson.id)
     );
 
-    if (lesson) {
+    if (nextLesson) {
       return {
-        topicId: topic.id,
         topic: topic.title,
-        lessonId: lesson.id,
-        lesson: lesson.title,
-        xp: lesson.xpReward,
-        estimatedTime: lesson.estimatedTime,
+        lesson: nextLesson.title,
+        lessonId: nextLesson.id,
+        xp: nextLesson.xpReward,
         difficulty: topic.difficulty,
+        estimatedTime: nextLesson.estimatedTime,
       };
     }
   }
