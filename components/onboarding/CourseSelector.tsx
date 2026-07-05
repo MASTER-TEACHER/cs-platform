@@ -6,6 +6,7 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserCourseSelection } from "@/services/userService";
+import toast from "react-hot-toast";
 
 export default function CourseSelector() {
   const router = useRouter();
@@ -18,12 +19,12 @@ export default function CourseSelector() {
   console.log("Continue clicked");
 
   if (!user) {
-    alert("You must be logged in.");
+    toast.error("You must be logged in.");
     return;
   }
 
   if (!qualification || !examBoard) {
-    alert("Please select a qualification and exam board.");
+    toast.error("Please select a qualification and exam board.");
     return;
   }
 
@@ -36,11 +37,11 @@ export default function CourseSelector() {
 
     await updateUserCourseSelection(user.uid, qualification, examBoard);
 
-    alert("Course saved successfully!");
+    toast.success("Course saved successfully!");
     router.push("/");
   } catch (error) {
     console.error("Course selection error:", error);
-    alert("Something went wrong saving your course. Check the console.");
+    toast.error("Something went wrong saving your course. Check the console.");
   }
 }
 

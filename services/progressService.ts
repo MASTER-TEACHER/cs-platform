@@ -14,27 +14,44 @@ export async function completeLesson(
   xpReward: number = 50
 ) {
   const userRef = doc(db, "users", uid);
-
-  await updateDoc(userRef, {
-    completedLessons: arrayUnion(lessonId),
-    xp: increment(xpReward),
-  });
-
   const snapshot = await getDoc(userRef);
 
   if (!snapshot.exists()) {
-    return;
+    throw new Error("User profile not found.");
   }
 
   const profile = snapshot.data();
 
-  const unlockedAchievements = getUnlockedAchievements(profile);
+  const completedLessons: string[] = profile.completedLessons || [];
+  const badges: string[] = profile.badges || [];
+  const currentXP: number = profile.xp || 0;
 
-  if (unlockedAchievements.length > 0) {
-    await updateDoc(userRef, {
-      badges: arrayUnion(
-        ...unlockedAchievements.map((achievement) => achievement.id)
-      ),
-    });
+  if (completedLessons.includes(lessonId)) {
+    return {
+      alreadyCompleted: true,
+      unlockedAchievements: [],
+    };
   }
+
+  const updatedProfile = {
+    ...profile,
+    xp: currentXP + xpReward,
+    completedLessons: [...completedLessons, lessonId],
+    badges,
+  };
+
+  const unlockedAchievements = getUnlockedAchievements(updatedProfile);
+
+  await updateDoc(userRef, {
+    completedLessons: arrayUnion(lessonId),
+    xp: increment(xpReward),
+    badges: arrayUnion(
+      ...unlockedAchievements.map((achievement) => achievement.id)
+    ),
+  });
+
+  return {
+    alreadyCompleted: false,
+    unlockedAchievements,
+  };
 }
