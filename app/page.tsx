@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function LandingPage() {
   return (
@@ -7,6 +8,16 @@ export default function LandingPage() {
         <p className="mb-4 inline-flex w-fit rounded-full bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200">
           🚀 CS Master v1.0 Public Beta
         </p>
+        <div className="mb-8">
+  <Image
+    src="/logo.png"
+    alt="CS Master Logo"
+    width={220}
+    height={220}
+    priority
+    className="drop-shadow-2xl"
+  />
+</div>
 
         <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight md:text-7xl">
           Master GCSE Computer Science.
