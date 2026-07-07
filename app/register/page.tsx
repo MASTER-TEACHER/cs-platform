@@ -17,7 +17,9 @@ export default function RegisterPage() {
 
     try {
       await registerUser(name, email, password, role);
-      router.push("/");
+
+      // Redirect to the student dashboard
+      router.push("/dashboard");
     } catch (error) {
       alert("Registration failed. Please check your details.");
     }
@@ -25,8 +27,13 @@ export default function RegisterPage() {
 
   return (
     <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-900">Create Account</h1>
-      <p className="mt-2 text-slate-600">Join CS Master as a student or teacher.</p>
+      <h1 className="text-2xl font-bold text-slate-900">
+        Create Account
+      </h1>
+
+      <p className="mt-2 text-slate-600">
+        Join CS Master as a student or teacher.
+      </p>
 
       <form onSubmit={handleRegister} className="mt-6 space-y-4">
         <input
@@ -41,7 +48,9 @@ export default function RegisterPage() {
         <select
           className="w-full rounded-lg border p-3"
           value={role}
-          onChange={(e) => setRole(e.target.value as "student" | "teacher")}
+          onChange={(e) =>
+            setRole(e.target.value as "student" | "teacher")
+          }
         >
           <option value="student">Student</option>
           <option value="teacher">Teacher</option>
