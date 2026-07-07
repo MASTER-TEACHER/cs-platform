@@ -15,7 +15,9 @@ export default function LoginPage() {
 
     try {
       await loginUser(email, password);
-      router.push("/");
+
+      // Redirect to the student dashboard
+      router.push("/dashboard");
     } catch (error) {
       alert("Login failed. Check your email and password.");
     }
@@ -24,7 +26,10 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm">
       <h1 className="text-2xl font-bold text-slate-900">Login</h1>
-      <p className="mt-2 text-slate-600">Welcome back to CS Master.</p>
+
+      <p className="mt-2 text-slate-600">
+        Welcome back to CS Master.
+      </p>
 
       <form onSubmit={handleLogin} className="mt-6 space-y-4">
         <input

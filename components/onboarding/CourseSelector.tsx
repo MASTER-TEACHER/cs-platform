@@ -16,34 +16,27 @@ export default function CourseSelector() {
   const [examBoard, setExamBoard] = useState("");
 
   async function handleContinue() {
-  console.log("Continue clicked");
+    if (!user) {
+      toast.error("You must be logged in.");
+      return;
+    }
 
-  if (!user) {
-    toast.error("You must be logged in.");
-    return;
+    if (!qualification || !examBoard) {
+      toast.error("Please select a qualification and exam board.");
+      return;
+    }
+
+    try {
+      await updateUserCourseSelection(user.uid, qualification, examBoard);
+
+      toast.success("Course saved successfully!");
+
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Course selection error:", error);
+      toast.error("Something went wrong saving your course.");
+    }
   }
-
-  if (!qualification || !examBoard) {
-    toast.error("Please select a qualification and exam board.");
-    return;
-  }
-
-  try {
-    console.log("Saving course selection...", {
-      uid: user.uid,
-      qualification,
-      examBoard,
-    });
-
-    await updateUserCourseSelection(user.uid, qualification, examBoard);
-
-    toast.success("Course saved successfully!");
-    router.push("/");
-  } catch (error) {
-    console.error("Course selection error:", error);
-    toast.error("Something went wrong saving your course. Check the console.");
-  }
-}
 
   return (
     <Card>
