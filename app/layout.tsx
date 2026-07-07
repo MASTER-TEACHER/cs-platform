@@ -25,12 +25,18 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Chris Brown" }],
   creator: "Chris Brown",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
+  },
   openGraph: {
     title: "CS Master",
     description:
       "Interactive GCSE Computer Science lessons, simulators, XP, badges and progress tracking.",
     siteName: "CS Master",
     type: "website",
+    images: ["/logo.png"],
   },
 };
 
