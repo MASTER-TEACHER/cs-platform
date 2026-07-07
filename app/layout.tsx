@@ -7,6 +7,7 @@ import { Toaster } from "react-hot-toast";
 import RequireCourse from "@/components/auth/RequireCourse";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://cs-platform-5cgp.vercel.app"),
   title: {
     default: "CS Master",
     template: "%s | CS Master",
