@@ -6,15 +6,19 @@ import Sidebar from "@/components/layout/Sidebar";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  const publicPages = ["/login", "/register", "/forgot-password", "/auth-test"];
+  const publicPages = [
+    "/",
+    "/landing",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/auth-test",
+  ];
+
   const isPublicPage = publicPages.includes(pathname);
 
   if (isPublicPage) {
-    return (
-      <main className="min-h-screen bg-slate-100 p-6">
-        {children}
-      </main>
-    );
+    return <main className="min-h-screen bg-slate-100">{children}</main>;
   }
 
   return (
