@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { registerUser } from "@/services/authService";
@@ -17,8 +19,6 @@ export default function RegisterPage() {
 
     try {
       await registerUser(name, email, password, role);
-
-      // Redirect to the student dashboard
       router.push("/dashboard");
     } catch (error) {
       alert("Registration failed. Please check your details.");
@@ -26,58 +26,78 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-900">
-        Create Account
-      </h1>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-6 py-12">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+        <div className="flex justify-center">
+          <Image
+            src="/logo.png"
+            alt="CS Master Logo"
+            width={150}
+            height={150}
+            priority
+            className="rounded-2xl"
+          />
+        </div>
 
-      <p className="mt-2 text-slate-600">
-        Join CS Master as a student or teacher.
-      </p>
+        <h1 className="mt-6 text-center text-3xl font-bold text-slate-900">
+          Create your account
+        </h1>
 
-      <form onSubmit={handleRegister} className="mt-6 space-y-4">
-        <input
-          className="w-full rounded-lg border p-3"
-          type="text"
-          placeholder="Full name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
+        <p className="mt-2 text-center text-slate-600">
+          Start your CS Master learning journey today.
+        </p>
 
-        <select
-          className="w-full rounded-lg border p-3"
-          value={role}
-          onChange={(e) =>
-            setRole(e.target.value as "student" | "teacher")
-          }
-        >
-          <option value="student">Student</option>
-          <option value="teacher">Teacher</option>
-        </select>
+        <form onSubmit={handleRegister} className="mt-8 space-y-4">
+          <input
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            type="text"
+            placeholder="Full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
 
-        <input
-          className="w-full rounded-lg border p-3"
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+          <select
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            value={role}
+            onChange={(e) =>
+              setRole(e.target.value as "student" | "teacher")
+            }
+          >
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+          </select>
 
-        <input
-          className="w-full rounded-lg border p-3"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+          <input
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <button className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white">
-          Create Account
-        </button>
-      </form>
-    </div>
+          <input
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button className="w-full rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700">
+            Create Account
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Already have an account?{" "}
+          <Link href="/login" className="font-bold text-blue-600">
+            Login
+          </Link>
+        </p>
+      </div>
+    </main>
   );
 }

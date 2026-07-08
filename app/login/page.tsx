@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginUser } from "@/services/authService";
@@ -15,8 +17,6 @@ export default function LoginPage() {
 
     try {
       await loginUser(email, password);
-
-      // Redirect to the student dashboard
       router.push("/dashboard");
     } catch (error) {
       alert("Login failed. Check your email and password.");
@@ -24,32 +24,58 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl bg-white p-8 shadow-sm">
-      <h1 className="text-2xl font-bold text-slate-900">Login</h1>
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-6 py-12">
+      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+        <div className="flex justify-center">
+          <Image
+            src="/logo.png"
+            alt="CS Master Logo"
+            width={150}
+            height={150}
+            priority
+            className="rounded-2xl"
+          />
+        </div>
 
-      <p className="mt-2 text-slate-600">
-        Welcome back to CS Master.
-      </p>
+        <h1 className="mt-6 text-center text-3xl font-bold text-slate-900">
+          Welcome back
+        </h1>
 
-      <form onSubmit={handleLogin} className="mt-6 space-y-4">
-        <input
-          className="w-full rounded-lg border p-3"
-          type="email"
-          placeholder="Email address"
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <p className="mt-2 text-center text-slate-600">
+          Continue your Computer Science learning journey.
+        </p>
 
-        <input
-          className="w-full rounded-lg border p-3"
-          type="password"
-          placeholder="Password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <form onSubmit={handleLogin} className="mt-8 space-y-4">
+          <input
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <button className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white">
-          Login
-        </button>
-      </form>
-    </div>
+          <input
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button className="w-full rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700">
+            Login
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="font-bold text-blue-600">
+            Create one
+          </Link>
+        </p>
+      </div>
+    </main>
   );
 }
