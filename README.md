@@ -1,36 +1,218 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🚀 CS Master
 
-## Getting Started
+> **Learn • Practice • Master**
 
-First, run the development server:
+CS Master is a modern GCSE Computer Science learning platform designed to help students learn through interactive lessons, live simulators, quizzes, progress tracking and gamification.
+
+Built with **Next.js**, **TypeScript**, **Firebase** and **Tailwind CSS**, CS Master provides a personalised learning experience that makes Computer Science engaging and accessible.
+
+---
+
+## 🌍 Live Demo
+
+**Website**
+
+https://cs-platform-5cgp.vercel.app
+
+---
+
+# ✨ Features
+
+### 📚 Interactive Learning
+
+- Structured GCSE Computer Science lessons
+- Clear explanations
+- Worked examples
+- Practice questions
+- Exam-style questions
+
+---
+
+### 🧠 Interactive Simulators
+
+- Binary Conversion Simulator
+- Hexadecimal Conversion Simulator
+- Real-time feedback
+- XP rewards
+- Challenge mode
+
+---
+
+### 🏆 Gamification
+
+- XP System
+- Achievement Badges
+- Daily Missions
+- Weekly Goals
+- Learning Journey
+- Progress Tracking
+
+---
+
+### 👤 Student Dashboard
+
+Students can monitor:
+
+- Current XP
+- Lessons Completed
+- Learning Streak
+- Badges Earned
+- Course Progress
+- Current Mission
+
+---
+
+### 🔐 Authentication
+
+- Firebase Authentication
+- Student Accounts
+- Teacher Accounts
+- Secure Login
+- Secure Registration
+
+---
+
+## 🛠️ Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| Next.js 16 | Frontend Framework |
+| TypeScript | Type Safety |
+| Tailwind CSS | UI Styling |
+| Firebase Authentication | User Authentication |
+| Firestore | Database |
+| Vercel | Hosting |
+| GitHub | Version Control |
+
+---
+
+# 📂 Project Structure
+
+```text
+app/
+components/
+contexts/
+hooks/
+lib/
+services/
+types/
+public/
+
+```
+
+---
+
+# 📸 Screenshots
+
+*(To be added in Version 1.0.1)*
+
+- Landing Page
+- Dashboard
+- Login
+- Register
+- Binary Simulator
+- Hex Simulator
+- Student Profile
+
+---
+
+# 🚀 Getting Started
+
+Clone the repository
+
+```bash
+git clone https://github.com/MASTER-TEACHER/cs-platform.git
+```
+
+Install dependencies
+
+```bash
+npm install
+```
+
+Run the development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Build for production
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+# 🎯 Roadmap
 
-To learn more about Next.js, take a look at the following resources:
+## ✅ Version 1.0
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Landing Page
+- Student Dashboard
+- Authentication
+- Binary Simulator
+- Hex Simulator
+- XP System
+- Badges
+- Daily Missions
+- Weekly Goals
+- Responsive Design
+- Live Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🚀 Version 1.1
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Quiz Engine
+- Quiz Results
+- Leaderboards
+- Certificates
+- Additional GCSE Topics
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🌟 Version 2.0
+
+- AI Tutor
+- Teacher Dashboard
+- Student Analytics
+- Adaptive Learning
+- School Accounts
+- Classroom Management
+
+---
+
+# 👨‍💻 About the Developer
+
+**Chris Brown**
+
+Computer Science Teacher | Head of Computer Science | Educational Technology Enthusiast
+
+This project was created to provide an engaging and interactive platform for students studying GCSE Computer Science, combining evidence-informed teaching approaches with modern web technologies.
+
+---
+
+# 🤝 Contributing
+
+Contributions, ideas and suggestions are welcome.
+
+Please open an Issue or submit a Pull Request.
+
+---
+
+# 📄 License
+
+This project is licensed under the MIT License.
+
+---
+
+# ⭐ Support
+
+If you found this project useful, please consider giving it a ⭐ on GitHub.
+
+---
+
+**CS Master**
+
+**Learn • Practice • Master**
