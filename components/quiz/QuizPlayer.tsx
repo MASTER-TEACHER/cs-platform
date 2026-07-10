@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 import { Quiz } from "@/types/quiz";
+import { useAuth } from "@/contexts/AuthContext";
+import { saveQuizResult } from "@/services/quizService";
 
 type Props = {
   quiz: Quiz;
@@ -31,10 +34,13 @@ function getMessage(scorePercent: number) {
 }
 
 export default function QuizPlayer({ quiz }: Props) {
+  const { user } = useAuth();
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
   const [timeLeft, setTimeLeft] = useState(8 * 60);
+  const [resultSaved, setResultSaved] = useState(false);
 
   const currentQuestion = quiz.questions[currentIndex];
   const selectedAnswer = answers[currentQuestion.id] || "";
@@ -102,6 +108,44 @@ export default function QuizPlayer({ quiz }: Props) {
     return () => clearInterval(timer);
   }, [showResults]);
 
+  useEffect(() => {
+    async function saveResult() {
+      if (!showResults || resultSaved || !user) return;
+
+      try {
+        await saveQuizResult({
+          uid: user.uid,
+          quizId: quiz.id,
+          topicId: quiz.topicId,
+          title: quiz.title,
+          scorePercent,
+          correctCount,
+          totalQuestions: quiz.questions.length,
+          earnedXP,
+        });
+
+        setResultSaved(true);
+        toast.success(`Quiz result saved! +${earnedXP} XP`);
+      } catch (error) {
+        console.error("Quiz save error:", error);
+        toast.error("Could not save quiz result.");
+      }
+    }
+
+    saveResult();
+  }, [
+    showResults,
+    resultSaved,
+    user,
+    quiz.id,
+    quiz.topicId,
+    quiz.title,
+    quiz.questions.length,
+    scorePercent,
+    correctCount,
+    earnedXP,
+  ]);
+
   function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -142,9 +186,7 @@ export default function QuizPlayer({ quiz }: Props) {
 
           <p className="mt-6 text-6xl font-extrabold">{scorePercent}%</p>
 
-          <p className="mt-3 text-2xl font-bold">
-            {getGrade(scorePercent)}
-          </p>
+          <p className="mt-3 text-2xl font-bold">{getGrade(scorePercent)}</p>
 
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-4">
@@ -160,17 +202,17 @@ export default function QuizPlayer({ quiz }: Props) {
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">Time Remaining</p>
-              <p className="mt-1 text-2xl font-bold">{formatTime(timeLeft)}</p>
+              <p className="text-sm text-blue-100">Saved</p>
+              <p className="mt-1 text-2xl font-bold">
+                {resultSaved ? "✅ Yes" : user ? "Saving..." : "Login needed"}
+              </p>
             </div>
           </div>
         </Card>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
-            <h2 className="text-2xl font-bold text-slate-900">
-              ✅ Strengths
-            </h2>
+            <h2 className="text-2xl font-bold text-slate-900">✅ Strengths</h2>
 
             {strengths.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -215,9 +257,7 @@ export default function QuizPlayer({ quiz }: Props) {
         </div>
 
         <Card>
-          <h2 className="text-2xl font-bold text-slate-900">
-            Review Answers
-          </h2>
+          <h2 className="text-2xl font-bold text-slate-900">Review Answers</h2>
 
           <div className="mt-6 space-y-4">
             {quiz.questions.map((question, index) => {
