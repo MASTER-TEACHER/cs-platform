@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
 import toast from "react-hot-toast";
+
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
-import { Quiz } from "@/types/quiz";
 import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
 import { saveQuizResult } from "@/services/quizService";
+import { saveAssignmentResult } from "@/services/assignmentResultService";
+import type { Quiz } from "@/types/quiz";
 
 type Props = {
   quiz: Quiz;
 };
+
+const QUIZ_DURATION_SECONDS = 8 * 60;
 
 function getGrade(scorePercent: number) {
   if (scorePercent >= 90) return "Grade 9";
@@ -30,17 +37,25 @@ function getMessage(scorePercent: number) {
   if (scorePercent >= 75) return "Excellent work!";
   if (scorePercent >= 60) return "Good progress!";
   if (scorePercent >= 40) return "You are getting there.";
+
   return "Keep practising. You can improve this.";
 }
 
 export default function QuizPlayer({ quiz }: Props) {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
+
+  const assignmentId = searchParams.get("assignment");
+
+  const quizSaveInProgress = useRef(false);
+  const assignmentSaveInProgress = useRef(false);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(8 * 60);
+  const [timeLeft, setTimeLeft] = useState(QUIZ_DURATION_SECONDS);
   const [resultSaved, setResultSaved] = useState(false);
+  const [assignmentResultSaved, setAssignmentResultSaved] = useState(false);
 
   const currentQuestion = quiz.questions[currentIndex];
   const selectedAnswer = answers[currentQuestion.id] || "";
@@ -56,61 +71,76 @@ export default function QuizPlayer({ quiz }: Props) {
     );
   }, [quiz.questions]);
 
-  const correctCount = quiz.questions.filter(
-    (question) =>
-      answers[question.id]?.trim().toLowerCase() ===
-      question.correctAnswer.trim().toLowerCase()
-  ).length;
+  const correctCount = quiz.questions.filter((question) => {
+    const userAnswer = answers[question.id]?.trim().toLowerCase();
+    const correctAnswer = question.correctAnswer.trim().toLowerCase();
+
+    return userAnswer === correctAnswer;
+  }).length;
 
   const scorePercent = Math.round(
     (correctCount / quiz.questions.length) * 100
   );
 
   const earnedXP = quiz.questions.reduce((total, question) => {
-    const isCorrect =
-      answers[question.id]?.trim().toLowerCase() ===
-      question.correctAnswer.trim().toLowerCase();
+    const userAnswer = answers[question.id]?.trim().toLowerCase();
+    const correctAnswer = question.correctAnswer.trim().toLowerCase();
 
-    return isCorrect ? total + question.xpReward : total;
+    return userAnswer === correctAnswer
+      ? total + question.xpReward
+      : total;
   }, 0);
 
   const strengths = quiz.questions
-    .filter(
-      (question) =>
-        answers[question.id]?.trim().toLowerCase() ===
-        question.correctAnswer.trim().toLowerCase()
-    )
+    .filter((question) => {
+      const userAnswer = answers[question.id]?.trim().toLowerCase();
+      const correctAnswer = question.correctAnswer.trim().toLowerCase();
+
+      return userAnswer === correctAnswer;
+    })
     .slice(0, 3);
 
   const needsPractice = quiz.questions
-    .filter(
-      (question) =>
-        answers[question.id]?.trim().toLowerCase() !==
-        question.correctAnswer.trim().toLowerCase()
-    )
+    .filter((question) => {
+      const userAnswer = answers[question.id]?.trim().toLowerCase();
+      const correctAnswer = question.correctAnswer.trim().toLowerCase();
+
+      return userAnswer !== correctAnswer;
+    })
     .slice(0, 3);
 
   useEffect(() => {
-    if (showResults) return;
+    if (showResults) {
+      return;
+    }
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
+    const timer = window.setInterval(() => {
+      setTimeLeft((previousTime) => {
+        if (previousTime <= 1) {
+          window.clearInterval(timer);
           setShowResults(true);
           return 0;
         }
 
-        return prev - 1;
+        return previousTime - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => window.clearInterval(timer);
   }, [showResults]);
 
   useEffect(() => {
-    async function saveResult() {
-      if (!showResults || resultSaved || !user) return;
+    async function saveNormalQuizResult() {
+      if (
+        !showResults ||
+        resultSaved ||
+        !user ||
+        quizSaveInProgress.current
+      ) {
+        return;
+      }
+
+      quizSaveInProgress.current = true;
 
       try {
         await saveQuizResult({
@@ -129,10 +159,12 @@ export default function QuizPlayer({ quiz }: Props) {
       } catch (error) {
         console.error("Quiz save error:", error);
         toast.error("Could not save quiz result.");
+      } finally {
+        quizSaveInProgress.current = false;
       }
     }
 
-    saveResult();
+    void saveNormalQuizResult();
   }, [
     showResults,
     resultSaved,
@@ -146,6 +178,80 @@ export default function QuizPlayer({ quiz }: Props) {
     earnedXP,
   ]);
 
+  useEffect(() => {
+    async function saveLinkedAssignmentResult() {
+      if (
+        !showResults ||
+        !assignmentId ||
+        assignmentResultSaved ||
+        !user ||
+        assignmentSaveInProgress.current
+      ) {
+        return;
+      }
+
+      assignmentSaveInProgress.current = true;
+
+      try {
+        const assignmentRef = doc(db, "assignments", assignmentId);
+        const assignmentSnapshot = await getDoc(assignmentRef);
+
+        if (!assignmentSnapshot.exists()) {
+          toast.error("The linked assignment could not be found.");
+          return;
+        }
+
+        const assignment = assignmentSnapshot.data();
+
+        if (!assignment.classId || !assignment.teacherId) {
+          throw new Error(
+            "The assignment is missing its class or teacher information."
+          );
+        }
+
+        await saveAssignmentResult({
+          assignmentId,
+          studentId: user.uid,
+          classId: assignment.classId,
+          teacherId: assignment.teacherId,
+          assignmentType: "quiz",
+          resourceId: assignment.resourceId || quiz.topicId,
+          score: correctCount,
+          totalQuestions: quiz.questions.length,
+          percentage: scorePercent,
+          earnedXP,
+          timeTakenSeconds: QUIZ_DURATION_SECONDS - timeLeft,
+        });
+
+        setAssignmentResultSaved(true);
+        toast.success("Assignment marked as completed.");
+      } catch (error) {
+        console.error("Assignment result save error:", error);
+
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not mark the assignment as completed."
+        );
+      } finally {
+        assignmentSaveInProgress.current = false;
+      }
+    }
+
+    void saveLinkedAssignmentResult();
+  }, [
+    showResults,
+    assignmentId,
+    assignmentResultSaved,
+    user,
+    quiz.topicId,
+    quiz.questions.length,
+    correctCount,
+    scorePercent,
+    earnedXP,
+    timeLeft,
+  ]);
+
   function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -154,23 +260,24 @@ export default function QuizPlayer({ quiz }: Props) {
   }
 
   function saveAnswer(answer: string) {
-    setAnswers((prev) => ({
-      ...prev,
+    setAnswers((previousAnswers) => ({
+      ...previousAnswers,
       [currentQuestion.id]: answer,
     }));
   }
 
   function goNext() {
     if (currentIndex < quiz.questions.length - 1) {
-      setCurrentIndex((prev) => prev + 1);
-    } else {
-      setShowResults(true);
+      setCurrentIndex((previousIndex) => previousIndex + 1);
+      return;
     }
+
+    setShowResults(true);
   }
 
   function goPrevious() {
     if (currentIndex > 0) {
-      setCurrentIndex((prev) => prev - 1);
+      setCurrentIndex((previousIndex) => previousIndex - 1);
     }
   }
 
@@ -180,39 +287,73 @@ export default function QuizPlayer({ quiz }: Props) {
         <Card className="border-0 bg-gradient-to-r from-blue-700 to-indigo-700 text-center text-white">
           <div className="text-6xl">🎉</div>
 
-          <h1 className="mt-4 text-4xl font-bold">Quiz Complete</h1>
+          <h1 className="mt-4 text-4xl font-bold">
+            Quiz Complete
+          </h1>
 
-          <p className="mt-3 text-blue-100">{getMessage(scorePercent)}</p>
+          <p className="mt-3 text-blue-100">
+            {getMessage(scorePercent)}
+          </p>
 
-          <p className="mt-6 text-6xl font-extrabold">{scorePercent}%</p>
+          <p className="mt-6 text-6xl font-extrabold">
+            {scorePercent}%
+          </p>
 
-          <p className="mt-3 text-2xl font-bold">{getGrade(scorePercent)}</p>
+          <p className="mt-3 text-2xl font-bold">
+            {getGrade(scorePercent)}
+          </p>
 
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">Correct Answers</p>
+              <p className="text-sm text-blue-100">
+                Correct Answers
+              </p>
+
               <p className="mt-1 text-2xl font-bold">
                 {correctCount} / {quiz.questions.length}
               </p>
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">XP Earned</p>
-              <p className="mt-1 text-2xl font-bold">⭐ {earnedXP}</p>
+              <p className="text-sm text-blue-100">
+                XP Earned
+              </p>
+
+              <p className="mt-1 text-2xl font-bold">
+                ⭐ {earnedXP}
+              </p>
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">Saved</p>
-              <p className="mt-1 text-2xl font-bold">
-                {resultSaved ? "✅ Yes" : user ? "Saving..." : "Login needed"}
+              <p className="text-sm text-blue-100">
+                Saved
               </p>
+
+              <p className="mt-1 text-2xl font-bold">
+                {resultSaved
+                  ? "✅ Yes"
+                  : user
+                    ? "Saving..."
+                    : "Login needed"}
+              </p>
+
+              {assignmentId && (
+                <p className="mt-2 text-sm text-blue-100">
+                  Assignment:{" "}
+                  {assignmentResultSaved
+                    ? "✅ Completed"
+                    : "Saving..."}
+                </p>
+              )}
             </div>
           </div>
         </Card>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
-            <h2 className="text-2xl font-bold text-slate-900">✅ Strengths</h2>
+            <h2 className="text-2xl font-bold text-slate-900">
+              ✅ Strengths
+            </h2>
 
             {strengths.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -227,7 +368,8 @@ export default function QuizPlayer({ quiz }: Props) {
               </div>
             ) : (
               <p className="mt-4 text-slate-600">
-                No strengths identified yet. Try the quiz again after revising.
+                No strengths identified yet. Try the quiz again after
+                revising.
               </p>
             )}
           </Card>
@@ -257,11 +399,15 @@ export default function QuizPlayer({ quiz }: Props) {
         </div>
 
         <Card>
-          <h2 className="text-2xl font-bold text-slate-900">Review Answers</h2>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Review Answers
+          </h2>
 
           <div className="mt-6 space-y-4">
             {quiz.questions.map((question, index) => {
-              const userAnswer = answers[question.id] || "No answer";
+              const userAnswer =
+                answers[question.id] || "No answer";
+
               const isCorrect =
                 userAnswer.trim().toLowerCase() ===
                 question.correctAnswer.trim().toLowerCase();
@@ -306,15 +452,20 @@ export default function QuizPlayer({ quiz }: Props) {
           Quiz
         </p>
 
-        <h1 className="mt-2 text-3xl font-bold">{quiz.title}</h1>
+        <h1 className="mt-2 text-3xl font-bold">
+          {quiz.title}
+        </h1>
 
-        <p className="mt-2 text-blue-100">{quiz.description}</p>
+        <p className="mt-2 text-blue-100">
+          {quiz.description}
+        </p>
 
         <div className="mt-6">
           <div className="mb-2 flex justify-between text-sm font-semibold text-blue-100">
             <span>
               Question {currentIndex + 1} of {quiz.questions.length}
             </span>
+
             <span>{progress}% complete</span>
           </div>
 
@@ -323,18 +474,33 @@ export default function QuizPlayer({ quiz }: Props) {
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">⏱ Time Left</p>
-            <p className="mt-1 text-2xl font-bold">{formatTime(timeLeft)}</p>
+            <p className="text-sm text-blue-100">
+              ⏱ Time Left
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {formatTime(timeLeft)}
+            </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">⭐ XP Available</p>
-            <p className="mt-1 text-2xl font-bold">{totalXP}</p>
+            <p className="text-sm text-blue-100">
+              ⭐ XP Available
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {totalXP}
+            </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">📚 Estimated Time</p>
-            <p className="mt-1 text-2xl font-bold">{quiz.estimatedTime}</p>
+            <p className="text-sm text-blue-100">
+              📚 Estimated Time
+            </p>
+
+            <p className="mt-1 text-2xl font-bold">
+              {quiz.estimatedTime}
+            </p>
           </div>
         </div>
       </Card>
@@ -368,7 +534,7 @@ export default function QuizPlayer({ quiz }: Props) {
           ) : (
             <input
               value={selectedAnswer}
-              onChange={(e) => saveAnswer(e.target.value)}
+              onChange={(event) => saveAnswer(event.target.value)}
               placeholder="Type your answer..."
               className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
             />
