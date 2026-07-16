@@ -4,13 +4,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { registerUser } from "@/services/authService";
+import { registerStudent } from "@/services/authService";
 
 export default function RegisterPage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"student" | "teacher">("student");
+  //const [role, setRole] = useState<"student" | "teacher">("student");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
@@ -18,7 +18,11 @@ export default function RegisterPage() {
     e.preventDefault();
 
     try {
-      await registerUser(name, email, password, role);
+      await registerStudent(
+  name.trim(),
+  email.trim().toLowerCase(),
+  password
+);
       router.push("/dashboard");
     } catch (error) {
       alert("Registration failed. Please check your details.");
@@ -57,18 +61,7 @@ export default function RegisterPage() {
             required
           />
 
-          <select
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
-            value={role}
-            onChange={(e) =>
-              setRole(e.target.value as "student" | "teacher")
-            }
-          >
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-          </select>
-
-          <input
+                    <input
             className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none"
             type="email"
             placeholder="Email address"

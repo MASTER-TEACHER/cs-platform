@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,11 +8,11 @@ import { updateUserCourseSelection } from "@/services/userService";
 import toast from "react-hot-toast";
 
 export default function CourseSelector() {
-  const router = useRouter();
   const { user } = useAuth();
 
   const [qualification, setQualification] = useState("");
   const [examBoard, setExamBoard] = useState("");
+  const [saving, setSaving] = useState(false);
 
   async function handleContinue() {
     if (!user) {
@@ -26,15 +25,32 @@ export default function CourseSelector() {
       return;
     }
 
+    setSaving(true);
+
     try {
-      await updateUserCourseSelection(user.uid, qualification, examBoard);
+      await updateUserCourseSelection(
+        user.uid,
+        qualification,
+        examBoard
+      );
 
-      toast.success("Course saved successfully!");
+      toast.success("Course saved successfully.");
 
-      router.push("/dashboard");
+      /*
+       * A full navigation ensures useUserProfile reloads the newly
+       * updated Firestore document before RequireCourse checks it.
+       */
+      window.location.assign("/dashboard");
     } catch (error) {
       console.error("Course selection error:", error);
-      toast.error("Something went wrong saving your course.");
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong saving your course."
+      );
+
+      setSaving(false);
     }
   }
 
@@ -49,15 +65,18 @@ export default function CourseSelector() {
       </p>
 
       <div className="mt-8">
-        <h2 className="font-semibold text-slate-900">Qualification</h2>
+        <h2 className="font-semibold text-slate-900">
+          Qualification
+        </h2>
 
         <div className="mt-4 space-y-3">
           {["gcse", "alevel"].map((item) => (
             <button
               key={item}
               type="button"
+              disabled={saving}
               onClick={() => setQualification(item)}
-              className={`w-full rounded-xl border p-4 text-left font-semibold capitalize transition ${
+              className={`w-full rounded-xl border p-4 text-left font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 qualification === item
                   ? "border-blue-600 bg-blue-50 text-blue-700"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -70,28 +89,40 @@ export default function CourseSelector() {
       </div>
 
       <div className="mt-8">
-        <h2 className="font-semibold text-slate-900">Exam Board</h2>
+        <h2 className="font-semibold text-slate-900">
+          Exam Board
+        </h2>
 
         <div className="mt-4 space-y-3">
           {["ocr", "aqa", "edexcel"].map((board) => (
             <button
               key={board}
               type="button"
+              disabled={saving}
               onClick={() => setExamBoard(board)}
-              className={`w-full rounded-xl border p-4 text-left font-semibold capitalize transition ${
+              className={`w-full rounded-xl border p-4 text-left font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-60 ${
                 examBoard === board
                   ? "border-blue-600 bg-blue-50 text-blue-700"
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              {board}
+              {board === "ocr"
+                ? "OCR"
+                : board === "aqa"
+                  ? "AQA"
+                  : "Edexcel"}
             </button>
           ))}
         </div>
       </div>
 
       <div className="mt-8">
-        <Button onClick={handleContinue}>Continue →</Button>
+        <Button
+          onClick={handleContinue}
+          disabled={saving}
+        >
+          {saving ? "Saving Course..." : "Continue →"}
+        </Button>
       </div>
     </Card>
   );

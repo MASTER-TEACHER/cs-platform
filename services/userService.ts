@@ -1,4 +1,10 @@
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { UserProfile, UserRole } from "@/types/database";
 
@@ -53,15 +59,23 @@ export async function updateUserCourseSelection(
 ) {
   const userRef = doc(db, "users", uid);
 
-  const currentCourse = `${qualification}-${examBoard}`;
+  const normalisedQualification = qualification
+    .trim()
+    .toLowerCase();
 
-  await setDoc(
-    userRef,
-    {
-      qualification,
-      examBoard,
-      currentCourse,
-    },
-    { merge: true }
-  );
+  const normalisedExamBoard = examBoard
+    .trim()
+    .toLowerCase();
+
+  const currentCourse =
+    `${normalisedQualification}-${normalisedExamBoard}`;
+
+  await updateDoc(userRef, {
+    qualification: normalisedQualification,
+    examBoard: normalisedExamBoard,
+    currentCourse,
+    updatedAt: serverTimestamp(),
+  });
+
+  return currentCourse;
 }
