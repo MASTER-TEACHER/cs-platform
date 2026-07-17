@@ -19,13 +19,23 @@ function initialiseFirebaseAdmin() {
   const privateKeyBase64 =
     process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64;
 
-  /*
-   * Vercel uses the Base64 environment variable.
-   * Base64 avoids multiline private-key formatting problems.
-   */
-  if (projectId && clientEmail && privateKeyBase64) {
+  const runningOnVercel = Boolean(process.env.VERCEL);
+
+  if (runningOnVercel) {
+    const missingVariables = [
+      !projectId && "FIREBASE_ADMIN_PROJECT_ID",
+      !clientEmail && "FIREBASE_ADMIN_CLIENT_EMAIL",
+      !privateKeyBase64 && "FIREBASE_ADMIN_PRIVATE_KEY_BASE64",
+    ].filter(Boolean);
+
+    if (missingVariables.length > 0) {
+      throw new Error(
+        `Missing Firebase Admin variables: ${missingVariables.join(", ")}`
+      );
+    }
+
     const privateKey = Buffer.from(
-      privateKeyBase64,
+      privateKeyBase64!,
       "base64"
     ).toString("utf8");
 
@@ -34,23 +44,19 @@ function initialiseFirebaseAdmin() {
       !privateKey.includes("-----END PRIVATE KEY-----")
     ) {
       throw new Error(
-        "The decoded Firebase Admin private key is invalid."
+        "FIREBASE_ADMIN_PRIVATE_KEY_BASE64 did not decode to a valid PEM key."
       );
     }
 
     return initializeApp({
       credential: cert({
-        projectId,
-        clientEmail,
+        projectId: projectId!,
+        clientEmail: clientEmail!,
         privateKey,
       }),
     });
   }
 
-  /*
-   * Local development fallback.
-   * This uses GOOGLE_APPLICATION_CREDENTIALS.
-   */
   return initializeApp({
     credential: applicationDefault(),
   });
