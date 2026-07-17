@@ -8,17 +8,36 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 function initialiseFirebaseAdmin() {
-  if (getApps().length > 0) {
-    return getApps()[0];
+  const existingApps = getApps();
+
+  if (existingApps.length > 0) {
+    return existingApps[0];
   }
 
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKey =
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const privateKeyBase64 =
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64;
 
-  // Use Vercel environment variables if present
-  if (projectId && clientEmail && privateKey) {
+  /*
+   * Vercel uses the Base64 environment variable.
+   * Base64 avoids multiline private-key formatting problems.
+   */
+  if (projectId && clientEmail && privateKeyBase64) {
+    const privateKey = Buffer.from(
+      privateKeyBase64,
+      "base64"
+    ).toString("utf8");
+
+    if (
+      !privateKey.includes("-----BEGIN PRIVATE KEY-----") ||
+      !privateKey.includes("-----END PRIVATE KEY-----")
+    ) {
+      throw new Error(
+        "The decoded Firebase Admin private key is invalid."
+      );
+    }
+
     return initializeApp({
       credential: cert({
         projectId,
@@ -28,7 +47,10 @@ function initialiseFirebaseAdmin() {
     });
   }
 
-  // Otherwise use GOOGLE_APPLICATION_CREDENTIALS locally
+  /*
+   * Local development fallback.
+   * This uses GOOGLE_APPLICATION_CREDENTIALS.
+   */
   return initializeApp({
     credential: applicationDefault(),
   });
