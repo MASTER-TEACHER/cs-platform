@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
-
+export const runtime = "nodejs";
 type RouteContext = {
   params: Promise<{
     teacherId: string;
