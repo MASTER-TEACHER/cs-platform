@@ -9,9 +9,12 @@ import ProgrammingModeTabs from "@/components/programming/ProgrammingModeTabs";
 import ProgrammingStats from "@/components/programming/ProgrammingStats";
 import SimulatorDifficulty from "@/components/Simulators/common/SimulatorDifficulty";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProgrammingChallenges } from "@/data/programming/challenges";
 import { useProgrammingProgress } from "@/hooks/useProgrammingProgress";
 import { evaluateProgrammingChallenge } from "@/lib/programming/evaluator";
+import {
+  chooseNextProgrammingChallenge,
+  getProgrammingChallenges,
+} from "@/services/programmingChallengeService";
 import { runPython } from "@/services/pythonRunnerService";
 import type {
   ProgrammingChallenge,
@@ -47,7 +50,11 @@ function toQualification(
 function toExamBoard(
   value: string | null | undefined,
 ): ProgrammingExamBoard | null {
-  if (value === "AQA" || value === "OCR" || value === "EDEXCEL") {
+  if (
+    value === "AQA" ||
+    value === "OCR" ||
+    value === "EDEXCEL"
+  ) {
     return value;
   }
 
@@ -60,12 +67,18 @@ export default function ProgrammingWorkspace() {
   const qualification = toQualification(profile?.qualification);
   const examBoard = toExamBoard(profile?.examBoard);
 
-  const [mode, setMode] = useState<ProgrammingMode>("practice");
+  const [mode, setMode] =
+    useState<ProgrammingMode>("practice");
+
   const [difficulty, setDifficulty] =
     useState<ProgrammingDifficulty>("foundation");
-  const [challengeIndex, setChallengeIndex] = useState(0);
 
-  const challenges = useMemo(() => {
+  const [currentChallengeId, setCurrentChallengeId] =
+    useState<string | null>(null);
+
+  const progress = useProgrammingProgress();
+
+  const availableChallenges = useMemo(() => {
     if (mode === "explore") return [];
 
     return getProgrammingChallenges({
@@ -76,29 +89,79 @@ export default function ProgrammingWorkspace() {
     });
   }, [difficulty, examBoard, mode, qualification]);
 
-  const challenge: ProgrammingChallenge | null =
-    mode === "explore"
-      ? null
-      : challenges[challengeIndex % Math.max(challenges.length, 1)] ?? null;
+  const challenge = useMemo<ProgrammingChallenge | null>(() => {
+    if (mode === "explore") return null;
 
-  const [code, setCode] = useState(exploreStarter);
-  const [stdin, setStdin] = useState("Ada");
-  const [runResult, setRunResult] = useState<PythonRunResult>(emptyRun);
+    const existing =
+      availableChallenges.find(
+        (item) => item.id === currentChallengeId,
+      ) ?? null;
+
+    if (existing) return existing;
+
+    return chooseNextProgrammingChallenge({
+      qualification,
+      examBoard,
+      difficulty,
+      mode,
+      completedChallengeIds:
+        progress.completedChallengeIds,
+      recentChallengeIds:
+        progress.history
+          .slice(0, 5)
+          .map((item) => item.challengeId),
+      preferredWeakSkills:
+        progress.weakSkills,
+    });
+  }, [
+    availableChallenges,
+    currentChallengeId,
+    difficulty,
+    examBoard,
+    mode,
+    progress.completedChallengeIds,
+    progress.history,
+    progress.weakSkills,
+    qualification,
+  ]);
+
+  const [code, setCode] =
+    useState(exploreStarter);
+
+  const [stdin, setStdin] =
+    useState("Ada");
+
+  const [runResult, setRunResult] =
+    useState<PythonRunResult>(emptyRun);
+
   const [evaluation, setEvaluation] =
     useState<ProgrammingEvaluation | null>(null);
-  const [running, setRunning] = useState(false);
-  const [checking, setChecking] = useState(false);
-  const [showHint, setShowHint] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(
-    "The first Python run may take longer while the browser loads the runtime.",
-  );
 
-  const progress = useProgrammingProgress();
+  const [running, setRunning] =
+    useState(false);
+
+  const [checking, setChecking] =
+    useState(false);
+
+  const [hintLevel, setHintLevel] =
+    useState<0 | 1 | 2>(0);
+
+  const [showExplanation, setShowExplanation] =
+    useState(false);
+
+  const [statusMessage, setStatusMessage] =
+    useState(
+      "The first Python run may take longer while the browser loads the runtime.",
+    );
 
   useEffect(() => {
-    setChallengeIndex(0);
-  }, [difficulty, examBoard, mode, qualification]);
+    setCurrentChallengeId(null);
+  }, [
+    difficulty,
+    examBoard,
+    mode,
+    qualification,
+  ]);
 
   useEffect(() => {
     if (mode === "explore") {
@@ -106,21 +169,31 @@ export default function ProgrammingWorkspace() {
       setStdin("Ada");
     } else if (challenge) {
       setCode(challenge.starterCode);
-      setStdin(challenge.stdin ?? challenge.visibleTests[0]?.input ?? "");
+      setStdin(
+        challenge.stdin ??
+          challenge.visibleTests[0]?.input ??
+          "",
+      );
+
+      if (challenge.id !== currentChallengeId) {
+        setCurrentChallengeId(challenge.id);
+      }
     }
 
     setRunResult(emptyRun);
     setEvaluation(null);
-    setShowHint(false);
+    setHintLevel(0);
     setShowExplanation(false);
-  }, [challenge, mode]);
+  }, [challenge, currentChallengeId, mode]);
 
   async function handleRun() {
     if (!code.trim()) return;
 
     setRunning(true);
     setRunResult(emptyRun);
-    setStatusMessage("Running Python in the browser...");
+    setStatusMessage(
+      "Running Python in the browser...",
+    );
 
     try {
       const result = await runPython({
@@ -135,7 +208,10 @@ export default function ProgrammingWorkspace() {
         setStatusMessage(
           "Execution stopped because it exceeded the time limit.",
         );
-      } else if (result.error || result.stderr) {
+      } else if (
+        result.error ||
+        result.stderr
+      ) {
         setStatusMessage(
           "Python returned an error. Use the console to debug it.",
         );
@@ -150,7 +226,10 @@ export default function ProgrammingWorkspace() {
             ? error.message
             : "Python could not run.",
       });
-      setStatusMessage("The Python runtime could not start.");
+
+      setStatusMessage(
+        "The Python runtime could not start.",
+      );
     } finally {
       setRunning(false);
     }
@@ -162,17 +241,28 @@ export default function ProgrammingWorkspace() {
     setChecking(true);
     setEvaluation(null);
     setShowExplanation(false);
-    setStatusMessage("Checking visible and hidden tests...");
+    setStatusMessage(
+      "Checking visible and hidden tests...",
+    );
 
     try {
-      const result = await evaluateProgrammingChallenge(challenge, code);
+      const result =
+        await evaluateProgrammingChallenge(
+          challenge,
+          code,
+        );
 
       setEvaluation(result);
 
-      const awarded = progress.recordAttempt(challenge, result.passed);
+      const awarded =
+        progress.recordAttempt(
+          challenge,
+          result.passed,
+        );
 
       if (result.passed) {
         setShowExplanation(true);
+
         setStatusMessage(
           awarded > 0
             ? `All tests passed. +${awarded} XP awarded.`
@@ -200,21 +290,72 @@ export default function ProgrammingWorkspace() {
       setStdin("Ada");
     } else if (challenge) {
       setCode(challenge.starterCode);
-      setStdin(challenge.stdin ?? challenge.visibleTests[0]?.input ?? "");
+      setStdin(
+        challenge.stdin ??
+          challenge.visibleTests[0]?.input ??
+          "",
+      );
     }
 
     setRunResult(emptyRun);
     setEvaluation(null);
-    setShowHint(false);
+    setHintLevel(0);
     setShowExplanation(false);
     setStatusMessage("Challenge reset.");
   }
 
   function nextChallenge() {
-    if (challenges.length === 0) return;
+    if (
+      mode === "explore" ||
+      availableChallenges.length === 0
+    ) {
+      return;
+    }
 
-    setChallengeIndex((current) => (current + 1) % challenges.length);
-    setStatusMessage("New challenge loaded.");
+    const next =
+      chooseNextProgrammingChallenge({
+        qualification,
+        examBoard,
+        difficulty,
+        mode,
+        completedChallengeIds:
+          progress.completedChallengeIds,
+        recentChallengeIds: [
+          challenge?.id ?? "",
+          ...progress.history
+            .slice(0, 5)
+            .map((item) => item.challengeId),
+        ].filter(Boolean),
+        preferredWeakSkills:
+          progress.weakSkills,
+      });
+
+    if (!next) {
+      setStatusMessage(
+        "No additional challenge is available for this combination yet.",
+      );
+      return;
+    }
+
+    setCurrentChallengeId(next.id);
+    setStatusMessage(
+      "New curriculum-matched challenge loaded.",
+    );
+  }
+
+  function requestHint() {
+    setHintLevel((current) => {
+      if (current === 0) return 1;
+
+      if (
+        current === 1 &&
+        challenge?.secondHint
+      ) {
+        return 2;
+      }
+
+      return current;
+    });
   }
 
   return (
@@ -225,13 +366,15 @@ export default function ProgrammingWorkspace() {
             <p className="text-sm font-black uppercase tracking-widest text-blue-600">
               Live programming practice
             </p>
+
             <h1 className="mt-2 text-4xl font-black text-slate-950">
               Python Programming Workspace
             </h1>
+
             <p className="mt-3 max-w-3xl leading-7 text-slate-600">
               Write, run, debug and test Python directly in your browser.
-              Practice challenges adapt to your selected qualification and
-              exam board.
+              Practice adapts to qualification, exam board, difficulty and
+              programming performance.
             </p>
           </div>
 
@@ -239,15 +382,21 @@ export default function ProgrammingWorkspace() {
             <p className="text-xs font-black uppercase tracking-widest text-slate-400">
               Current curriculum
             </p>
+
             <p className="mt-1 font-black">
               {examBoard ?? "General"}{" "}
-              {qualification === "A_LEVEL" ? "A-Level" : "GCSE"}
+              {qualification === "A_LEVEL"
+                ? "A-Level"
+                : "GCSE"}
             </p>
           </div>
         </div>
       </section>
 
-      <ProgrammingModeTabs value={mode} onChange={setMode} />
+      <ProgrammingModeTabs
+        value={mode}
+        onChange={setMode}
+      />
 
       {mode !== "explore" && (
         <SimulatorDifficulty
@@ -265,15 +414,30 @@ export default function ProgrammingWorkspace() {
         bestStreak={progress.bestStreak}
       />
 
+      {progress.weakSkills.length > 0 && (
+        <section className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4">
+          <p className="font-black text-violet-950">
+            Adaptive focus
+          </p>
+
+          <p className="mt-1 text-sm text-violet-800">
+            CS Master is prioritising:{" "}
+            {progress.weakSkills.join(", ")}.
+          </p>
+        </section>
+      )}
+
       <section className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
-        <p className="font-bold text-blue-950">{statusMessage}</p>
+        <p className="font-bold text-blue-950">
+          {statusMessage}
+        </p>
       </section>
 
       {mode !== "explore" && (
         <ProgrammingChallengePanel
           challenge={challenge}
           evaluation={evaluation}
-          showHint={showHint}
+          hintLevel={hintLevel}
           showExplanation={showExplanation}
         />
       )}
@@ -283,12 +447,14 @@ export default function ProgrammingWorkspace() {
           <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
             Explore mode
           </p>
+
           <h2 className="mt-2 text-2xl font-black text-emerald-950">
             Your own Python
           </h2>
+
           <p className="mt-3 leading-7 text-emerald-900">
-            Change the program and standard input freely. Code runs inside a
-            browser Web Worker and is stopped if it runs for too long.
+            Change the program and standard input freely. Code runs inside
+            the browser worker and is stopped if it runs for too long.
           </p>
         </section>
       )}
@@ -308,13 +474,17 @@ export default function ProgrammingWorkspace() {
             >
               Standard input
             </label>
+
             <p className="mt-1 text-sm leading-6 text-slate-500">
               Put each input() value on a new line.
             </p>
+
             <textarea
               id="programming-stdin"
               value={stdin}
-              onChange={(event) => setStdin(event.target.value)}
+              onChange={(event) =>
+                setStdin(event.target.value)
+              }
               disabled={running || checking}
               spellCheck={false}
               className="mt-3 min-h-28 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
@@ -327,7 +497,9 @@ export default function ProgrammingWorkspace() {
             error={runResult.error}
             running={running}
             durationMs={
-              runResult.durationMs > 0 ? runResult.durationMs : undefined
+              runResult.durationMs > 0
+                ? runResult.durationMs
+                : undefined
             }
           />
         </div>
@@ -337,20 +509,33 @@ export default function ProgrammingWorkspace() {
         <button
           type="button"
           onClick={handleRun}
-          disabled={running || checking || !code.trim()}
+          disabled={
+            running ||
+            checking ||
+            !code.trim()
+          }
           className="rounded-xl bg-slate-950 px-5 py-3 font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {running ? "Running..." : "Run code"}
+          {running
+            ? "Running..."
+            : "Run code"}
         </button>
 
         {mode !== "explore" && (
           <button
             type="button"
             onClick={handleCheck}
-            disabled={running || checking || !challenge || !code.trim()}
+            disabled={
+              running ||
+              checking ||
+              !challenge ||
+              !code.trim()
+            }
             className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {checking ? "Checking..." : "Check solution"}
+            {checking
+              ? "Checking..."
+              : "Check solution"}
           </button>
         )}
 
@@ -358,20 +543,34 @@ export default function ProgrammingWorkspace() {
           <>
             <button
               type="button"
-              onClick={() => setShowHint((current) => !current)}
-              className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 font-black text-amber-800 transition hover:bg-amber-100"
+              onClick={requestHint}
+              disabled={
+                hintLevel === 2 ||
+                (hintLevel === 1 &&
+                  !challenge.secondHint)
+              }
+              className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-40"
             >
-              {showHint ? "Hide hint" : "Hint"}
+              {hintLevel === 0
+                ? "Hint 1"
+                : hintLevel === 1 &&
+                    challenge.secondHint
+                  ? "Hint 2"
+                  : "Hints shown"}
             </button>
 
             <button
               type="button"
               onClick={() =>
-                setShowExplanation((current) => !current)
+                setShowExplanation(
+                  (current) => !current,
+                )
               }
               className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 font-black text-violet-800 transition hover:bg-violet-100"
             >
-              {showExplanation ? "Hide explanation" : "Show explanation"}
+              {showExplanation
+                ? "Hide explanation"
+                : "Show explanation"}
             </button>
           </>
         )}
@@ -385,20 +584,23 @@ export default function ProgrammingWorkspace() {
           Reset
         </button>
 
-        {mode !== "explore" && challenges.length > 1 && (
-          <button
-            type="button"
-            onClick={nextChallenge}
-            disabled={running || checking}
-            className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-40"
-          >
-            New challenge
-          </button>
-        )}
+        {mode !== "explore" &&
+          availableChallenges.length > 1 && (
+            <button
+              type="button"
+              onClick={nextChallenge}
+              disabled={running || checking}
+              className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-40"
+            >
+              New challenge
+            </button>
+          )}
 
         <button
           type="button"
-          onClick={() => setRunResult(emptyRun)}
+          onClick={() =>
+            setRunResult(emptyRun)
+          }
           disabled={running}
           className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
         >
@@ -410,12 +612,12 @@ export default function ProgrammingWorkspace() {
         <h2 className="text-xl font-black text-amber-950">
           Learning-runner boundaries
         </h2>
+
         <p className="mt-3 leading-7 text-amber-900">
           Python runs on the student's device rather than on the CS Master
-          server. Browser, network and process-control modules are blocked and
-          long-running code is terminated. This is designed for educational
-          practice; it should not be described as a security sandbox for
-          hostile code.
+          server. Browser, network and process-control modules are blocked
+          and long-running code is terminated. This is educational
+          isolation, not a hostile-code security sandbox.
         </p>
       </section>
 
@@ -426,36 +628,46 @@ export default function ProgrammingWorkspace() {
           </h2>
 
           <div className="mt-4 divide-y divide-slate-100">
-            {progress.history.slice(0, 8).map((item) => (
-              <article
-                key={item.id}
-                className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <p className="font-black text-slate-800">
-                    {item.challengeTitle}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {item.mode} · {item.difficulty}
-                  </p>
-                </div>
+            {progress.history
+              .slice(0, 8)
+              .map((item) => (
+                <article
+                  key={item.id}
+                  className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-black text-slate-800">
+                      {item.challengeTitle}
+                    </p>
 
-                <div className="text-sm font-black">
-                  <span
-                    className={
-                      item.passed ? "text-emerald-700" : "text-red-700"
-                    }
-                  >
-                    {item.passed ? "Passed" : "Not passed"}
-                  </span>
-                  {item.xpAwarded > 0 && (
-                    <span className="ml-3 text-blue-700">
-                      +{item.xpAwarded} XP
+                    <p className="text-sm text-slate-500">
+                      {item.mode} ·{" "}
+                      {item.difficulty} ·{" "}
+                      {item.skills.join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="text-sm font-black">
+                    <span
+                      className={
+                        item.passed
+                          ? "text-emerald-700"
+                          : "text-red-700"
+                      }
+                    >
+                      {item.passed
+                        ? "Passed"
+                        : "Not passed"}
                     </span>
-                  )}
-                </div>
-              </article>
-            ))}
+
+                    {item.xpAwarded > 0 && (
+                      <span className="ml-3 text-blue-700">
+                        +{item.xpAwarded} XP
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
           </div>
         </section>
       )}

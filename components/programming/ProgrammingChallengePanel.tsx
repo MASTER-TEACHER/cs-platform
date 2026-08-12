@@ -6,14 +6,14 @@ import type {
 type Props = {
   challenge: ProgrammingChallenge | null;
   evaluation: ProgrammingEvaluation | null;
-  showHint: boolean;
+  hintLevel: 0 | 1 | 2;
   showExplanation: boolean;
 };
 
 export default function ProgrammingChallengePanel({
   challenge,
   evaluation,
-  showHint,
+  hintLevel,
   showExplanation,
 }: Props) {
   if (!challenge) {
@@ -34,9 +34,11 @@ export default function ProgrammingChallengePanel({
             ? "Debugging challenge"
             : "Programming challenge"}
         </p>
+
         <h2 className="mt-2 text-2xl font-black text-slate-950">
           {challenge.title}
         </h2>
+
         <p className="mt-3 leading-7 text-slate-700">
           {challenge.description}
         </p>
@@ -49,8 +51,17 @@ export default function ProgrammingChallengePanel({
             {challenge.xpReward} XP
           </span>
           <span className="rounded-full bg-white px-3 py-1 text-slate-700">
-            {challenge.topicId}
+            ~{challenge.estimatedMinutes} min
           </span>
+
+          {challenge.skills.map((skill) => (
+            <span
+              key={skill}
+              className="rounded-full bg-blue-100 px-3 py-1 text-blue-700"
+            >
+              {skill}
+            </span>
+          ))}
         </div>
       </section>
 
@@ -61,8 +72,14 @@ export default function ProgrammingChallengePanel({
 
         <div className="mt-4 space-y-3">
           {challenge.visibleTests.map((test) => (
-            <article key={test.id} className="rounded-2xl bg-slate-50 p-4">
-              <p className="font-black text-slate-800">{test.label}</p>
+            <article
+              key={test.id}
+              className="rounded-2xl bg-slate-50 p-4"
+            >
+              <p className="font-black text-slate-800">
+                {test.label}
+              </p>
+
               <div className="mt-2 grid gap-3 text-sm md:grid-cols-2">
                 <div>
                   <p className="font-bold text-slate-500">Input</p>
@@ -70,8 +87,11 @@ export default function ProgrammingChallengePanel({
                     {test.input || "(none)"}
                   </pre>
                 </div>
+
                 <div>
-                  <p className="font-bold text-slate-500">Expected output</p>
+                  <p className="font-bold text-slate-500">
+                    Expected output
+                  </p>
                   <pre className="mt-1 whitespace-pre-wrap font-mono text-slate-800">
                     {test.expectedOutput}
                   </pre>
@@ -89,13 +109,24 @@ export default function ProgrammingChallengePanel({
         )}
       </section>
 
-      {showHint && (
+      {hintLevel >= 1 && (
         <section className="rounded-3xl border border-amber-200 bg-amber-50 p-5">
           <p className="text-xs font-black uppercase tracking-widest text-amber-700">
-            Hint
+            Hint 1
           </p>
           <p className="mt-2 leading-7 text-amber-950">
             {challenge.hint}
+          </p>
+        </section>
+      )}
+
+      {hintLevel >= 2 && challenge.secondHint && (
+        <section className="rounded-3xl border border-orange-200 bg-orange-50 p-5">
+          <p className="text-xs font-black uppercase tracking-widest text-orange-700">
+            Hint 2
+          </p>
+          <p className="mt-2 leading-7 text-orange-950">
+            {challenge.secondHint}
           </p>
         </section>
       )}
@@ -110,35 +141,15 @@ export default function ProgrammingChallengePanel({
         >
           <h3
             className={`text-xl font-black ${
-              evaluation.passed ? "text-emerald-950" : "text-red-950"
+              evaluation.passed
+                ? "text-emerald-950"
+                : "text-red-950"
             }`}
           >
             {evaluation.passed
               ? "All tests passed"
               : `${evaluation.passedCount}/${evaluation.totalCount} tests passed`}
           </h3>
-
-          <div className="mt-4 space-y-2">
-            {evaluation.results.map((result) => (
-              <div
-                key={result.id}
-                className="rounded-xl bg-white/70 p-3 text-sm"
-              >
-                <p className="font-black text-slate-800">
-                  {result.passed ? "✓" : "✕"}{" "}
-                  {result.hidden ? "Hidden test" : result.label}
-                </p>
-
-                {!result.passed && !result.hidden && (
-                  <div className="mt-2 font-mono text-xs text-slate-600">
-                    <p>Expected: {result.expectedOutput || "(no output)"}</p>
-                    <p>Actual: {result.actualOutput || "(no output)"}</p>
-                    {result.error && <p>Error: {result.error}</p>}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
         </section>
       )}
 

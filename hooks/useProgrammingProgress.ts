@@ -6,9 +6,11 @@ import { useProgress } from "@/contexts/ProgressContext";
 import type {
   ProgrammingChallenge,
   ProgrammingProgressSnapshot,
+  ProgrammingSkill,
+  ProgrammingSkillProgress,
 } from "@/types/programming";
 
-const STORAGE_KEY = "cs-master-programming-progress-v1";
+const STORAGE_KEY = "cs-master-programming-progress-v2";
 
 const emptyProgress: ProgrammingProgressSnapshot = {
   attempts: 0,
@@ -18,6 +20,7 @@ const emptyProgress: ProgrammingProgressSnapshot = {
   bestStreak: 0,
   completedChallengeIds: [],
   history: [],
+  skillProgress: {},
 };
 
 function loadProgress(): ProgrammingProgressSnapshot {
@@ -36,10 +39,41 @@ function loadProgress(): ProgrammingProgressSnapshot {
         ? parsed.completedChallengeIds
         : [],
       history: Array.isArray(parsed.history) ? parsed.history : [],
+      skillProgress:
+        parsed.skillProgress && typeof parsed.skillProgress === "object"
+          ? parsed.skillProgress
+          : {},
     };
   } catch {
     return emptyProgress;
   }
+}
+
+function updateSkillProgress(
+  current: Partial<Record<ProgrammingSkill, ProgrammingSkillProgress>>,
+  skills: ProgrammingSkill[],
+  passed: boolean,
+): Partial<Record<ProgrammingSkill, ProgrammingSkillProgress>> {
+  const next = { ...current };
+
+  for (const skill of skills) {
+    const existing = next[skill] ?? {
+      attempts: 0,
+      correct: 0,
+      accuracy: 0,
+    };
+
+    const attempts = existing.attempts + 1;
+    const correct = existing.correct + (passed ? 1 : 0);
+
+    next[skill] = {
+      attempts,
+      correct,
+      accuracy: Math.round((correct / attempts) * 100),
+    };
+  }
+
+  return next;
 }
 
 export function useProgrammingProgress() {
@@ -64,8 +98,22 @@ export function useProgrammingProgress() {
 
   const accuracy = useMemo(() => {
     if (progress.attempts === 0) return 0;
-    return Math.round((progress.correct / progress.attempts) * 100);
+
+    return Math.round(
+      (progress.correct / progress.attempts) * 100,
+    );
   }, [progress.attempts, progress.correct]);
+
+  const weakSkills = useMemo(() => {
+    return Object.entries(progress.skillProgress)
+      .filter(([, value]) => value && value.attempts >= 2)
+      .sort(
+        (a, b) =>
+          (a[1]?.accuracy ?? 100) - (b[1]?.accuracy ?? 100),
+      )
+      .slice(0, 4)
+      .map(([skill]) => skill as ProgrammingSkill);
+  }, [progress.skillProgress]);
 
   const recordAttempt = useCallback(
     (challenge: ProgrammingChallenge, passed: boolean) => {
@@ -90,6 +138,11 @@ export function useProgrammingProgress() {
             passed && !alreadyCompleted
               ? [...current.completedChallengeIds, challenge.id]
               : current.completedChallengeIds,
+          skillProgress: updateSkillProgress(
+            current.skillProgress,
+            challenge.skills,
+            passed,
+          ),
           history: [
             {
               id: `${challenge.id}-${Date.now()}`,
@@ -97,16 +150,20 @@ export function useProgrammingProgress() {
               challengeTitle: challenge.title,
               mode: challenge.mode,
               difficulty: challenge.difficulty,
+              skills: challenge.skills,
               passed,
               xpAwarded: awarded,
               createdAt: new Date().toISOString(),
             },
             ...current.history,
-          ].slice(0, 30),
+          ].slice(0, 50),
         };
       });
 
-      if (awarded > 0) addXP(awarded);
+      if (awarded > 0) {
+        addXP(awarded);
+      }
+
       return awarded;
     },
     [addXP],
@@ -120,6 +177,7 @@ export function useProgrammingProgress() {
     ...progress,
     hydrated,
     accuracy,
+    weakSkills,
     recordAttempt,
     resetProgrammingProgress,
   };

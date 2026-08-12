@@ -3,6 +3,13 @@ export type ProgrammingDifficulty = "foundation" | "intermediate" | "higher";
 export type ProgrammingQualification = "GCSE" | "A_LEVEL";
 export type ProgrammingExamBoard = "AQA" | "OCR" | "EDEXCEL";
 
+export type ProgrammingSkill =
+  | "sequence" | "input-output" | "variables" | "arithmetic"
+  | "selection" | "iteration" | "strings" | "lists" | "functions"
+  | "validation" | "testing" | "debugging" | "files"
+  | "searching" | "sorting" | "recursion" | "oop"
+  | "stacks" | "queues" | "algorithmic-thinking";
+
 export type ProgrammingTestCase = {
   id: string;
   label: string;
@@ -16,6 +23,8 @@ export type ProgrammingChallenge = {
   title: string;
   description: string;
   topicId: string;
+  curriculumTopicIds: string[];
+  skills: ProgrammingSkill[];
   mode: Exclude<ProgrammingMode, "explore">;
   difficulty: ProgrammingDifficulty;
   qualifications: ProgrammingQualification[];
@@ -25,40 +34,25 @@ export type ProgrammingChallenge = {
   visibleTests: ProgrammingTestCase[];
   hiddenTests: ProgrammingTestCase[];
   hint: string;
+  secondHint?: string;
   explanation: string;
   examinerTip: string;
   xpReward: number;
+  estimatedMinutes: number;
 };
 
-export type PythonRunRequest = {
-  code: string;
-  stdin?: string;
-  timeoutMs?: number;
-};
-
+export type PythonRunRequest = { code: string; stdin?: string; timeoutMs?: number };
 export type PythonRunResult = {
-  stdout: string;
-  stderr: string;
-  error: string;
-  timedOut: boolean;
-  durationMs: number;
+  stdout: string; stderr: string; error: string; timedOut: boolean; durationMs: number;
 };
 
 export type ProgrammingTestResult = {
-  id: string;
-  label: string;
-  passed: boolean;
-  hidden: boolean;
-  expectedOutput: string;
-  actualOutput: string;
-  error: string;
+  id: string; label: string; passed: boolean; hidden: boolean;
+  expectedOutput: string; actualOutput: string; error: string;
 };
 
 export type ProgrammingEvaluation = {
-  passed: boolean;
-  passedCount: number;
-  totalCount: number;
-  results: ProgrammingTestResult[];
+  passed: boolean; passedCount: number; totalCount: number; results: ProgrammingTestResult[];
 };
 
 export type ProgrammingAttemptHistory = {
@@ -67,9 +61,16 @@ export type ProgrammingAttemptHistory = {
   challengeTitle: string;
   mode: Exclude<ProgrammingMode, "explore">;
   difficulty: ProgrammingDifficulty;
+  skills: ProgrammingSkill[];
   passed: boolean;
   xpAwarded: number;
   createdAt: string;
+};
+
+export type ProgrammingSkillProgress = {
+  attempts: number;
+  correct: number;
+  accuracy: number;
 };
 
 export type ProgrammingProgressSnapshot = {
@@ -80,4 +81,20 @@ export type ProgrammingProgressSnapshot = {
   bestStreak: number;
   completedChallengeIds: string[];
   history: ProgrammingAttemptHistory[];
+  skillProgress: Partial<Record<ProgrammingSkill, ProgrammingSkillProgress>>;
+};
+
+export type ProgrammingChallengeFilter = {
+  qualification: ProgrammingQualification;
+  difficulty: ProgrammingDifficulty;
+  mode: Exclude<ProgrammingMode, "explore">;
+  examBoard?: ProgrammingExamBoard | null;
+  topicId?: string | null;
+  skill?: ProgrammingSkill | null;
+};
+
+export type ProgrammingChallengeSelectionContext = ProgrammingChallengeFilter & {
+  completedChallengeIds?: string[];
+  recentChallengeIds?: string[];
+  preferredWeakSkills?: ProgrammingSkill[];
 };
