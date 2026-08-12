@@ -14,7 +14,7 @@ import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { createClass } from "@/services/classService";
+import { createTeacherClass } from "@/services/classService";
 
 type ClassRecord = {
   id: string;
@@ -52,7 +52,7 @@ export default function TeacherClassesPage() {
 
     const classesQuery = query(
       collection(db, "classes"),
-      where("teacherId", "==", user.uid)
+      where("teacherId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
@@ -68,15 +68,13 @@ export default function TeacherClassesPage() {
               name: data.name || "Untitled Class",
               yearGroup: data.yearGroup || "Not specified",
               subject: data.subject || "Computer Science",
-              studentIds: Array.isArray(data.studentIds)
-                ? data.studentIds
-                : [],
+              studentIds: Array.isArray(data.studentIds) ? data.studentIds : [],
               assignmentIds: Array.isArray(data.assignmentIds)
                 ? data.assignmentIds
                 : [],
               createdAt: data.createdAt,
             };
-          }
+          },
         );
 
         loadedClasses.sort((a, b) => {
@@ -93,7 +91,7 @@ export default function TeacherClassesPage() {
         console.error("Failed to load classes:", error);
         toast.error("Could not load your classes.");
         setLoadingClasses(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -103,18 +101,18 @@ export default function TeacherClassesPage() {
     () =>
       classes.reduce(
         (total, classItem) => total + classItem.studentIds.length,
-        0
+        0,
       ),
-    [classes]
+    [classes],
   );
 
   const totalAssignments = useMemo(
     () =>
       classes.reduce(
         (total, classItem) => total + classItem.assignmentIds.length,
-        0
+        0,
       ),
-    [classes]
+    [classes],
   );
 
   async function handleCreateClass(event: FormEvent<HTMLFormElement>) {
@@ -132,12 +130,16 @@ export default function TeacherClassesPage() {
 
     setSubmitting(true);
 
+    const academicYear = "2024/2025";
+
     try {
-      await createClass({
+      await createTeacherClass({
+        name: className,
+        subject,
+        yearGroup,
+        academicYear,
         teacherId: user.uid,
-        name: className.trim(),
-        yearGroup: yearGroup.trim(),
-        subject: subject.trim(),
+        teacherName: user.displayName ?? user.email ?? "Teacher",
       });
 
       toast.success("Class created successfully.");
@@ -179,9 +181,7 @@ export default function TeacherClassesPage() {
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Manage Classes
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">Manage Classes</h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
               Create teaching groups, organise students and prepare class

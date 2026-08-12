@@ -11,9 +11,7 @@ type ClassPerformanceProps = {
   topics: TopicPerformance[];
 };
 
-export default function ClassPerformance({
-  topics,
-}: ClassPerformanceProps) {
+export default function ClassPerformance({ topics }: ClassPerformanceProps) {
   return (
     <Card>
       <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
@@ -38,9 +36,7 @@ export default function ClassPerformance({
               <div className="mb-3 flex items-center justify-between gap-4">
                 <p className="font-bold text-slate-900">{topic.topic}</p>
 
-                <p className="font-bold text-blue-700">
-                  {topic.averageScore}%
-                </p>
+                <p className="font-bold text-blue-700">{topic.averageScore}%</p>
               </div>
 
               <ProgressBar value={topic.averageScore} />

@@ -1,7 +1,4 @@
-export type QuizQuestionType =
-  | "multipleChoice"
-  | "trueFalse"
-  | "shortAnswer";
+export type QuizQuestionType = "multipleChoice" | "trueFalse" | "shortAnswer";
 
 export interface QuizQuestion {
   id: string;

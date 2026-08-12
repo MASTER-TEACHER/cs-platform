@@ -50,8 +50,7 @@ export const binaryTopic: Topic = {
       ],
       explanation:
         "To convert binary to denary, add the place values where the binary digit is 1. For example, 1011 uses 8, 2 and 1.",
-      workedExample:
-        "1011 = 8 + 0 + 2 + 1 = 11.",
+      workedExample: "1011 = 8 + 0 + 2 + 1 = 11.",
       practiceQuestions: [
         { question: "Convert binary 1010 to denary.", answer: "10" },
         { question: "Convert denary 6 to binary.", answer: "110" },
@@ -76,8 +75,7 @@ export const binaryTopic: Topic = {
       ],
       explanation:
         "Binary addition follows rules similar to denary addition, but only uses 0 and 1. For example, 1 + 1 gives 10 in binary.",
-      workedExample:
-        "101 + 011 = 1000.",
+      workedExample: "101 + 011 = 1000.",
       practiceQuestions: [
         { question: "What is 1 + 1 in binary?", answer: "10" },
         { question: "Add 101 and 010.", answer: "111" },

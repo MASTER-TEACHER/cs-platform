@@ -1,0 +1,51 @@
+# Interactive Learning Polish
+
+## Replace these files
+
+- `types/interactiveLesson.ts`
+- `services/lessonProgressService.ts`
+- `services/progressService.ts`
+- `components/lesson/CompleteLessonButton.tsx`
+- `components/lesson/LessonCompleteModal.tsx`
+- `components/lesson-engine/InteractiveLessonEngine.tsx`
+
+## Improvements
+
+- step changes and responses continue to save
+- audio voice and speed are saved with a short debounce
+- practice and checkpoint accuracy are calculated
+- `lessonProgress.status` becomes `completed`
+- XP and completion are updated in one Firestore transaction
+- duplicate XP is prevented
+- completion summary shows XP, accuracy, mastery impact and review date
+- achievements remain supported
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\types\interactiveLesson.ts" `
+  ".\services\lessonProgressService.ts" `
+  ".\services\progressService.ts" `
+  ".\components\lesson\CompleteLessonButton.tsx" `
+  ".\components\lesson\LessonCompleteModal.tsx" `
+  ".\components\lesson-engine\InteractiveLessonEngine.tsx"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+## Test
+
+1. Complete guided practice and checkpoint questions.
+2. Finish the lesson.
+3. Confirm the modal shows accuracy, XP, mastery impact and review date.
+4. Confirm Firestore stores:
+   - `status: completed`
+   - `practiceAccuracy`
+   - `checkpointAccuracy`
+   - `overallAccuracy`
+   - `masteryImpact`
+   - `reviewAt`
+5. Complete the same lesson again and confirm no additional XP is awarded.
+6. Change audio voice and speed, leave the lesson and return.

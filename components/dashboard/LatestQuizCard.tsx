@@ -18,9 +18,7 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
   if (!quiz) {
     return (
       <Card>
-        <h2 className="text-xl font-bold text-slate-900">
-          📝 Latest Quiz
-        </h2>
+        <h2 className="text-xl font-bold text-slate-900">📝 Latest Quiz</h2>
 
         <p className="mt-4 text-slate-600">
           You haven't completed any quizzes yet.
@@ -31,16 +29,11 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
 
   return (
     <Card>
-      <h2 className="text-xl font-bold text-slate-900">
-        📝 Latest Quiz
-      </h2>
+      <h2 className="text-xl font-bold text-slate-900">📝 Latest Quiz</h2>
 
-      <p className="mt-4 text-lg font-semibold">
-        {quiz.title}
-      </p>
+      <p className="mt-4 text-lg font-semibold">{quiz.title}</p>
 
       <div className="mt-6 grid grid-cols-2 gap-4">
-
         <div className="rounded-xl bg-blue-50 p-4">
           <p className="text-sm text-slate-500">Score</p>
           <p className="text-2xl font-bold text-blue-700">
@@ -54,7 +47,6 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
             ⭐ {quiz.earnedXP}
           </p>
         </div>
-
       </div>
 
       <p className="mt-6 text-sm text-slate-600">

@@ -1,5 +1,4 @@
 export interface Progress {
-
   userId: string;
 
   courseId: string;
@@ -15,5 +14,4 @@ export interface Progress {
   score: number;
 
   updatedAt: Date;
-
 }

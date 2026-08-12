@@ -38,9 +38,7 @@ export default function AssignmentDetailsStep({
 
       <div className="mt-6 space-y-5">
         <label className="block">
-          <span className="text-sm font-semibold text-slate-700">
-            Due date
-          </span>
+          <span className="text-sm font-semibold text-slate-700">Due date</span>
 
           <input
             type="date"
@@ -58,9 +56,7 @@ export default function AssignmentDetailsStep({
 
           <textarea
             value={instructions}
-            onChange={(event) =>
-              onInstructionsChange(event.target.value)
-            }
+            onChange={(event) => onInstructionsChange(event.target.value)}
             placeholder="Explain what students need to complete."
             rows={5}
             className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"

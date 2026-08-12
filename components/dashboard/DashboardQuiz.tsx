@@ -19,10 +19,7 @@ export default function DashboardQuiz({
 }: DashboardQuizProps) {
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <LatestQuizCard
-        quiz={recentQuiz}
-        loading={recentQuizLoading}
-      />
+      <LatestQuizCard quiz={recentQuiz} loading={recentQuizLoading} />
 
       <NextBadgeCard
         unlockedBadges={unlockedBadges}

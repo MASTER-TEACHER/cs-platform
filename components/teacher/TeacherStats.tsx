@@ -15,17 +15,9 @@ export default function TeacherStats({
 }: TeacherStatsProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard
-        title="Students"
-        value={students.toString()}
-        icon="👨‍🎓"
-      />
+      <StatCard title="Students" value={students.toString()} icon="👨‍🎓" />
 
-      <StatCard
-        title="Average Quiz"
-        value={`${averageScore}%`}
-        icon="📊"
-      />
+      <StatCard title="Average Quiz" value={`${averageScore}%`} icon="📊" />
 
       <StatCard
         title="Lessons Completed"

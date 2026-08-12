@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 
@@ -47,14 +42,14 @@ export function useStudentAssignmentResults(): UseStudentAssignmentResultsReturn
 
     const resultsQuery = query(
       collection(db, "assignmentResults"),
-      where("studentId", "==", studentId)
+      where("studentId", "==", studentId),
     );
 
     const unsubscribe = onSnapshot(
       resultsQuery,
       (snapshot) => {
-        const loadedResults: StudentAssignmentResult[] =
-          snapshot.docs.map((resultDocument) => {
+        const loadedResults: StudentAssignmentResult[] = snapshot.docs.map(
+          (resultDocument) => {
             const data = resultDocument.data();
 
             return {
@@ -62,37 +57,27 @@ export function useStudentAssignmentResults(): UseStudentAssignmentResultsReturn
               assignmentId: data.assignmentId || "",
               studentId: data.studentId || "",
               percentage:
-                typeof data.percentage === "number"
-                  ? data.percentage
-                  : 0,
-              score:
-                typeof data.score === "number"
-                  ? data.score
-                  : 0,
+                typeof data.percentage === "number" ? data.percentage : 0,
+              score: typeof data.score === "number" ? data.score : 0,
               totalQuestions:
                 typeof data.totalQuestions === "number"
                   ? data.totalQuestions
                   : 0,
-              earnedXP:
-                typeof data.earnedXP === "number"
-                  ? data.earnedXP
-                  : 0,
+              earnedXP: typeof data.earnedXP === "number" ? data.earnedXP : 0,
               status: data.status || "completed",
             };
-          });
+          },
+        );
 
         setResults(loadedResults);
         setLoading(false);
       },
       (error) => {
-        console.error(
-          "Failed to load assignment results:",
-          error
-        );
+        console.error("Failed to load assignment results:", error);
 
         setResults([]);
         setLoading(false);
-      }
+      },
     );
 
     return unsubscribe;

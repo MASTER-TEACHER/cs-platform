@@ -36,9 +36,7 @@ export default function QuizPage() {
 
   const quizzes = useMemo(() => Object.values(quizLibrary), []);
 
-  const builtInQuiz = selectedQuizId
-    ? quizLibrary[selectedQuizId]
-    : null;
+  const builtInQuiz = selectedQuizId ? quizLibrary[selectedQuizId] : null;
 
   const selectedQuiz = generatedQuiz || builtInQuiz;
 
@@ -68,7 +66,7 @@ export default function QuizPage() {
 
       try {
         const quizSnapshot = await getDoc(
-          doc(db, "generatedQuizzes", topicParam as string)
+          doc(db, "generatedQuizzes", topicParam as string),
         );
 
         if (cancelled) {
@@ -92,7 +90,7 @@ export default function QuizPage() {
             (question) =>
               typeof question.question === "string" &&
               Array.isArray(question.options) &&
-              typeof question.correctAnswer === "string"
+              typeof question.correctAnswer === "string",
           )
           .map((question, index) => ({
             id: question.id || `${quizSnapshot.id}-question-${index + 1}`,
@@ -103,9 +101,7 @@ export default function QuizPage() {
             explanation:
               question.explanation || "Review this topic with your teacher.",
             xpReward:
-              typeof question.xpReward === "number"
-                ? question.xpReward
-                : 10,
+              typeof question.xpReward === "number" ? question.xpReward : 10,
           }));
 
         if (questions.length === 0) {
@@ -184,13 +180,10 @@ export default function QuizPage() {
         <p className="mt-3 text-slate-600">{loadError}</p>
 
         <div className="mt-6">
-  <Button
-    variant="secondary"
-    onClick={returnToQuizLibrary}
-  >
-    ← Back to quizzes
-  </Button>
-</div>
+          <Button variant="secondary" onClick={returnToQuizLibrary}>
+            ← Back to quizzes
+          </Button>
+        </div>
       </Card>
     );
   }
@@ -199,10 +192,7 @@ export default function QuizPage() {
     return (
       <div className="space-y-8">
         {!assignmentId && (
-          <Button
-            variant="secondary"
-            onClick={returnToQuizLibrary}
-          >
+          <Button variant="secondary" onClick={returnToQuizLibrary}>
             ← Back to quizzes
           </Button>
         )}
@@ -243,13 +233,9 @@ export default function QuizPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {quizzes.map((quiz) => (
           <Card key={quiz.id}>
-            <h2 className="text-2xl font-bold text-slate-900">
-              {quiz.title}
-            </h2>
+            <h2 className="text-2xl font-bold text-slate-900">{quiz.title}</h2>
 
-            <p className="mt-3 text-slate-600">
-              {quiz.description}
-            </p>
+            <p className="mt-3 text-slate-600">{quiz.description}</p>
 
             <p className="mt-4 text-sm font-semibold text-slate-500">
               ⏱ {quiz.estimatedTime} · {quiz.questions.length} questions

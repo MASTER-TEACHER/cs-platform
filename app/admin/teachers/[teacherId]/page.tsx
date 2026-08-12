@@ -64,16 +64,15 @@ export default function AdminTeacherDetailsPage() {
 
   const { user } = useAuth();
 
-const { profile, loading: profileLoading } =
-  useUserProfile();
+  const { profile, loading: profileLoading } = useUserProfile();
 
   const [teacher, setTeacher] = useState<TeacherRecord | null>(null);
   const [classes, setClasses] = useState<ClassRecord[]>([]);
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
   const [loading, setLoading] = useState(true);
-const [notFound, setNotFound] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
-const [processing, setProcessing] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   const isAdmin = profile?.role === "admin";
 
@@ -92,9 +91,7 @@ const [processing, setProcessing] = useState(false);
         setLoading(true);
         setNotFound(false);
 
-        const teacherSnapshot = await getDoc(
-          doc(db, "users", teacherId)
-        );
+        const teacherSnapshot = await getDoc(doc(db, "users", teacherId));
 
         if (!teacherSnapshot.exists()) {
           setNotFound(true);
@@ -103,29 +100,25 @@ const [processing, setProcessing] = useState(false);
 
         const teacherData = teacherSnapshot.data();
 
-        if (
-          teacherData.role !== "teacher" &&
-          teacherData.role !== "admin"
-        ) {
+        if (teacherData.role !== "teacher" && teacherData.role !== "admin") {
           setNotFound(true);
           return;
         }
 
-        const [classesSnapshot, assignmentsSnapshot] =
-          await Promise.all([
-            getDocs(
-              query(
-                collection(db, "classes"),
-                where("teacherId", "==", teacherId)
-              )
+        const [classesSnapshot, assignmentsSnapshot] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, "classes"),
+              where("teacherId", "==", teacherId),
             ),
-            getDocs(
-              query(
-                collection(db, "assignments"),
-                where("teacherId", "==", teacherId)
-              )
+          ),
+          getDocs(
+            query(
+              collection(db, "assignments"),
+              where("teacherId", "==", teacherId),
             ),
-          ]);
+          ),
+        ]);
 
         const loadedTeacher: TeacherRecord = {
           id: teacherSnapshot.id,
@@ -136,48 +129,38 @@ const [processing, setProcessing] = useState(false);
             teacherData.schoolName ||
             teacherData.school ||
             "School not assigned",
-          status:
-            teacherData.status === "suspended"
-              ? "suspended"
-              : "active",
+          status: teacherData.status === "suspended" ? "suspended" : "active",
           createdAt: teacherData.createdAt,
           teacherApprovedAt: teacherData.teacherApprovedAt,
         };
 
-        const loadedClasses: ClassRecord[] =
-          classesSnapshot.docs
-            .map((classDocument) => {
-              const data = classDocument.data();
+        const loadedClasses: ClassRecord[] = classesSnapshot.docs
+          .map((classDocument) => {
+            const data = classDocument.data();
 
-              return {
-                id: classDocument.id,
-                name: data.name || "Untitled Class",
-                yearGroup: data.yearGroup || "Not specified",
-                subject: data.subject || "Computer Science",
-                studentIds: Array.isArray(data.studentIds)
-                  ? data.studentIds
-                  : [],
-              };
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
+            return {
+              id: classDocument.id,
+              name: data.name || "Untitled Class",
+              yearGroup: data.yearGroup || "Not specified",
+              subject: data.subject || "Computer Science",
+              studentIds: Array.isArray(data.studentIds) ? data.studentIds : [],
+            };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
 
-        const loadedAssignments: AssignmentRecord[] =
-          assignmentsSnapshot.docs
-            .map<AssignmentRecord>((assignmentDocument) => {
-              const data = assignmentDocument.data();
+        const loadedAssignments: AssignmentRecord[] = assignmentsSnapshot.docs
+          .map<AssignmentRecord>((assignmentDocument) => {
+            const data = assignmentDocument.data();
 
-              return {
-                id: assignmentDocument.id,
-                title: data.title || "Untitled Assignment",
-                classId: data.classId || "",
-                type:
-                  data.type === "quiz"
-                    ? "quiz"
-                    : "lesson",
-                status: data.status || "active",
-              };
-            })
-            .sort((a, b) => a.title.localeCompare(b.title));
+            return {
+              id: assignmentDocument.id,
+              title: data.title || "Untitled Assignment",
+              classId: data.classId || "",
+              type: data.type === "quiz" ? "quiz" : "lesson",
+              status: data.status || "active",
+            };
+          })
+          .sort((a, b) => a.title.localeCompare(b.title));
 
         setTeacher(loadedTeacher);
         setClasses(loadedClasses);
@@ -195,11 +178,8 @@ const [processing, setProcessing] = useState(false);
   }, [teacherId, profileLoading, isAdmin]);
 
   const totalStudents = useMemo(
-    () =>
-      new Set(
-        classes.flatMap((classItem) => classItem.studentIds)
-      ).size,
-    [classes]
+    () => new Set(classes.flatMap((classItem) => classItem.studentIds)).size,
+    [classes],
   );
 
   if (profileLoading || loading) {
@@ -244,9 +224,7 @@ const [processing, setProcessing] = useState(false);
   if (notFound || !teacher) {
     return (
       <Card>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Teacher not found
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-900">Teacher not found</h1>
 
         <p className="mt-3 text-slate-600">
           This teacher account does not exist or could not be loaded.
@@ -262,22 +240,18 @@ const [processing, setProcessing] = useState(false);
     );
   }
 
-  async function updateTeacherStatus(
-  action: "suspend" | "restore"
-) {
-  if (!user || !teacher) {
-    toast.error("Unable to update this teacher account.");
-    return;
-  }
+  async function updateTeacherStatus(action: "suspend" | "restore") {
+    if (!user || !teacher) {
+      toast.error("Unable to update this teacher account.");
+      return;
+    }
 
-  setProcessing(true);
+    setProcessing(true);
 
-  try {
-    const adminIdToken = await user.getIdToken(true);
+    try {
+      const adminIdToken = await user.getIdToken(true);
 
-    const response = await fetch(
-      `/api/admin/teachers/${teacher.id}/status`,
-      {
+      const response = await fetch(`/api/admin/teachers/${teacher.id}/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -286,68 +260,61 @@ const [processing, setProcessing] = useState(false);
           action,
           adminIdToken,
         }),
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+
+      if (!contentType.includes("application/json")) {
+        const responseText = await response.text();
+
+        console.error(
+          "Teacher status API returned non-JSON:",
+          response.status,
+          responseText,
+        );
+
+        throw new Error(
+          `The server returned an unexpected response (${response.status}). Check the API route and terminal.`,
+        );
       }
-    );
 
-    const contentType =
-      response.headers.get("content-type") || "";
+      const data = (await response.json()) as {
+        success?: boolean;
+        status?: "active" | "suspended";
+        error?: string;
+      };
 
-    if (!contentType.includes("application/json")) {
-      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error(data.error || "Unable to update the teacher account.");
+      }
 
-      console.error(
-        "Teacher status API returned non-JSON:",
-        response.status,
-        responseText
+      setTeacher((current) =>
+        current
+          ? {
+              ...current,
+              status:
+                data.status ?? (action === "suspend" ? "suspended" : "active"),
+            }
+          : current,
       );
 
-      throw new Error(
-        `The server returned an unexpected response (${response.status}). Check the API route and terminal.`
+      toast.success(
+        action === "suspend"
+          ? "Teacher suspended successfully."
+          : "Teacher restored successfully.",
       );
+    } catch (error) {
+      console.error("Teacher status update error:", error);
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong updating the teacher.",
+      );
+    } finally {
+      setProcessing(false);
     }
-
-    const data = (await response.json()) as {
-      success?: boolean;
-      status?: "active" | "suspended";
-      error?: string;
-    };
-
-    if (!response.ok) {
-      throw new Error(
-        data.error || "Unable to update the teacher account."
-      );
-    }
-
-    setTeacher((current) =>
-      current
-        ? {
-            ...current,
-            status:
-              data.status ??
-              (action === "suspend"
-                ? "suspended"
-                : "active"),
-          }
-        : current
-    );
-
-    toast.success(
-      action === "suspend"
-        ? "Teacher suspended successfully."
-        : "Teacher restored successfully."
-    );
-  } catch (error) {
-    console.error("Teacher status update error:", error);
-
-    toast.error(
-      error instanceof Error
-        ? error.message
-        : "Something went wrong updating the teacher."
-    );
-  } finally {
-    setProcessing(false);
   }
-}
 
   return (
     <div className="space-y-8">
@@ -358,13 +325,9 @@ const [processing, setProcessing] = useState(false);
               Teacher Account
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              {teacher.name}
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">{teacher.name}</h1>
 
-            <p className="mt-3 text-indigo-100">
-              {teacher.email}
-            </p>
+            <p className="mt-3 text-indigo-100">{teacher.email}</p>
           </div>
 
           <Link
@@ -398,11 +361,7 @@ const [processing, setProcessing] = useState(false);
         <SummaryCard
           label="Status"
           value={teacher.status}
-          icon={
-            teacher.status === "active"
-              ? "✅"
-              : "⛔"
-          }
+          icon={teacher.status === "active" ? "✅" : "⛔"}
         />
       </div>
 
@@ -420,16 +379,10 @@ const [processing, setProcessing] = useState(false);
             <DetailRow label="Name" value={teacher.name} />
             <DetailRow label="Email" value={teacher.email} />
             <DetailRow label="Role" value={teacher.role} />
-            <DetailRow
-              label="School"
-              value={teacher.schoolName}
-            />
+            <DetailRow label="School" value={teacher.schoolName} />
             <DetailRow
               label="Approved"
-              value={formatDate(
-                teacher.teacherApprovedAt ||
-                  teacher.createdAt
-              )}
+              value={formatDate(teacher.teacherApprovedAt || teacher.createdAt)}
             />
           </div>
         </Card>
@@ -439,9 +392,7 @@ const [processing, setProcessing] = useState(false);
             Teaching Activity
           </p>
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
-            Classes
-          </h2>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">Classes</h2>
 
           {classes.length === 0 ? (
             <p className="mt-6 text-slate-600">
@@ -454,9 +405,7 @@ const [processing, setProcessing] = useState(false);
                   key={classItem.id}
                   className="rounded-xl border border-slate-200 bg-slate-50 p-4"
                 >
-                  <p className="font-bold text-slate-900">
-                    {classItem.name}
-                  </p>
+                  <p className="font-bold text-slate-900">{classItem.name}</p>
 
                   <p className="mt-1 text-sm text-slate-600">
                     {classItem.yearGroup} · {classItem.subject}
@@ -510,67 +459,49 @@ const [processing, setProcessing] = useState(false);
       </Card>
 
       <Card>
-  <p className="text-sm font-semibold uppercase tracking-wide text-red-600">
-    Account Controls
-  </p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-red-600">
+          Account Controls
+        </p>
 
-  <h2 className="mt-2 text-2xl font-bold text-slate-900">
-    Manage Access
-  </h2>
+        <h2 className="mt-2 text-2xl font-bold text-slate-900">
+          Manage Access
+        </h2>
 
-  <p className="mt-3 text-slate-600">
-    Suspend a teacher to immediately disable login.
-    Restore access at any time.
-  </p>
+        <p className="mt-3 text-slate-600">
+          Suspend a teacher to immediately disable login. Restore access at any
+          time.
+        </p>
 
-  {teacher.status === "active" ? (
-    <button
-      type="button"
-      disabled={processing}
-      onClick={() =>
-        updateTeacherStatus("suspend")
-      }
-      className="mt-6 rounded-xl bg-red-600 px-6 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
-    >
-      {processing
-        ? "Suspending..."
-        : "Suspend Teacher"}
-    </button>
-  ) : (
-    <button
-      type="button"
-      disabled={processing}
-      onClick={() =>
-        updateTeacherStatus("restore")
-      }
-      className="mt-6 rounded-xl bg-green-600 px-6 py-3 font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
-    >
-      {processing
-        ? "Restoring..."
-        : "Restore Teacher"}
-    </button>
-  )}
-</Card>
+        {teacher.status === "active" ? (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => updateTeacherStatus("suspend")}
+            className="mt-6 rounded-xl bg-red-600 px-6 py-3 font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+          >
+            {processing ? "Suspending..." : "Suspend Teacher"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={processing}
+            onClick={() => updateTeacherStatus("restore")}
+            className="mt-6 rounded-xl bg-green-600 px-6 py-3 font-bold text-white transition hover:bg-green-700 disabled:opacity-50"
+          >
+            {processing ? "Restoring..." : "Restore Teacher"}
+          </button>
+        )}
+      </Card>
     </div>
   );
 }
 
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1 rounded-xl bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-sm font-semibold text-slate-500">
-        {label}
-      </span>
+      <span className="text-sm font-semibold text-slate-500">{label}</span>
 
-      <span className="font-bold capitalize text-slate-900">
-        {value}
-      </span>
+      <span className="font-bold capitalize text-slate-900">{value}</span>
     </div>
   );
 }
@@ -588,9 +519,7 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
 
           <p className="mt-2 break-words text-2xl font-bold capitalize text-slate-900">
             {value}

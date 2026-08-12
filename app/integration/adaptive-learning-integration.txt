@@ -1,0 +1,36 @@
+Update services/adaptiveLearningService.ts.
+
+1. Add this import:
+
+import { getExamTrainerAdaptiveEvidence } from "@/services/examTrainerAdaptiveEvidenceService";
+
+2. Add the request to the main Promise.all:
+
+const [
+  profile,
+  quizSnapshot,
+  assignedQuizSnapshot,
+  examAssignments,
+  interventions,
+  examTrainerEvidence,
+] = await Promise.all([
+  getUserProfile(id),
+  ...your existing requests...,
+  getExamTrainerAdaptiveEvidence(id),
+]);
+
+3. After creating:
+
+const evidence: AdaptiveEvidence[] = [];
+
+add:
+
+evidence.push(...examTrainerEvidence);
+
+This makes each saved Exam Trainer topic score available to:
+- topic mastery;
+- Knowledge Map;
+- Adaptive Learning;
+- revision recommendations.
+
+Do not add the evidence twice.

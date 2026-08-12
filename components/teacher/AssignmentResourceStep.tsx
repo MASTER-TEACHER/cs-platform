@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,29 +37,25 @@ const resourceOptions: Array<{
   {
     type: "lesson",
     title: "Existing Lesson",
-    description:
-      "Assign one of the learning resources already in CS Master.",
+    description: "Assign one of the learning resources already in CS Master.",
     icon: "📚",
   },
   {
     type: "quiz",
     title: "Existing Quiz",
-    description:
-      "Assign one of the standard quizzes already available.",
+    description: "Assign one of the standard quizzes already available.",
     icon: "📝",
   },
   {
     type: "ai-quiz",
     title: "AI Quiz",
-    description:
-      "Choose a saved quiz from your AI quiz library.",
+    description: "Choose a saved quiz from your AI quiz library.",
     icon: "🤖",
   },
   {
     type: "exam-paper",
     title: "Exam Paper",
-    description:
-      "Assign an exam-style assessment or practice paper.",
+    description: "Assign an exam-style assessment or practice paper.",
     icon: "📄",
   },
 ];
@@ -72,7 +63,7 @@ const resourceOptions: Array<{
 function createPlaceholderResource(
   type: AssignmentResourceType,
   title: string,
-  description: string
+  description: string,
 ): AssignmentWizardResource {
   return {
     id: type,
@@ -92,7 +83,7 @@ export default function AssignmentResourceStep({
 
   const [selectedType, setSelectedType] =
     useState<AssignmentResourceType | null>(
-      selectedResource?.resourceType || null
+      selectedResource?.resourceType || null,
     );
 
   const [savedQuizzes, setSavedQuizzes] = useState<SavedQuizOption[]>([]);
@@ -116,7 +107,7 @@ export default function AssignmentResourceStep({
 
     const quizzesQuery = query(
       collection(db, "generatedQuizzes"),
-      where("teacherId", "==", user.uid)
+      where("teacherId", "==", user.uid),
     );
 
     const unsubscribe = onSnapshot(
@@ -129,8 +120,7 @@ export default function AssignmentResourceStep({
             return {
               id: quizDocument.id,
               title: data.title || "Untitled Quiz",
-              description:
-                data.description || "Complete the assigned quiz.",
+              description: data.description || "Complete the assigned quiz.",
               qualification: data.qualification || "GCSE",
               examBoard: data.examBoard || "AQA",
               difficulty: data.difficulty || "standard",
@@ -141,12 +131,10 @@ export default function AssignmentResourceStep({
                     ? data.questions.length
                     : 0,
             };
-          }
+          },
         );
 
-        loadedQuizzes.sort((a, b) =>
-          a.title.localeCompare(b.title)
-        );
+        loadedQuizzes.sort((a, b) => a.title.localeCompare(b.title));
 
         setSavedQuizzes(loadedQuizzes);
         setQuizLoadError("");
@@ -157,7 +145,7 @@ export default function AssignmentResourceStep({
         setSavedQuizzes([]);
         setQuizLoadError("Could not load your saved quizzes.");
         setLoadingQuizzes(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -176,8 +164,8 @@ export default function AssignmentResourceStep({
           createPlaceholderResource(
             "ai-quiz",
             "Choose an AI Quiz",
-            "Select a saved quiz from the list below."
-          )
+            "Select a saved quiz from the list below.",
+          ),
         );
       }
 
@@ -185,11 +173,7 @@ export default function AssignmentResourceStep({
     }
 
     onSelect(
-      createPlaceholderResource(
-        option.type,
-        option.title,
-        option.description
-      )
+      createPlaceholderResource(option.type, option.title, option.description),
     );
   }
 

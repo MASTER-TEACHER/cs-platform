@@ -36,7 +36,8 @@ export const hexadecimalTopic: Topic = {
         },
       ],
       examQuestion: {
-        question: "Explain why programmers often use hexadecimal instead of binary.",
+        question:
+          "Explain why programmers often use hexadecimal instead of binary.",
         marks: 2,
         answer:
           "Hexadecimal is shorter and easier to read than binary, while still being easy to convert to and from binary.",

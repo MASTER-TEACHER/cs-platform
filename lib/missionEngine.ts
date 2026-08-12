@@ -6,7 +6,7 @@ export function getDailyMission(completedLessons: string[]) {
 
   for (const topic of topics) {
     const nextLesson = topic.lessons.find(
-      (lesson) => !completedLessons.includes(lesson.id)
+      (lesson) => !completedLessons.includes(lesson.id),
     );
 
     if (nextLesson) {

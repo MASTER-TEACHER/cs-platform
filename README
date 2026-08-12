@@ -1,0 +1,453 @@
+# Lesson Exam Marking Upgrade
+
+Replace/create these files:
+
+- `types/curriculum.ts`
+- `types/interactiveLesson.ts`
+- `services/lessonProgressService.ts`
+- `services/progressService.ts`
+- `components/lesson-engine/LessonExamQuestionStep.tsx`
+- `components/lesson-engine/InteractiveLessonEngine.tsx`
+- `app/api/ai/mark-lesson-question/route.ts` (new)
+
+## Important curriculum improvement
+
+Add `markScheme` arrays to lesson exam questions where possible:
+
+```ts
+examQuestion: {
+  question: "Explain why computers use binary.",
+  marks: 2,
+  answer:
+    "Computer circuits have two reliable states represented by 0 and 1.",
+  markScheme: [
+    "Electronic circuits can represent two reliable states.",
+    "The two states are represented using binary 0 and 1.",
+  ],
+  guidance: [
+    "Award one mark for each distinct valid point.",
+  ],
+}
+```
+
+Without `markScheme`, demo marking derives provisional points from the model
+answer. Explicit mark-scheme points are more accurate.
+
+## Demo mode
+
+To force marking to work without API credit, add this to `.env.local`:
+
+```env
+AI_MARKING_DEMO_MODE=true
+```
+
+Restart the development server after changing `.env.local`.
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\types\curriculum.ts" `
+  ".\types\interactiveLesson.ts" `
+  ".\services\lessonProgressService.ts" `
+  ".\services\progressService.ts" `
+  ".\components\lesson-engine\LessonExamQuestionStep.tsx" `
+  ".\components\lesson-engine\InteractiveLessonEngine.tsx" `
+  ".\app\api\ai\mark-lesson-question\route.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+## Test flow
+
+1. Open a lesson using a fresh or deleted lesson-progress document.
+2. Reach the exam-style question.
+3. Enter `n/a` and mark it: expected `0` marks.
+4. Enter a partially correct answer and mark it.
+5. Confirm matched points, missing points, feedback and improved answer appear.
+6. Confirm Next remains unavailable until the response has been marked.
+7. Finish the lesson and verify Firestore includes:
+   - `examMarking`
+   - `examAccuracy`
+   - exam evidence included in `overallAccuracy`
+
+# Data Representation Batch
+
+Copy all folders into the root of the CS Master project.
+
+New topics:
+
+- Character Encoding
+- Digital Images
+- Digital Sound
+- Data Compression
+
+New simulators:
+
+- Character Encoding Explorer
+- Bitmap Pixel Editor
+- Sound Sampling Explorer
+- Run-Length Encoding
+
+Replace:
+
+- components/lesson/SimulatorRenderer.tsx
+- data/curriculum/topics/index.ts
+
+Run:
+
+```powershell
+npx prettier --write `
+  ".\data\curriculum\topics\characters.ts" `
+  ".\data\curriculum\topics\images.ts" `
+  ".\data\curriculum\topics\sound.ts" `
+  ".\data\curriculum\topics\compression.ts" `
+  ".\components\Simulators\CharacterEncodingSimulator.tsx" `
+  ".\components\Simulators\ImageRepresentationSimulator.tsx" `
+  ".\components\Simulators\SoundSamplingSimulator.tsx" `
+  ".\components\Simulators\CompressionSimulator.tsx" `
+  ".\components\lesson\SimulatorRenderer.tsx" `
+  ".\data\curriculum\topics\index.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# Networks Pack
+
+## Create
+
+- `data/curriculum/topics/networks.ts`
+- `components/Simulators/NetworkBuilderSimulator.tsx`
+- `components/Simulators/NetworkTopologySimulator.tsx`
+- `components/Simulators/ProtocolSimulator.tsx`
+- `components/Simulators/DNSJourneySimulator.tsx`
+- `components/Simulators/PacketRoutingSimulator.tsx`
+
+## Replace
+
+- `components/lesson/SimulatorRenderer.tsx`
+- `data/curriculum/topics/index.ts`
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\data\curriculum\topics\networks.ts" `
+  ".\components\Simulators\NetworkBuilderSimulator.tsx" `
+  ".\components\Simulators\NetworkTopologySimulator.tsx" `
+  ".\components\Simulators\ProtocolSimulator.tsx" `
+  ".\components\Simulators\DNSJourneySimulator.tsx" `
+  ".\components\Simulators\PacketRoutingSimulator.tsx" `
+  ".\components\lesson\SimulatorRenderer.tsx" `
+  ".\data\curriculum\topics\index.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# Cyber Security Pack
+
+## Create
+
+- `data/curriculum/topics/cyber-security.ts`
+- `components/Simulators/CyberSecurityScenarioSimulator.tsx`
+- `components/Simulators/PasswordSecuritySimulator.tsx`
+- `components/Simulators/CaesarCipherSimulator.tsx`
+- `components/Simulators/EncryptionSimulator.tsx`
+- `components/Simulators/SQLInjectionSimulator.tsx`
+
+## Replace
+
+- `components/lesson/SimulatorRenderer.tsx`
+- `data/curriculum/topics/index.ts`
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\data\curriculum\topics\cyber-security.ts" `
+  ".\components\Simulators\CyberSecurityScenarioSimulator.tsx" `
+  ".\components\Simulators\PasswordSecuritySimulator.tsx" `
+  ".\components\Simulators\CaesarCipherSimulator.tsx" `
+  ".\components\Simulators\EncryptionSimulator.tsx" `
+  ".\components\Simulators\SQLInjectionSimulator.tsx" `
+  ".\components\lesson\SimulatorRenderer.tsx" `
+  ".\data\curriculum\topics\index.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# Algorithms Pack
+
+## Create
+
+- `data/curriculum/topics/algorithms.ts`
+- `components/Simulators/LinearSearchSimulator.tsx`
+- `components/Simulators/BinarySearchSimulator.tsx`
+- `components/Simulators/BubbleSortSimulator.tsx`
+- `components/Simulators/MergeSortSimulator.tsx`
+- `components/Simulators/TraceTableSimulator.tsx`
+
+## Replace
+
+- `components/lesson/SimulatorRenderer.tsx`
+- `data/curriculum/topics/index.ts`
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\data\curriculum\topics\algorithms.ts" `
+  ".\components\Simulators\LinearSearchSimulator.tsx" `
+  ".\components\Simulators\BinarySearchSimulator.tsx" `
+  ".\components\Simulators\BubbleSortSimulator.tsx" `
+  ".\components\Simulators\MergeSortSimulator.tsx" `
+  ".\components\Simulators\TraceTableSimulator.tsx" `
+  ".\components\lesson\SimulatorRenderer.tsx" `
+  ".\data\curriculum\topics\index.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# Databases and Boolean Logic Pack
+
+## Create
+
+- `data/curriculum/topics/databases.ts`
+- `data/curriculum/topics/boolean-logic.ts`
+- `components/Simulators/DatabaseSimulator.tsx`
+- `components/Simulators/SQLPlaygroundSimulator.tsx`
+- `components/Simulators/EntityRelationshipSimulator.tsx`
+- `components/Simulators/LogicGateSimulator.tsx`
+- `components/Simulators/TruthTableSimulator.tsx`
+- `components/Simulators/LogicCircuitSimulator.tsx`
+
+## Replace
+
+- `components/lesson/SimulatorRenderer.tsx`
+- `data/curriculum/topics/index.ts`
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\data\curriculum\topics\databases.ts" `
+  ".\data\curriculum\topics\boolean-logic.ts" `
+  ".\components\Simulators\DatabaseSimulator.tsx" `
+  ".\components\Simulators\SQLPlaygroundSimulator.tsx" `
+  ".\components\Simulators\EntityRelationshipSimulator.tsx" `
+  ".\components\Simulators\LogicGateSimulator.tsx" `
+  ".\components\Simulators\TruthTableSimulator.tsx" `
+  ".\components\Simulators\LogicCircuitSimulator.tsx" `
+  ".\components\lesson\SimulatorRenderer.tsx" `
+  ".\data\curriculum\topics\index.ts"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# GCSE Exam Question Trainer Pack
+
+## Create
+
+- `types/examTrainer.ts`
+- `data/examTrainerQuestionBank.ts`
+- `services/examTrainerService.ts`
+- `components/exam-trainer/ExamQuestionTrainer.tsx`
+- `app/exam-trainer/page.tsx`
+
+## Open
+
+After starting the app, visit:
+
+```text
+http://localhost:3000/exam-trainer
+```
+
+## Optional sidebar link
+
+Add this item to the student sidebar links:
+
+```ts
+{
+  href: "/exam-trainer",
+  label: "Exam Trainer",
+  icon: "🧪",
+},
+```
+
+## Existing API dependency
+
+Written-response marking uses:
+
+```text
+/api/ai/mark-lesson-question
+```
+
+This is the same endpoint used by the interactive lesson exam-question step.
+Objective and exact-answer questions are marked locally.
+
+## Current scope
+
+This pack provides:
+
+- topic and difficulty selection;
+- generated mixed-question sessions;
+- timed exams;
+- multiple-choice and written-response support;
+- automatic and AI marking;
+- total score and estimated grade;
+- topic performance;
+- examiner feedback;
+- mark schemes and improved answers.
+
+Firestore persistence, attempt history and teacher analytics should be added in
+the next integration pack after the user flow has been tested.
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\types\examTrainer.ts" `
+  ".\data\examTrainerQuestionBank.ts" `
+  ".\services\examTrainerService.ts" `
+  ".\components\exam-trainer\ExamQuestionTrainer.tsx" `
+  ".\app\exam-trainer\page.tsx"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+# Exam Trainer Persistence Pack
+
+## Create
+
+- `services/examTrainerAttemptService.ts`
+- `services/examTrainerAnalyticsService.ts`
+- `services/examTrainerAdaptiveEvidenceService.ts`
+- `components/exam-trainer/ExamTrainerHistory.tsx`
+- `app/exam-trainer/history/page.tsx`
+
+## Replace
+
+- `types/examTrainer.ts`
+- `components/exam-trainer/ExamQuestionTrainer.tsx`
+
+## Supporting files
+
+- `firebase/firestore-rules-exam-trainer-snippet.txt`
+- `firebase/firestore-indexes-exam-trainer.json`
+- `integration/adaptive-learning-integration.txt`
+- `integration/dashboard-integration.txt`
+- `EXAM-MODE-INTEGRITY-SPECIFICATION.md`
+
+## Features
+
+- creates a Firestore attempt before an exam begins;
+- autosaves answers, question position and remaining time;
+- discovers and resumes an unfinished attempt;
+- saves submitted examiner reports;
+- prevents a submitted attempt from being resumed;
+- writes topic-level result evidence beneath the user profile;
+- provides student exam history;
+- provides dashboard summary analytics;
+- provides an Adaptive Learning evidence adapter.
+
+## Sidebar link
+
+Add beside Exam Trainer:
+
+```tsx
+{
+  href: "/exam-trainer/history",
+  label: "Exam History",
+  icon: "📈",
+},
+```
+
+## Firestore rules
+
+Merge the rule blocks from:
+
+```text
+firebase/firestore-rules-exam-trainer-snippet.txt
+```
+
+into your existing rules. Do not replace all current rules with the snippet.
+
+## Firestore indexes
+
+The two queries use compound indexes. Either:
+
+1. deploy the supplied index definitions after merging them with your existing
+   `firestore.indexes.json`; or
+2. run the page once and follow the Firebase console index-creation link.
+
+## Adaptive Learning
+
+Follow:
+
+```text
+integration/adaptive-learning-integration.txt
+```
+
+This is deliberately provided as a small integration instruction because your
+Adaptive Learning service already contains several project-specific evidence
+sources that must be preserved.
+
+## Format and build
+
+```powershell
+npx prettier --write `
+  ".\types\examTrainer.ts" `
+  ".\services\examTrainerAttemptService.ts" `
+  ".\services\examTrainerAnalyticsService.ts" `
+  ".\services\examTrainerAdaptiveEvidenceService.ts" `
+  ".\components\exam-trainer\ExamQuestionTrainer.tsx" `
+  ".\components\exam-trainer\ExamTrainerHistory.tsx" `
+  ".\app\exam-trainer\history\page.tsx"
+
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+## Test order
+
+1. Start an exam and answer two questions.
+2. Refresh the browser.
+3. Confirm the unfinished-attempt card appears.
+4. Resume and confirm the answers and timer remain.
+5. Submit the paper.
+6. Open `/exam-trainer/history`.
+7. Confirm the result appears once.
+8. Refresh and confirm it is still present.
+9. Complete the Adaptive Learning integration.
+10. Confirm exam topic scores affect mastery recommendations.
+
+CS Master — Batch 01 CPU & Memory Upgrade
+
+Replace these files in your project:
+components/Simulators/CPUSimulator.tsx
+components/Simulators/CPUMemoryTable.tsx
+components/Simulators/CPURegisterCard.tsx
+components/Simulators/MemorySimulator.tsx
+components/Simulators/StorageCapacitySimulator.tsx
+components/Simulators/StorageComparisonSimulator.tsx
+
+What this batch adds:
+
+- Standard Foundation / Intermediate / Higher challenge controls.
+- Standard Questions / Correct / Accuracy / XP / Streak tracking.
+- Hint, Show working, Try again and New question/scenario controls.
+- Real ProgressContext XP awarding via useSimulator.
+- Existing hands-on CPU, memory and storage explorers retained and expanded.
+- Mojibake/encoding characters in these replacement files cleaned.
+
+After extracting into the project root run:
+npm run build
+
+Then test CPU, Memory, Storage Capacity and Storage Comparison lesson simulator steps at all three difficulty levels.

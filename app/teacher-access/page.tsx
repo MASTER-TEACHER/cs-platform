@@ -20,24 +20,18 @@ export default function TeacherAccessPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!user) {
       toast.error(
-        "Create a student account or log in before requesting teacher access."
+        "Create a student account or log in before requesting teacher access.",
       );
       router.push("/register");
       return;
     }
 
-    if (
-      !name.trim() ||
-      !schoolName.trim() ||
-      !jobTitle.trim()
-    ) {
+    if (!name.trim() || !schoolName.trim() || !jobTitle.trim()) {
       toast.error("Please complete all required fields.");
       return;
     }
@@ -62,7 +56,7 @@ export default function TeacherAccessPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Could not submit your request."
+          : "Could not submit your request.",
       );
     } finally {
       setSubmitting(false);
@@ -75,9 +69,7 @@ export default function TeacherAccessPage() {
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
 
-          <p className="mt-4 font-semibold text-slate-600">
-            Loading...
-          </p>
+          <p className="mt-4 font-semibold text-slate-600">Loading...</p>
         </div>
       </main>
     );
@@ -106,8 +98,8 @@ export default function TeacherAccessPage() {
             </h1>
 
             <p className="mt-3 leading-7 text-slate-600">
-              Your teacher access request is awaiting administrator review.
-              You will remain a student account until it is approved.
+              Your teacher access request is awaiting administrator review. You
+              will remain a student account until it is approved.
             </p>
 
             <Link
@@ -147,10 +139,7 @@ export default function TeacherAccessPage() {
               </div>
             )}
 
-            <form
-              onSubmit={handleSubmit}
-              className="mt-8 space-y-5"
-            >
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">
                   Full name
@@ -173,9 +162,7 @@ export default function TeacherAccessPage() {
                 <input
                   type="text"
                   value={schoolName}
-                  onChange={(event) =>
-                    setSchoolName(event.target.value)
-                  }
+                  onChange={(event) => setSchoolName(event.target.value)}
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
                 />
@@ -189,9 +176,7 @@ export default function TeacherAccessPage() {
                 <input
                   type="text"
                   value={jobTitle}
-                  onChange={(event) =>
-                    setJobTitle(event.target.value)
-                  }
+                  onChange={(event) => setJobTitle(event.target.value)}
                   placeholder="Example: Head of Computer Science"
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
@@ -205,9 +190,7 @@ export default function TeacherAccessPage() {
 
                 <textarea
                   value={message}
-                  onChange={(event) =>
-                    setMessage(event.target.value)
-                  }
+                  onChange={(event) => setMessage(event.target.value)}
                   rows={4}
                   placeholder="Include any useful information for the administrator."
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
@@ -226,10 +209,7 @@ export default function TeacherAccessPage() {
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-600">
-              <Link
-                href="/login"
-                className="font-bold text-indigo-600"
-              >
+              <Link href="/login" className="font-bold text-indigo-600">
                 Return to login
               </Link>
             </p>

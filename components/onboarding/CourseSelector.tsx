@@ -28,11 +28,7 @@ export default function CourseSelector() {
     setSaving(true);
 
     try {
-      await updateUserCourseSelection(
-        user.uid,
-        qualification,
-        examBoard
-      );
+      await updateUserCourseSelection(user.uid, qualification, examBoard);
 
       toast.success("Course saved successfully.");
 
@@ -47,7 +43,7 @@ export default function CourseSelector() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Something went wrong saving your course."
+          : "Something went wrong saving your course.",
       );
 
       setSaving(false);
@@ -65,9 +61,7 @@ export default function CourseSelector() {
       </p>
 
       <div className="mt-8">
-        <h2 className="font-semibold text-slate-900">
-          Qualification
-        </h2>
+        <h2 className="font-semibold text-slate-900">Qualification</h2>
 
         <div className="mt-4 space-y-3">
           {["gcse", "alevel"].map((item) => (
@@ -89,9 +83,7 @@ export default function CourseSelector() {
       </div>
 
       <div className="mt-8">
-        <h2 className="font-semibold text-slate-900">
-          Exam Board
-        </h2>
+        <h2 className="font-semibold text-slate-900">Exam Board</h2>
 
         <div className="mt-4 space-y-3">
           {["ocr", "aqa", "edexcel"].map((board) => (
@@ -106,21 +98,14 @@ export default function CourseSelector() {
                   : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               }`}
             >
-              {board === "ocr"
-                ? "OCR"
-                : board === "aqa"
-                  ? "AQA"
-                  : "Edexcel"}
+              {board === "ocr" ? "OCR" : board === "aqa" ? "AQA" : "Edexcel"}
             </button>
           ))}
         </div>
       </div>
 
       <div className="mt-8">
-        <Button
-          onClick={handleContinue}
-          disabled={saving}
-        >
+        <Button onClick={handleContinue} disabled={saving}>
           {saving ? "Saving Course..." : "Continue →"}
         </Button>
       </div>

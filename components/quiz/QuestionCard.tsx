@@ -21,9 +21,7 @@ export default function QuestionCard({ question }: QuestionCardProps) {
 
   return (
     <Card>
-      <h2 className="text-xl font-bold text-slate-900">
-        {question.question}
-      </h2>
+      <h2 className="text-xl font-bold text-slate-900">{question.question}</h2>
 
       <div className="mt-5 space-y-3">
         {question.options.map((option) => (

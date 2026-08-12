@@ -28,7 +28,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
-, "next.config.js"  ],
+    "**/*.mts",
+    "next.config.js",
+    "data/curriculum/topics/systems-software"
+  ],
   "exclude": ["node_modules"]
 }

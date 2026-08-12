@@ -1,55 +1,108 @@
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
+  updateProfile,
+  type UserCredential,
 } from "firebase/auth";
 
-import { auth } from "@/lib/firebase";
-import { createUserProfile } from "@/services/userService";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+
+import { auth, db } from "@/lib/firebase";
+
+function validateRegistration(
+  name: string,
+  email: string,
+  password: string,
+): void {
+  if (!name.trim()) {
+    throw new Error("Please enter your full name.");
+  }
+
+  if (!email.trim()) {
+    throw new Error("Please enter your email address.");
+  }
+
+  if (password.length < 6) {
+    throw new Error("Your password must contain at least 6 characters.");
+  }
+}
 
 export async function registerStudent(
   name: string,
   email: string,
-  password: string
-) {
+  password: string,
+): Promise<UserCredential> {
+  const cleanedName = name.trim();
+  const cleanedEmail = email.trim().toLowerCase();
+
+  validateRegistration(cleanedName, cleanedEmail, password);
+
   const userCredential = await createUserWithEmailAndPassword(
     auth,
-    email,
-    password
+    cleanedEmail,
+    password,
   );
 
   try {
-    await createUserProfile(
-      userCredential.user.uid,
-      name,
-      email,
-      "student"
-    );
+    await updateProfile(userCredential.user, {
+      displayName: cleanedName,
+    });
+
+    await setDoc(doc(db, "users", userCredential.user.uid), {
+      uid: userCredential.user.uid,
+      name: cleanedName,
+      email: cleanedEmail,
+      role: "student",
+
+      qualification: null,
+      examBoard: null,
+      onboardingComplete: false,
+
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
     return userCredential;
   } catch (error) {
-    /*
-     * The Authentication account may already exist even if the
-     * Firestore profile write fails. Log the account out so the app
-     * does not continue with an incomplete profile.
-     */
-    await signOut(auth);
+    console.error("Unable to create the student profile:", error);
+
+    try {
+      await deleteUser(userCredential.user);
+    } catch (cleanupError) {
+      console.error(
+        "Unable to remove the incomplete Authentication account:",
+        cleanupError,
+      );
+
+      await signOut(auth);
+    }
+
     throw error;
   }
 }
 
 export async function loginUser(
   email: string,
-  password: string
-) {
-  return signInWithEmailAndPassword(auth, email, password);
+  password: string,
+): Promise<UserCredential> {
+  const cleanedEmail = email.trim().toLowerCase();
+
+  return signInWithEmailAndPassword(auth, cleanedEmail, password);
 }
 
-export async function logoutUser() {
-  return signOut(auth);
+export async function logoutUser(): Promise<void> {
+  await signOut(auth);
 }
 
-export async function resetPassword(email: string) {
-  return sendPasswordResetEmail(auth, email);
+export async function resetPassword(email: string): Promise<void> {
+  const cleanedEmail = email.trim().toLowerCase();
+
+  if (!cleanedEmail) {
+    throw new Error("Please enter your email address.");
+  }
+
+  await sendPasswordResetEmail(auth, cleanedEmail);
 }

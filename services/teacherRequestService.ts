@@ -1,8 +1,4 @@
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 
@@ -23,20 +19,17 @@ export async function createTeacherRequest({
   jobTitle,
   message,
 }: CreateTeacherRequestInput) {
-  const requestReference = await addDoc(
-    collection(db, "teacherRequests"),
-    {
-      userId,
-      name,
-      email,
-      schoolName,
-      jobTitle,
-      message,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }
-  );
+  const requestReference = await addDoc(collection(db, "teacherRequests"), {
+    userId,
+    name,
+    email,
+    schoolName,
+    jobTitle,
+    message,
+    status: "pending",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 
   return requestReference.id;
 }

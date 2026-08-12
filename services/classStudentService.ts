@@ -1,15 +1,7 @@
-import {
-  arrayUnion,
-  doc,
-  getDoc,
-  updateDoc,
-} from "firebase/firestore";
+import { arrayUnion, doc, getDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-export async function addStudentToClass(
-  classId: string,
-  studentId: string
-) {
+export async function addStudentToClass(classId: string, studentId: string) {
   const classRef = doc(db, "classes", classId);
   const studentRef = doc(db, "users", studentId);
 

@@ -9,11 +9,10 @@ const firebaseConfig = {
   storageBucket: "computer-science-platform.firebasestorage.app",
   messagingSenderId: "990895587894",
   appId: "1:990895587894:web:9cf88dc09aea65f2af0e97",
-  measurementId: "G-91JNWXQHN1"
+  measurementId: "G-91JNWXQHN1",
 };
 
 const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-

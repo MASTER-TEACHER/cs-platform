@@ -33,9 +33,7 @@ export default function EditableQuizPreview({
               {quiz.title}
             </h2>
 
-            <p className="mt-3 max-w-3xl text-slate-600">
-              {quiz.description}
-            </p>
+            <p className="mt-3 max-w-3xl text-slate-600">{quiz.description}</p>
 
             <div className="mt-5 flex flex-wrap gap-3 text-sm font-semibold">
               <span className="rounded-full bg-indigo-50 px-4 py-2 text-indigo-700">
@@ -94,9 +92,7 @@ export default function EditableQuizPreview({
           </div>
 
           <div className="mt-6 rounded-xl bg-blue-50 p-4">
-            <p className="font-semibold text-blue-900">
-              Explanation
-            </p>
+            <p className="font-semibold text-blue-900">Explanation</p>
 
             <p className="mt-2 text-sm leading-6 text-blue-800">
               {question.explanation}

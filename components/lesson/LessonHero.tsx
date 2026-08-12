@@ -2,7 +2,6 @@ import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import ProgressBar from "@/components/ui/ProgressBar";
 
-
 type LessonHeroProps = {
   title: string;
   subtitle: string;
@@ -21,7 +20,6 @@ export default function LessonHero({
   progress,
   lessonNumber,
   totalLessons,
-
 }: LessonHeroProps) {
   return (
     <Card className="overflow-hidden border-blue-100 bg-gradient-to-br from-white to-blue-50">
@@ -80,17 +78,17 @@ export default function LessonHero({
       </div>
 
       <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-5">
-  <div className="mb-3 flex items-center justify-between">
-    <span className="font-semibold text-slate-800">Course Progress</span>
-    <span className="font-bold text-blue-700">{progress}%</span>
-  </div>
+        <div className="mb-3 flex items-center justify-between">
+          <span className="font-semibold text-slate-800">Course Progress</span>
+          <span className="font-bold text-blue-700">{progress}%</span>
+        </div>
 
-  <ProgressBar value={progress} />
-</div>
+        <ProgressBar value={progress} />
+      </div>
 
-<div className="mt-10">
-  <Button>▶ Start Lesson</Button>
-</div>
+      <div className="mt-10">
+        <Button>▶ Start Lesson</Button>
+      </div>
     </Card>
   );
 }

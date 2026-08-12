@@ -12,7 +12,7 @@ export default function WeeklyGoalCard({
 }: Props) {
   const progress = Math.min(
     100,
-    Math.round((completedThisWeek / weeklyTarget) * 100)
+    Math.round((completedThisWeek / weeklyTarget) * 100),
   );
 
   return (

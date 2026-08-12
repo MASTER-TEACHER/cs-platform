@@ -1,141 +1,257 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
+import { useState } from "react";
+
 import { useProgress } from "@/contexts/ProgressContext";
+
+import SimulatorControls from "@/components/Simulators/common/SimulatorControls";
+import SimulatorDifficulty from "@/components/Simulators/common/SimulatorDifficulty";
+import SimulatorFeedback from "@/components/Simulators/common/SimulatorFeedback";
+import SimulatorStats from "@/components/Simulators/common/SimulatorStats";
+
+import {
+  useSimulator,
+  type SimulatorDifficulty as DifficultyLevel,
+} from "@/components/Simulators/common/useSimulator";
 
 const hexDigits = "0123456789ABCDEF".split("");
 
-function randomTarget() {
-  return Math.floor(Math.random() * 256);
+type Question = {
+  target: number;
+  digits: number;
+};
+
+function digitsForDifficulty(difficulty: DifficultyLevel): number {
+  switch (difficulty) {
+    case "foundation":
+      return 2;
+
+    case "intermediate":
+      return 3;
+
+    case "higher":
+      return 4;
+  }
+}
+
+function createQuestion(difficulty: DifficultyLevel): Question {
+  const digits = digitsForDifficulty(difficulty);
+
+  const maximum = 16 ** digits - 1;
+
+  return {
+    digits,
+    target: Math.floor(Math.random() * maximum) + 1,
+  };
 }
 
 export default function HexSimulator() {
   const { addXP } = useProgress();
 
-  const [target, setTarget] = useState<number | null>(null);
+  const simulator = useSimulator<Question>({
+    initialQuestion: createQuestion("foundation"),
+    generateQuestion: createQuestion,
 
-useEffect(() => {
-  setTarget(randomTarget());
-}, []);
+    xpByDifficulty: {
+      foundation: 10,
+      intermediate: 15,
+      higher: 20,
+    },
+
+    onAwardXP: addXP,
+  });
+
+  const {
+    difficulty,
+    question,
+
+    checked,
+    correct,
+
+    hintVisible,
+    workingVisible,
+
+    attempts,
+    correctAnswers,
+    accuracy,
+    xp,
+    streak,
+
+    markAnswer,
+    resetQuestion,
+    newQuestion,
+    changeDifficulty,
+
+    toggleHint,
+    toggleWorking,
+  } = simulator;
 
   const [answer, setAnswer] = useState("");
-  const [message, setMessage] = useState("");
-  const [correct, setCorrect] = useState(false);
-  const [score, setScore] = useState(0);
 
-  const correctHex = target !== null ? target.toString(16).toUpperCase().padStart(2, "0") : "";
+  const correctHex = question.target
+    .toString(16)
+    .toUpperCase()
+    .padStart(question.digits, "0");
 
   function addDigit(digit: string) {
-    if (answer.length < 2) {
-      setAnswer((prev) => prev + digit);
-      setMessage("");
+    if (checked || answer.length >= question.digits) {
+      return;
     }
+
+    setAnswer((current) => current + digit);
   }
 
-  function clearAnswer() {
+  function deleteDigit() {
+    if (checked) {
+      return;
+    }
+
+    setAnswer((current) => current.slice(0, -1));
+  }
+
+  function handleCheck() {
+    if (answer.length !== question.digits) {
+      return;
+    }
+
+    markAnswer(answer === correctHex);
+  }
+
+  function handleTryAgain() {
     setAnswer("");
-    setMessage("");
-    setCorrect(false);
+    resetQuestion();
   }
 
-  function checkAnswer() {
-    if (target === null) return;
-
-    if (answer === correctHex) {
-      setCorrect(true);
-      setMessage("🏆 Excellent! +50 XP earned.");
-      setScore((prev) => prev + 1);
-      addXP(50);
-    } else {
-      setCorrect(false);
-      setMessage(`❌ Not quite. The correct answer is ${correctHex}.`);
-    }
+  function handleNewQuestion() {
+    setAnswer("");
+    newQuestion();
   }
 
-  function nextChallenge() {
-  setTarget(randomTarget());
-  setAnswer("");
-  setMessage("");
-  setCorrect(false);
-}
+  function handleDifficultyChange(nextDifficulty: DifficultyLevel) {
+    setAnswer("");
+    changeDifficulty(nextDifficulty);
+  }
+
+  const placeValues = Array.from(
+    { length: question.digits },
+    (_, index) => 16 ** (question.digits - index - 1),
+  );
+
+  const working = correctHex
+    .split("")
+    .map((digit, index) => {
+      const decimalDigit = parseInt(digit, 16);
+
+      return `${digit} × ${placeValues[index]} = ${
+        decimalDigit * placeValues[index]
+      }`;
+    })
+    .join("\n");
 
   return (
-    <Card>
-      <h2 className="text-3xl font-bold text-slate-900">
-        Interactive Hexadecimal Challenge
-      </h2>
+    <section className="space-y-6 rounded-3xl border border-violet-200 bg-white p-6 shadow-sm md:p-8">
+      <header>
+        <p className="text-sm font-black uppercase tracking-widest text-violet-600">
+          Hexadecimal laboratory
+        </p>
 
-      <p className="mt-2 text-slate-600">
-        Convert the target denary number into hexadecimal.
-      </p>
+        <h2 className="mt-2 text-3xl font-black text-slate-950">
+          Hexadecimal Challenge
+        </h2>
 
-      <div className="mt-8 rounded-2xl border border-purple-100 bg-purple-50 p-6 text-center">
-        <p className="text-sm uppercase tracking-widest text-purple-600">
+        <p className="mt-3 max-w-3xl leading-7 text-slate-600">
+          Convert denary values into hexadecimal and build accuracy across
+          repeated challenges.
+        </p>
+      </header>
+
+      <SimulatorDifficulty
+        value={difficulty}
+        onChange={handleDifficultyChange}
+      />
+
+      <section className="rounded-3xl border border-violet-200 bg-violet-50 p-6 text-center">
+        <p className="text-xs font-black uppercase tracking-widest text-violet-600">
           Convert this denary number
         </p>
 
-        <h1 className="mt-2 text-6xl font-bold text-purple-700">{target}</h1>
-      </div>
-
-      <div className="mt-6 rounded-xl bg-emerald-50 p-4 text-center">
-        <p className="text-sm text-slate-500">Challenge Progress</p>
-        <p className="text-2xl font-bold text-emerald-700">
-          {score} Correct
+        <p className="mt-3 text-6xl font-black text-violet-900">
+          {question.target}
         </p>
-      </div>
 
-      <div className="mt-8 rounded-2xl bg-slate-100 p-6 text-center">
-        <p className="text-sm text-slate-500">Your Hexadecimal Answer</p>
-        <p className="mt-3 font-mono text-5xl font-bold tracking-widest text-slate-900">
-          {answer || "__"}
+        <p className="mt-3 text-sm text-violet-700">
+          Enter a {question.digits}-digit hexadecimal value.
         </p>
-      </div>
+      </section>
 
-      <div className="mt-8 grid grid-cols-4 gap-3">
+      <SimulatorStats
+        attempts={attempts}
+        correct={correctAnswers}
+        accuracy={accuracy}
+        xp={xp}
+        streak={streak}
+      />
+
+      <section className="rounded-3xl bg-slate-950 p-6 text-center text-white">
+        <p className="text-xs font-black uppercase tracking-widest text-violet-300">
+          Your hexadecimal answer
+        </p>
+
+        <p className="mt-4 font-mono text-5xl font-black tracking-widest">
+          {answer || "_".repeat(question.digits)}
+        </p>
+      </section>
+
+      <div className="grid grid-cols-4 gap-3 md:grid-cols-8">
         {hexDigits.map((digit) => (
           <button
             key={digit}
+            type="button"
+            disabled={checked || answer.length >= question.digits}
             onClick={() => addDigit(digit)}
-            className="rounded-xl bg-slate-200 py-4 text-xl font-bold transition hover:scale-105 hover:bg-purple-100"
+            className="rounded-xl bg-slate-100 py-4 text-xl font-black text-slate-950 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {digit}
           </button>
         ))}
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Button onClick={checkAnswer}>Check Answer</Button>
-        <button
-          onClick={clearAnswer}
-          className="w-full rounded-xl border border-slate-300 px-6 py-4 text-lg font-semibold text-slate-700 transition hover:bg-slate-50"
-        >
-          Clear
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={deleteDigit}
+        disabled={checked || answer.length === 0}
+        className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Delete last digit
+      </button>
 
-      {message && (
-        <div
-          className={`mt-6 rounded-2xl p-5 text-center text-lg font-semibold ${
-            correct ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-          }`}
-        >
-          <p>{message}</p>
+      <SimulatorControls
+        canCheck={answer.length === question.digits}
+        checked={checked}
+        hintVisible={hintVisible}
+        workingVisible={workingVisible}
+        resetLabel="Try again"
+        newExampleLabel="New question"
+        onCheck={handleCheck}
+        onHint={toggleHint}
+        onToggleWorking={toggleWorking}
+        onReset={handleTryAgain}
+        onNewExample={handleNewQuestion}
+      />
 
-          {correct && (
-            <div className="mt-5">
-              <Button onClick={nextChallenge}>Next Challenge →</Button>
-            </div>
-          )}
-        </div>
-      )}
+      <SimulatorFeedback
+        checked={checked}
+        correct={correct}
+        successMessage={`Excellent. ${question.target} in denary is ${correctHex} in hexadecimal.`}
+        errorMessage={`Not quite. The correct hexadecimal value is ${correctHex}.`}
+        hintVisible={hintVisible}
+        hint="Remember that each hexadecimal digit represents a value from 0 to 15. Divide or reason using powers of 16."
+        workingVisible={workingVisible}
+        working={`${working}
 
-      {score >= 5 && (
-        <div className="mt-6 rounded-xl bg-yellow-100 p-5 text-center font-semibold text-yellow-800">
-          🏅 Hex Hero Badge Unlocked!
-        </div>
-      )}
-    </Card>
+Add the values together to obtain ${question.target}.`}
+        examinerTip="Remember that hexadecimal uses A, B, C, D, E and F to represent denary values 10 to 15."
+      />
+    </section>
   );
 }

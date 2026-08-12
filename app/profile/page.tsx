@@ -68,9 +68,7 @@ export default function ProfilePage() {
 
         <Card>
           <p className="text-sm text-slate-500">Streak</p>
-          <h2 className="mt-2 text-3xl font-bold text-slate-900">
-            {streak}
-          </h2>
+          <h2 className="mt-2 text-3xl font-bold text-slate-900">{streak}</h2>
         </Card>
       </div>
 

@@ -6,7 +6,7 @@ export function getNextLesson(completedLessons: string[] = []) {
 
   for (const topic of topics) {
     const lesson = topic.lessons.find(
-      (lesson) => !completedLessons.includes(lesson.id)
+      (lesson) => !completedLessons.includes(lesson.id),
     );
 
     if (lesson) {

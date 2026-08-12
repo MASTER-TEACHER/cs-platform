@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
-import LessonRenderer from "../../../components/lesson/LessonRenderer";
+
+import LessonRenderer from "@/components/lesson/LessonRenderer";
 import LessonNavigation from "@/components/lesson/LessonNavigation";
-import { topicLibrary } from "@/data/curriculum/topics/index";
+import { topicLibrary } from "@/data/curriculum/topics";
 import type { Lesson, Topic } from "@/types/curriculum";
 
 type Props = {
   params: Promise<{
     topicId: string;
   }>;
+
   searchParams: Promise<{
     lesson?: string;
   }>;
@@ -15,17 +17,16 @@ type Props = {
 
 export default async function LessonPage({ params, searchParams }: Props) {
   const { topicId } = await params;
-  const { lesson } = await searchParams;
+  const { lesson: requestedLessonId } = await searchParams;
 
-  const topics = topicLibrary as unknown as Record<string, Topic>;
-  const topic = topics[topicId];
+  const topic = (topicLibrary as Record<string, Topic>)[topicId];
 
   if (!topic) {
     notFound();
   }
 
-  const lessonIndex = lesson
-    ? topic.lessons.findIndex((item: Lesson) => item.id === lesson)
+  const lessonIndex = requestedLessonId
+    ? topic.lessons.findIndex((item: Lesson) => item.id === requestedLessonId)
     : 0;
 
   if (lessonIndex === -1) {
@@ -35,6 +36,10 @@ export default async function LessonPage({ params, searchParams }: Props) {
   const currentLesson = topic.lessons[lessonIndex];
   const previousLesson = topic.lessons[lessonIndex - 1];
   const nextLesson = topic.lessons[lessonIndex + 1];
+
+  if (!currentLesson) {
+    notFound();
+  }
 
   return (
     <div className="space-y-8">
@@ -47,16 +52,10 @@ export default async function LessonPage({ params, searchParams }: Props) {
       />
 
       <LessonRenderer
-  lesson={currentLesson}
-  topicSimulator={topic.simulator}
-/>
-
-      <LessonNavigation
+        lesson={currentLesson}
         topicId={topicId}
-        currentIndex={lessonIndex}
-        totalLessons={topic.lessons.length}
-        previousLessonId={previousLesson?.id}
         nextLessonId={nextLesson?.id}
+        topicSimulator={topic.simulator}
       />
     </div>
   );

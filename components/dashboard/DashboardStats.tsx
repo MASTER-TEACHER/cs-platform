@@ -15,11 +15,7 @@ export default function DashboardStats({
 }: DashboardStatsProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-      <StatCard
-        title="Current XP"
-        value={xp.toString()}
-        icon="⭐"
-      />
+      <StatCard title="Current XP" value={xp.toString()} icon="⭐" />
 
       <StatCard
         title="Lessons Completed"
@@ -27,17 +23,9 @@ export default function DashboardStats({
         icon="📚"
       />
 
-      <StatCard
-        title="Current Streak"
-        value={streak.toString()}
-        icon="🔥"
-      />
+      <StatCard title="Current Streak" value={streak.toString()} icon="🔥" />
 
-      <StatCard
-        title="Badges"
-        value={badges.toString()}
-        icon="🏆"
-      />
+      <StatCard title="Badges" value={badges.toString()} icon="🏆" />
     </div>
   );
 }

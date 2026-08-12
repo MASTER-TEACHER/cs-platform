@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -37,7 +31,7 @@ export function useRecentQuiz() {
         const quizQuery = query(
           collection(db, "users", user.uid, "quizResults"),
           orderBy("createdAt", "desc"),
-          limit(1)
+          limit(1),
         );
 
         const snapshot = await getDocs(quizQuery);

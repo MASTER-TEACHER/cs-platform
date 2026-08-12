@@ -9,13 +9,11 @@ type ProgressContextType = {
   completeLesson: () => void;
 };
 
-const ProgressContext = createContext<ProgressContextType | undefined>(undefined);
+const ProgressContext = createContext<ProgressContextType | undefined>(
+  undefined,
+);
 
-export function ProgressProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function ProgressProvider({ children }: { children: React.ReactNode }) {
   const [xp, setXP] = useState(0);
   const [completedLessons, setCompletedLessons] = useState(0);
 

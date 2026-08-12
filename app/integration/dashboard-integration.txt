@@ -1,0 +1,25 @@
+Use:
+
+import { getExamTrainerDashboardSummary } from "@/services/examTrainerAnalyticsService";
+
+const examSummary = await getExamTrainerDashboardSummary(studentId);
+
+Available values:
+
+examSummary.completedAttempts
+examSummary.averagePercentage
+examSummary.bestPercentage
+examSummary.bestGrade
+examSummary.latestPercentage
+examSummary.weakestTopic
+examSummary.strongestTopic
+examSummary.recentTrend
+
+Suggested dashboard cards:
+
+Completed papers
+Average exam score
+Best grade
+Latest score
+Weakest exam topic
+Recent trend

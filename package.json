@@ -6,25 +6,32 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
-  
   "dependencies": {
+    "docx": "^9.7.1",
+    "dox": "^1.0.0",
+    "file-saver": "^2.0.5",
     "firebase": "^12.15.0",
     "firebase-admin": "^14.1.0",
+    "lucide-react": "^1.25.0",
     "next": "^16.2.9",
-    "openai": "^6.46.0",
+    "openai": "^6.48.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "prettier": "^3.9.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   },
@@ -34,4 +41,3 @@
     }
   }
 }
-

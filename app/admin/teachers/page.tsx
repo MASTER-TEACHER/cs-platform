@@ -60,7 +60,7 @@ export default function AdminTeachersPage() {
 
     const teachersQuery = query(
       collection(db, "users"),
-      where("role", "==", "teacher")
+      where("role", "==", "teacher"),
     );
 
     const unsubscribe = onSnapshot(
@@ -76,9 +76,7 @@ export default function AdminTeachersPage() {
               email: data.email || "No email available",
               role: data.role || "teacher",
               schoolName:
-                data.schoolName ||
-                data.school ||
-                "School not assigned",
+                data.schoolName || data.school || "School not assigned",
               teacherApprovedAt: data.teacherApprovedAt,
               createdAt: data.createdAt,
             };
@@ -93,7 +91,7 @@ export default function AdminTeachersPage() {
         toast.error("Could not load teacher accounts.");
         setTeachers([]);
         setLoadingTeachers(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -110,7 +108,7 @@ export default function AdminTeachersPage() {
       (teacher) =>
         teacher.name.toLowerCase().includes(search) ||
         teacher.email.toLowerCase().includes(search) ||
-        teacher.schoolName.toLowerCase().includes(search)
+        teacher.schoolName.toLowerCase().includes(search),
     );
   }, [teachers, searchTerm]);
 
@@ -162,9 +160,7 @@ export default function AdminTeachersPage() {
               Administration
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Teacher Management
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">Teacher Management</h1>
 
             <p className="mt-3 max-w-2xl text-indigo-100">
               View approved teachers and monitor platform access.
@@ -192,10 +188,7 @@ export default function AdminTeachersPage() {
           value={new Set(
             teachers
               .map((teacher) => teacher.schoolName)
-              .filter(
-                (schoolName) =>
-                  schoolName !== "School not assigned"
-              )
+              .filter((schoolName) => schoolName !== "School not assigned"),
           ).size.toString()}
           icon="🏫"
         />
@@ -272,8 +265,7 @@ export default function AdminTeachersPage() {
                     Approved:{" "}
                     <span className="font-bold text-slate-900">
                       {formatDate(
-                        teacher.teacherApprovedAt ||
-                          teacher.createdAt
+                        teacher.teacherApprovedAt || teacher.createdAt,
                       )}
                     </span>
                   </p>
@@ -314,13 +306,9 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
         </div>
 
         <div className="text-3xl">{icon}</div>

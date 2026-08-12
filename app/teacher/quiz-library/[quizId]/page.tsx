@@ -39,9 +39,7 @@ export default function SavedQuizPage() {
   useEffect(() => {
     async function loadQuiz() {
       try {
-        const snapshot = await getDoc(
-          doc(db, "generatedQuizzes", quizId)
-        );
+        const snapshot = await getDoc(doc(db, "generatedQuizzes", quizId));
 
         if (!snapshot.exists()) {
           setNotFound(true);
@@ -59,14 +57,11 @@ export default function SavedQuizPage() {
           qualification: data.qualification || "GCSE",
           examBoard: data.examBoard || "AQA",
           difficulty:
-            data.difficulty === "foundation" ||
-            data.difficulty === "higher"
+            data.difficulty === "foundation" || data.difficulty === "higher"
               ? data.difficulty
               : "standard",
           estimatedTime: data.estimatedTime || "10 minutes",
-          questions: Array.isArray(data.questions)
-            ? data.questions
-            : [],
+          questions: Array.isArray(data.questions) ? data.questions : [],
           questionCount:
             typeof data.questionCount === "number"
               ? data.questionCount
@@ -101,9 +96,7 @@ export default function SavedQuizPage() {
   if (notFound || !quiz) {
     return (
       <Card>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Quiz not found
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-900">Quiz not found</h1>
 
         <p className="mt-3 text-slate-600">
           This saved quiz does not exist or could not be loaded.
@@ -128,13 +121,9 @@ export default function SavedQuizPage() {
               Saved AI Quiz
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              {quiz.title}
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">{quiz.title}</h1>
 
-            <p className="mt-3 max-w-3xl text-violet-100">
-              {quiz.description}
-            </p>
+            <p className="mt-3 max-w-3xl text-violet-100">{quiz.description}</p>
           </div>
 
           <Link
@@ -159,17 +148,9 @@ export default function SavedQuizPage() {
           icon="⏱"
         />
 
-        <SummaryCard
-          label="Difficulty"
-          value={quiz.difficulty}
-          icon="🎯"
-        />
+        <SummaryCard label="Difficulty" value={quiz.difficulty} icon="🎯" />
 
-        <SummaryCard
-          label="Status"
-          value={quiz.status}
-          icon="📝"
-        />
+        <SummaryCard label="Status" value={quiz.status} icon="📝" />
       </div>
 
       <Card>
@@ -183,9 +164,7 @@ export default function SavedQuizPage() {
 
         <p className="mt-3 text-slate-600">
           Topic ID:{" "}
-          <span className="font-bold text-slate-900">
-            {quiz.topicId}
-          </span>
+          <span className="font-bold text-slate-900">{quiz.topicId}</span>
         </p>
       </Card>
 
@@ -221,9 +200,7 @@ export default function SavedQuizPage() {
             </div>
 
             <div className="mt-6 rounded-xl bg-blue-50 p-4">
-              <p className="font-semibold text-blue-900">
-                Explanation
-              </p>
+              <p className="font-semibold text-blue-900">Explanation</p>
 
               <p className="mt-2 text-sm leading-6 text-blue-800">
                 {question.explanation}
@@ -267,9 +244,7 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
 
           <p className="mt-2 break-words text-2xl font-bold capitalize text-slate-900">
             {value}

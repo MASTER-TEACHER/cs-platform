@@ -1,8 +1,4 @@
-import {
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export type SaveAssignmentResultInput = {
@@ -53,7 +49,7 @@ export async function saveAssignmentResult({
       status: "completed",
       completedAt: serverTimestamp(),
     },
-    { merge: true }
+    { merge: true },
   );
 
   return resultId;

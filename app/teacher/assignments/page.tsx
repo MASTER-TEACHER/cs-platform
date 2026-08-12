@@ -1,512 +1,448 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import toast from "react-hot-toast";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  collection,
-  onSnapshot,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
+  AlertCircle,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Eye,
+  FileText,
+  Loader2,
+  Search,
+  Users,
+} from "lucide-react";
+
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
-import { createAssignment } from "@/services/assignmentService";
+import {
+  getTeacherAssignments,
+  ResourceAssignment,
+} from "@/services/resourceAssignmentService";
 
-type ClassOption = {
-  id: string;
-  name: string;
-  yearGroup: string;
-};
+function formatDate(value: Date | null): string {
+  if (!value) {
+    return "No due date";
+  }
 
-type AssignmentRecord = {
-  id: string;
-  teacherId: string;
-  classId: string;
-  title: string;
-  description: string;
-  type: "lesson" | "quiz";
-  resourceId: string;
-  dueDate: string;
-  status: string;
-  createdAt?: Timestamp;
-};
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(value);
+}
+
+function formatResourceType(value: string): string {
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getCompletionPercentage(assignment: ResourceAssignment): number {
+  if (assignment.studentCount === 0) {
+    return 0;
+  }
+
+  return Math.round(
+    (assignment.completedCount / assignment.studentCount) * 100,
+  );
+}
+
+function getDueStatus(dueDate: Date | null): {
+  label: string;
+  overdue: boolean;
+} {
+  if (!dueDate) {
+    return {
+      label: "No due date",
+      overdue: false,
+    };
+  }
+
+  const today = new Date();
+  const due = new Date(dueDate);
+
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+
+  const differenceInDays = Math.ceil(
+    (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (differenceInDays < 0) {
+    const overdueDays = Math.abs(differenceInDays);
+
+    return {
+      label: `${overdueDays} ${overdueDays === 1 ? "day" : "days"} overdue`,
+      overdue: true,
+    };
+  }
+
+  if (differenceInDays === 0) {
+    return {
+      label: "Due today",
+      overdue: false,
+    };
+  }
+
+  if (differenceInDays === 1) {
+    return {
+      label: "Due tomorrow",
+      overdue: false,
+    };
+  }
+
+  return {
+    label: `${differenceInDays} days remaining`,
+    overdue: false,
+  };
+}
 
 export default function TeacherAssignmentsPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
 
-  const [classes, setClasses] = useState<ClassOption[]>([]);
-  const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  const [assignments, setAssignments] = useState<ResourceAssignment[]>([]);
 
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [classId, setClassId] = useState("");
-  const [type, setType] = useState<"lesson" | "quiz">("lesson");
-  const [resourceId, setResourceId] = useState("");
-  const [dueDate, setDueDate] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const loadAssignments = useCallback(async () => {
+    if (!user?.uid) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const loadedAssignments = await getTeacherAssignments(user.uid);
+
+      setAssignments(loadedAssignments);
+    } catch (caughtError) {
+      console.error("Failed to load teacher assignments:", caughtError);
+
+      setAssignments([]);
+
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Your assignments could not be loaded.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.uid]);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
+    void loadAssignments();
+  }, [loadAssignments]);
+
+  const filteredAssignments = useMemo(() => {
+    const search = searchTerm.trim().toLowerCase();
+
+    if (!search) {
+      return assignments;
     }
 
-    if (!user) {
-      setClasses([]);
-      setAssignments([]);
-      setLoadingData(false);
-      return;
-    }
+    return assignments.filter((assignment) => {
+      return (
+        assignment.resourceTitle.toLowerCase().includes(search) ||
+        assignment.resourceTopic.toLowerCase().includes(search) ||
+        assignment.className.toLowerCase().includes(search)
+      );
+    });
+  }, [assignments, searchTerm]);
 
-    const teacherId = user.uid;
+  const totalStudents = useMemo(
+    () =>
+      assignments.reduce(
+        (total, assignment) => total + assignment.studentCount,
+        0,
+      ),
+    [assignments],
+  );
 
-    const classesQuery = query(
-      collection(db, "classes"),
-      where("teacherId", "==", teacherId)
-    );
-
-    const assignmentsQuery = query(
-      collection(db, "assignments"),
-      where("teacherId", "==", teacherId)
-    );
-
-    let classesLoaded = false;
-    let assignmentsLoaded = false;
-
-    function finishLoading() {
-      if (classesLoaded && assignmentsLoaded) {
-        setLoadingData(false);
-      }
-    }
-
-    const unsubscribeClasses = onSnapshot(
-      classesQuery,
-      (snapshot) => {
-        const loadedClasses: ClassOption[] = snapshot.docs.map(
-          (classDocument) => {
-            const data = classDocument.data();
-
-            return {
-              id: classDocument.id,
-              name: data.name || "Untitled Class",
-              yearGroup: data.yearGroup || "Not specified",
-            };
-          }
-        );
-
-        loadedClasses.sort((a, b) => a.name.localeCompare(b.name));
-
-        setClasses(loadedClasses);
-
-        classesLoaded = true;
-        finishLoading();
-      },
-      (error) => {
-        console.error("Failed to load classes:", error);
-        toast.error("Could not load classes.");
-
-        classesLoaded = true;
-        finishLoading();
-      }
-    );
-
-    const unsubscribeAssignments = onSnapshot(
-      assignmentsQuery,
-      (snapshot) => {
-        const loadedAssignments: AssignmentRecord[] = snapshot.docs.map(
-          (assignmentDocument) => {
-            const data = assignmentDocument.data();
-
-            return {
-              id: assignmentDocument.id,
-              teacherId: data.teacherId || "",
-              classId: data.classId || "",
-              title: data.title || "Untitled Assignment",
-              description: data.description || "",
-              type: data.type === "quiz" ? "quiz" : "lesson",
-              resourceId: data.resourceId || "",
-              dueDate: data.dueDate || "",
-              status: data.status || "active",
-              createdAt: data.createdAt,
-            };
-          }
-        );
-
-        loadedAssignments.sort((a, b) => {
-          const aTime = a.createdAt?.toMillis() || 0;
-          const bTime = b.createdAt?.toMillis() || 0;
-
-          return bTime - aTime;
-        });
-
-        setAssignments(loadedAssignments);
-
-        assignmentsLoaded = true;
-        finishLoading();
-      },
-      (error) => {
-        console.error("Failed to load assignments:", error);
-        toast.error("Could not load assignments.");
-
-        assignmentsLoaded = true;
-        finishLoading();
-      }
-    );
-
-    return () => {
-      unsubscribeClasses();
-      unsubscribeAssignments();
-    };
-  }, [authLoading, user]);
+  const totalCompleted = useMemo(
+    () =>
+      assignments.reduce(
+        (total, assignment) => total + assignment.completedCount,
+        0,
+      ),
+    [assignments],
+  );
 
   const activeAssignments = useMemo(
     () =>
-      assignments.filter(
-        (assignment) => assignment.status === "active"
-      ),
-    [assignments]
+      assignments.filter((assignment) => assignment.status === "active").length,
+    [assignments],
   );
 
-  function getClassName(selectedClassId: string) {
-    const selectedClass = classes.find(
-      (classItem) => classItem.id === selectedClassId
-    );
-
-    return selectedClass
-      ? `${selectedClass.name} (${selectedClass.yearGroup})`
-      : "Unknown class";
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!user) {
-      toast.error("You must be logged in as a teacher.");
-      return;
-    }
-
-    if (
-      !title.trim() ||
-      !description.trim() ||
-      !classId ||
-      !resourceId.trim() ||
-      !dueDate
-    ) {
-      toast.error("Please complete every assignment field.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      await createAssignment({
-        teacherId: user.uid,
-        classId,
-        title: title.trim(),
-        description: description.trim(),
-        type,
-        resourceId: resourceId.trim(),
-        dueDate,
-      });
-
-      toast.success("Assignment created successfully.");
-
-      setTitle("");
-      setDescription("");
-      setClassId("");
-      setType("lesson");
-      setResourceId("");
-      setDueDate("");
-    } catch (error) {
-      console.error("Create assignment error:", error);
-      toast.error("Could not create the assignment.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (authLoading || loadingData) {
+  if (loading) {
     return (
       <div className="space-y-8">
-        <Skeleton className="h-52 w-full" />
-        <Skeleton className="h-96 w-full" />
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-56 w-full rounded-3xl" />
+
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-72 rounded-3xl" />
+          <Skeleton className="h-72 rounded-3xl" />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <Card className="border-0 bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 text-white">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <section className="rounded-3xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-700 p-7 text-white shadow-xl sm:p-9">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-100">
-              Teacher Portal
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100">
+              Teacher assignments
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Manage Assignments
+            <h1 className="mt-3 text-3xl font-black sm:text-4xl">
+              Assignment tracking
             </h1>
 
-            <p className="mt-3 max-w-2xl text-emerald-100">
-              Assign lessons and quizzes to classes and track active work.
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-100">
+              Review resource assignments, monitor completion and identify
+              students who may need support.
             </p>
           </div>
 
           <Link
-            href="/teacher"
-            className="rounded-xl bg-white px-5 py-3 text-center font-bold text-teal-700 transition hover:bg-emerald-50"
+            href="/teacher/resources"
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-700 transition hover:bg-emerald-50"
           >
-            ← Teacher Dashboard
+            <BookOpen className="h-4 w-4" />
+            Resource library
           </Link>
         </div>
-      </Card>
+      </section>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
-          label="Total Assignments"
-          value={assignments.length.toString()}
-          icon="📋"
+          label="Assignments"
+          value={assignments.length}
+          description="All resource assignments"
+          icon={<FileText className="h-6 w-6" />}
+          iconClassName="bg-blue-50 text-blue-600"
         />
 
         <SummaryCard
-          label="Active Assignments"
-          value={activeAssignments.length.toString()}
-          icon="✅"
+          label="Active"
+          value={activeAssignments}
+          description="Currently available"
+          icon={<Clock3 className="h-6 w-6" />}
+          iconClassName="bg-amber-50 text-amber-600"
         />
 
         <SummaryCard
-          label="Classes"
-          value={classes.length.toString()}
-          icon="🏫"
+          label="Completed"
+          value={`${totalCompleted}/${totalStudents}`}
+          description="Student completions"
+          icon={<CheckCircle2 className="h-6 w-6" />}
+          iconClassName="bg-emerald-50 text-emerald-600"
         />
       </div>
 
-      <Card>
-        <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-          New Assignment
-        </p>
+      <Card className="rounded-3xl border border-slate-200 p-6 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-600">
+              Resource assignments
+            </p>
 
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          Create Assignment
-        </h2>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Your assignments
+            </h2>
+          </div>
 
-        {classes.length === 0 ? (
-          <div className="mt-6 rounded-2xl bg-amber-50 p-6">
-            <p className="font-semibold text-amber-800">
-              Create a class before assigning work.
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search assignments..."
+              className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 sm:w-72"
+            />
+          </label>
+        </div>
+
+        {error ? (
+          <div className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+
+              <div>
+                <p className="font-bold text-red-950">
+                  Assignments unavailable
+                </p>
+
+                <p className="mt-1 text-sm text-red-700">{error}</p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadAssignments();
+                  }}
+                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
+                >
+                  <Loader2 className="h-4 w-4" />
+                  Try again
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : filteredAssignments.length === 0 ? (
+          <div className="mt-8 rounded-3xl bg-slate-50 p-10 text-center">
+            <BookOpen className="mx-auto h-10 w-10 text-slate-400" />
+
+            <h3 className="mt-4 text-xl font-black text-slate-950">
+              No assignments found
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
+              Create and assign a published teaching resource to begin tracking
+              student completion.
             </p>
 
             <Link
-              href="/teacher/classes"
-              className="mt-4 inline-flex rounded-xl bg-amber-600 px-5 py-3 font-bold text-white transition hover:bg-amber-700"
+              href="/teacher/resources"
+              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700"
             >
-              Go to Classes
+              Open resource library
             </Link>
           </div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2"
-          >
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Assignment title
-              </span>
+          <div className="mt-7 grid gap-6 lg:grid-cols-2">
+            {filteredAssignments.map((assignment) => {
+              const completionPercentage = getCompletionPercentage(assignment);
 
-              <input
-                type="text"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Example: Binary Conversion Practice"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
-            </label>
+              const dueStatus = getDueStatus(assignment.dueDate);
 
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Class
-              </span>
+              return (
+                <article
+                  key={assignment.id}
+                  className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-700">
+                          {formatResourceType(assignment.resourceType)}
+                        </span>
 
-              <select
-                value={classId}
-                onChange={(event) => setClassId(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              >
-                <option value="">Select a class</option>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {assignment.className}
+                        </span>
 
-                {classes.map((classItem) => (
-                  <option key={classItem.id} value={classItem.id}>
-                    {classItem.name} — {classItem.yearGroup}
-                  </option>
-                ))}
-              </select>
-            </label>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-600">
+                          {assignment.status}
+                        </span>
+                      </div>
 
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Assignment type
-              </span>
+                      <h3 className="mt-4 text-xl font-black text-slate-950">
+                        {assignment.resourceTitle}
+                      </h3>
 
-              <select
-                value={type}
-                onChange={(event) =>
-                  setType(event.target.value as "lesson" | "quiz")
-                }
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-              >
-                <option value="lesson">Lesson</option>
-                <option value="quiz">Quiz</option>
-              </select>
-            </label>
+                      <p className="mt-2 text-sm font-semibold text-teal-700">
+                        {assignment.resourceTopic}
+                      </p>
+                    </div>
 
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Resource ID
-              </span>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
+                      <BookOpen className="h-5 w-5" />
+                    </div>
+                  </div>
 
-              <input
-                type="text"
-                value={resourceId}
-                onChange={(event) => setResourceId(event.target.value)}
-                placeholder={
-                  type === "lesson"
-                    ? "Example: binary-conversion"
-                    : "Example: binary"
-                }
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Due date
-              </span>
-
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(event) => setDueDate(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
-            </label>
-
-            <label className="block md:col-span-2">
-              <span className="text-sm font-semibold text-slate-700">
-                Instructions
-              </span>
-
-              <textarea
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                placeholder="Explain what students need to complete."
-                rows={4}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
-            </label>
-
-            <div className="md:col-span-2">
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-teal-600 px-6 py-3 font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {submitting
-                  ? "Creating Assignment..."
-                  : "Create Assignment"}
-              </button>
-            </div>
-          </form>
-        )}
-      </Card>
-
-      <Card>
-        <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-          Assignment Directory
-        </p>
-
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          Your Assignments
-        </h2>
-
-        {assignments.length === 0 ? (
-          <div className="mt-8 rounded-2xl bg-slate-50 p-10 text-center">
-            <div className="text-5xl">📋</div>
-
-            <h3 className="mt-4 text-2xl font-bold text-slate-900">
-              No assignments created yet
-            </h3>
-
-            <p className="mt-2 text-slate-600">
-              Use the form above to assign a lesson or quiz to a class.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {assignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-                      {assignment.type}
+                  {assignment.instructions && (
+                    <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
+                      {assignment.instructions}
                     </p>
+                  )}
 
-                    <h3 className="mt-2 text-xl font-bold text-slate-900">
-                      {assignment.title}
-                    </h3>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Students
+                      </p>
 
-                    <p className="mt-2 text-sm text-slate-600">
-                      {getClassName(assignment.classId)}
+                      <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
+                        <Users className="h-4 w-4 text-blue-600" />
+                        {assignment.studentCount}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        Due date
+                      </p>
+
+                      <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
+                        <CalendarDays className="h-4 w-4 text-teal-600" />
+                        {formatDate(assignment.dueDate)}
+                      </p>
+
+                      <p
+                        className={`mt-1 text-xs font-semibold ${
+                          dueStatus.overdue ? "text-red-600" : "text-slate-500"
+                        }`}
+                      >
+                        {dueStatus.label}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-bold text-slate-700">
+                        Completion
+                      </span>
+
+                      <span className="font-black text-teal-700">
+                        {completionPercentage}%
+                      </span>
+                    </div>
+
+                    <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 transition-all"
+                        style={{
+                          width: `${completionPercentage}%`,
+                        }}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs font-semibold text-slate-500">
+                      {assignment.completedCount} of {assignment.studentCount}{" "}
+                      completed
                     </p>
                   </div>
 
-                  <span className="w-fit rounded-full bg-green-100 px-3 py-1 text-sm font-semibold capitalize text-green-700">
-                    {assignment.status}
-                  </span>
-                </div>
-
-                <p className="mt-4 leading-6 text-slate-600">
-                  {assignment.description}
-                </p>
-
-                <div className="mt-5 space-y-2 text-sm text-slate-600">
-                  <p>
-                    Resource:{" "}
-                    <span className="font-bold text-slate-900">
-                      {assignment.resourceId}
-                    </span>
-                  </p>
-
-                  <p>
-                    Due:{" "}
-                    <span className="font-bold text-slate-900">
-                      {assignment.dueDate || "No due date"}
-                    </span>
-                  </p>
-                </div>
-
-                <div className="mt-6">
-                  <Link
-                    href={`/teacher/assignments/${assignment.id}`}
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-teal-600 px-5 py-3 font-bold text-white transition hover:bg-teal-700"
-                  >
-                    📊 View Results
-                  </Link>
-                </div>
-              </div>
-            ))}
+                  <div className="mt-6">
+                    <Link
+                      href={`/teacher/assignments/${assignment.id}`}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700"
+                    >
+                      <Eye className="h-4 w-4" />
+                      View progress
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </Card>
@@ -517,26 +453,32 @@ export default function TeacherAssignmentsPage() {
 function SummaryCard({
   label,
   value,
+  description,
   icon,
+  iconClassName,
 }: {
   label: string;
-  value: string;
-  icon: string;
+  value: number | string;
+  description: string;
+  icon: React.ReactNode;
+  iconClassName: string;
 }) {
   return (
-    <Card>
+    <Card className="rounded-3xl border border-slate-200 p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-bold text-slate-500">{label}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
 
-        <div className="text-3xl">{icon}</div>
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}
+        >
+          {icon}
+        </div>
       </div>
     </Card>
   );

@@ -1,8 +1,5 @@
 export type AssignmentResourceType =
-  | "lesson"
-  | "quiz"
-  | "ai-quiz"
-  | "exam-paper";
+  "lesson" | "quiz" | "ai-quiz" | "exam-paper";
 
 export type AssignmentWizardResource = {
   id: string;
@@ -26,7 +23,4 @@ export type AssignmentWizardData = {
 };
 
 export type AssignmentWizardStep =
-  | "resource"
-  | "classes"
-  | "details"
-  | "review";
+  "resource" | "classes" | "details" | "review";

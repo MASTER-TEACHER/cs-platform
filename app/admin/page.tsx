@@ -57,8 +57,9 @@ export default function AdminDashboardPage() {
 
   const [requests, setRequests] = useState<TeacherRequest[]>([]);
   const [loadingRequests, setLoadingRequests] = useState(true);
-  const [processingRequestId, setProcessingRequestId] =
-    useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null,
+  );
 
   const isAdmin = profile?.role === "admin";
 
@@ -75,7 +76,7 @@ export default function AdminDashboardPage() {
 
     const requestsQuery = query(
       collection(db, "teacherRequests"),
-      orderBy("createdAt", "desc")
+      orderBy("createdAt", "desc"),
     );
 
     const unsubscribe = onSnapshot(
@@ -101,7 +102,7 @@ export default function AdminDashboardPage() {
               status,
               createdAt: data.createdAt,
             };
-          }
+          },
         );
 
         setRequests(loadedRequests);
@@ -112,7 +113,7 @@ export default function AdminDashboardPage() {
         toast.error("Could not load teacher access requests.");
         setRequests([]);
         setLoadingRequests(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -120,23 +121,20 @@ export default function AdminDashboardPage() {
 
   const pendingRequests = useMemo(
     () => requests.filter((request) => request.status === "pending"),
-    [requests]
+    [requests],
   );
 
   const approvedRequests = useMemo(
     () => requests.filter((request) => request.status === "approved"),
-    [requests]
+    [requests],
   );
 
   const rejectedRequests = useMemo(
     () => requests.filter((request) => request.status === "rejected"),
-    [requests]
+    [requests],
   );
 
-  async function reviewTeacherRequest(
-    requestId: string,
-    action: ReviewAction
-  ) {
+  async function reviewTeacherRequest(requestId: string, action: ReviewAction) {
     if (!user) {
       toast.error("You must be logged in as an administrator.");
       return;
@@ -147,25 +145,22 @@ export default function AdminDashboardPage() {
     try {
       const adminIdToken = await user.getIdToken(true);
 
-      const response = await fetch(
-        `/api/admin/teacher-request/${requestId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            action,
-            adminIdToken,
-          }),
-        }
-      );
+      const response = await fetch(`/api/admin/teacher-request/${requestId}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          action,
+          adminIdToken,
+        }),
+      });
 
       const data = (await response.json()) as ReviewResponse;
 
       if (!response.ok) {
         throw new Error(
-          data.error || "The teacher request could not be reviewed."
+          data.error || "The teacher request could not be reviewed.",
         );
       }
 
@@ -180,7 +175,7 @@ export default function AdminDashboardPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "The teacher request could not be reviewed."
+          : "The teacher request could not be reviewed.",
       );
     } finally {
       setProcessingRequestId(null);
@@ -234,9 +229,7 @@ export default function AdminDashboardPage() {
             Administration
           </p>
 
-          <h1 className="mt-3 text-4xl font-extrabold">
-            Admin Dashboard
-          </h1>
+          <h1 className="mt-3 text-4xl font-extrabold">Admin Dashboard</h1>
 
           <p className="mt-3 max-w-2xl text-indigo-100">
             Review teacher access requests and manage platform permissions.
@@ -334,22 +327,16 @@ export default function AdminDashboardPage() {
                       disabled={processing}
                       className="rounded-xl bg-green-600 px-5 py-3 font-bold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {processing
-                        ? "Processing..."
-                        : "Approve Teacher"}
+                      {processing ? "Processing..." : "Approve Teacher"}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() =>
-                        reviewTeacherRequest(request.id, "reject")
-                      }
+                      onClick={() => reviewTeacherRequest(request.id, "reject")}
                       disabled={processing}
                       className="rounded-xl border border-red-300 px-5 py-3 font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {processing
-                        ? "Processing..."
-                        : "Reject Request"}
+                      {processing ? "Processing..." : "Reject Request"}
                     </button>
                   </div>
                 </div>
@@ -404,9 +391,7 @@ function RequestHistory({
       </h2>
 
       {requests.length === 0 ? (
-        <p className="mt-6 text-slate-600">
-          {emptyMessage}
-        </p>
+        <p className="mt-6 text-slate-600">{emptyMessage}</p>
       ) : (
         <div className="mt-6 space-y-4">
           {requests.map((request) => (
@@ -416,13 +401,9 @@ function RequestHistory({
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="font-bold text-slate-900">
-                    {request.name}
-                  </p>
+                  <p className="font-bold text-slate-900">{request.name}</p>
 
-                  <p className="mt-1 text-sm text-slate-600">
-                    {request.email}
-                  </p>
+                  <p className="mt-1 text-sm text-slate-600">{request.email}</p>
 
                   <p className="mt-2 text-sm text-slate-600">
                     {request.schoolName}
@@ -456,13 +437,9 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
         </div>
 
         <div className="text-3xl">{icon}</div>

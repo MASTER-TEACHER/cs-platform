@@ -1,509 +1,519 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
 import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  type Timestamp,
-} from "firebase/firestore";
+  AlertCircle,
+  ArrowLeft,
+  Award,
+  BarChart3,
+  BookOpen,
+  Brain,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  Flame,
+  FileText,
+  GraduationCap,
+  Lightbulb,
+  School,
+  Sparkles,
+  Star,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  UserRound,
+  XCircle,
+} from "lucide-react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
-import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getStudentAnalytics,
+  type AnalyticsAssignmentStatus,
+  type StudentAnalyticsActivity,
+  type StudentAnalyticsData,
+  type StudentAnalyticsRecommendation,
+  type StudentTopicPerformance,
+} from "@/services/studentAnalyticsService";
 
-type StudentProfile = {
-  id: string;
-  name: string;
-  email: string;
-  xp: number;
-  streak: number;
-  badges: string[];
-  completedLessons: string[];
-  qualification?: string;
-  examBoard?: string;
-  currentCourse?: string;
-};
-
-type AssignmentRecord = {
-  id: string;
-  title: string;
-  type: "lesson" | "quiz";
-  dueDate: string;
-};
-
-type AssignmentResult = {
-  id: string;
-  assignmentId: string;
-  studentId: string;
-  percentage: number;
-  score: number;
-  totalQuestions: number;
-  earnedXP: number;
-  status: string;
-  completedAt?: Timestamp;
-};
-
-type ProgressRow = {
-  assignment: AssignmentRecord | null;
-  result: AssignmentResult;
-};
-
-function getGrade(percentage: number) {
-  if (percentage >= 90) return "9";
-  if (percentage >= 80) return "8";
-  if (percentage >= 70) return "7";
-  if (percentage >= 60) return "6";
-  if (percentage >= 50) return "5";
-  if (percentage >= 40) return "4";
-  if (percentage >= 30) return "3";
-  if (percentage >= 20) return "2";
-  return "1";
-}
-
-function formatDate(timestamp?: Timestamp) {
-  if (!timestamp) {
-    return "Recently";
+function formatDate(value: Date | null, includeTime = false): string {
+  if (!value) {
+    return "—";
   }
 
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(timestamp.toDate());
+  return new Intl.DateTimeFormat(
+    "en-GB",
+    includeTime
+      ? {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      : {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        },
+  ).format(value);
 }
 
-export default function TeacherStudentProfilePage() {
-  const params = useParams<{ studentId: string }>();
+function formatDuration(seconds: number): string {
+  if (seconds <= 0) {
+    return "No data";
+  }
+
+  const minutes = Math.floor(seconds / 60);
+
+  const remainingSeconds = seconds % 60;
+
+  if (minutes === 0) {
+    return `${remainingSeconds}s`;
+  }
+
+  return `${minutes}m ${remainingSeconds}s`;
+}
+
+function formatQualification(value: string): string {
+  if (!value.trim()) {
+    return "Not selected";
+  }
+
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function getInitials(name: string): string {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase() || "ST"
+  );
+}
+
+export default function TeacherStudentAnalyticsPage() {
+  const params = useParams<{
+    studentId: string;
+  }>();
+
   const studentId = params.studentId;
 
-  const [student, setStudent] = useState<StudentProfile | null>(null);
-  const [progressRows, setProgressRows] = useState<ProgressRow[]>([]);
+  const { user } = useAuth();
+
+  const [analytics, setAnalytics] = useState<StudentAnalyticsData | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
+
+  const [error, setError] = useState("");
+
+  const loadAnalytics = useCallback(async () => {
+    if (!studentId || !user?.uid) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+
+      const loadedAnalytics = await getStudentAnalytics(studentId, user.uid);
+
+      if (!loadedAnalytics) {
+        setAnalytics(null);
+
+        setError(
+          "This student could not be found or is not enrolled in one of your classes.",
+        );
+
+        return;
+      }
+
+      setAnalytics(loadedAnalytics);
+    } catch (caughtError) {
+      console.error("Failed to load student analytics:", caughtError);
+
+      setAnalytics(null);
+
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Student analytics could not be loaded.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [studentId, user?.uid]);
 
   useEffect(() => {
-    async function loadStudentProgress() {
-      try {
-        const studentSnapshot = await getDoc(
-          doc(db, "users", studentId)
-        );
+    void loadAnalytics();
+  }, [loadAnalytics]);
 
-        if (!studentSnapshot.exists()) {
-          setNotFound(true);
-          return;
-        }
+  const sortedOutstanding = useMemo(
+    () =>
+      analytics
+        ? [...analytics.outstandingActivities].sort((first, second) => {
+            const firstOverdue = first.status === "overdue";
 
-        const studentData = studentSnapshot.data();
+            const secondOverdue = second.status === "overdue";
 
-        if (studentData.role !== "student") {
-          setNotFound(true);
-          return;
-        }
+            if (firstOverdue !== secondOverdue) {
+              return firstOverdue ? -1 : 1;
+            }
 
-        const loadedStudent: StudentProfile = {
-          id: studentSnapshot.id,
-          name: studentData.name || "Student",
-          email: studentData.email || "No email available",
-          xp: studentData.xp || 0,
-          streak: studentData.streak || 0,
-          badges: Array.isArray(studentData.badges)
-            ? studentData.badges
-            : [],
-          completedLessons: Array.isArray(studentData.completedLessons)
-            ? studentData.completedLessons
-            : [],
-          qualification: studentData.qualification,
-          examBoard: studentData.examBoard,
-          currentCourse: studentData.currentCourse,
-        };
-
-        const resultsSnapshot = await getDocs(
-          query(
-            collection(db, "assignmentResults"),
-            where("studentId", "==", studentId)
-          )
-        );
-
-        const results: AssignmentResult[] = resultsSnapshot.docs.map(
-          (resultDocument) => {
-            const data = resultDocument.data();
-
-            return {
-              id: resultDocument.id,
-              assignmentId: data.assignmentId || "",
-              studentId: data.studentId || "",
-              percentage: data.percentage || 0,
-              score: data.score || 0,
-              totalQuestions: data.totalQuestions || 0,
-              earnedXP: data.earnedXP || 0,
-              status: data.status || "completed",
-              completedAt: data.completedAt,
-            };
-          }
-        );
-
-        const assignmentIds = Array.from(
-          new Set(
-            results
-              .map((result) => result.assignmentId)
-              .filter(Boolean)
-          )
-        );
-
-        const assignmentSnapshots = await Promise.all(
-          assignmentIds.map((assignmentId) =>
-            getDoc(doc(db, "assignments", assignmentId))
-          )
-        );
-
-        const assignments = new Map<string, AssignmentRecord>();
-
-        assignmentSnapshots.forEach((snapshot) => {
-          if (!snapshot.exists()) {
-            return;
-          }
-
-          const data = snapshot.data();
-
-          assignments.set(snapshot.id, {
-            id: snapshot.id,
-            title: data.title || "Untitled Assignment",
-            type: data.type === "quiz" ? "quiz" : "lesson",
-            dueDate: data.dueDate || "",
-          });
-        });
-
-        const rows: ProgressRow[] = results
-          .map((result) => ({
-            result,
-            assignment: assignments.get(result.assignmentId) || null,
-          }))
-          .sort((a, b) => {
-            const aTime = a.result.completedAt?.toMillis() || 0;
-            const bTime = b.result.completedAt?.toMillis() || 0;
-
-            return bTime - aTime;
-          });
-
-        setStudent(loadedStudent);
-        setProgressRows(rows);
-      } catch (error) {
-        console.error("Failed to load student progress:", error);
-        setNotFound(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (studentId) {
-      void loadStudentProgress();
-    }
-  }, [studentId]);
-
-  const completedAssignments = progressRows.length;
-
-  const averageScore = useMemo(() => {
-    if (progressRows.length === 0) {
-      return 0;
-    }
-
-    const total = progressRows.reduce(
-      (sum, row) => sum + row.result.percentage,
-      0
-    );
-
-    return Math.round(total / progressRows.length);
-  }, [progressRows]);
-
-  const highestScore = useMemo(() => {
-    if (progressRows.length === 0) {
-      return 0;
-    }
-
-    return Math.max(
-      ...progressRows.map((row) => row.result.percentage)
-    );
-  }, [progressRows]);
-
-  const lowestScore = useMemo(() => {
-    if (progressRows.length === 0) {
-      return 0;
-    }
-
-    return Math.min(
-      ...progressRows.map((row) => row.result.percentage)
-    );
-  }, [progressRows]);
-
-  const strengths = progressRows
-    .filter((row) => row.result.percentage >= 70)
-    .slice(0, 3);
-
-  const needsSupport = progressRows
-    .filter((row) => row.result.percentage < 50)
-    .slice(0, 3);
+            return (
+              (first.dueDate?.getTime() || Number.MAX_SAFE_INTEGER) -
+              (second.dueDate?.getTime() || Number.MAX_SAFE_INTEGER)
+            );
+          })
+        : [],
+    [analytics],
+  );
 
   if (loading) {
     return (
       <div className="space-y-8">
-        <Skeleton className="h-52 w-full" />
+        <Skeleton className="h-64 w-full rounded-3xl" />
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({
+            length: 8,
+          }).map((_, index) => (
+            <Skeleton key={index} className="h-28 rounded-3xl" />
+          ))}
         </div>
 
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full rounded-3xl" />
       </div>
     );
   }
 
-  if (notFound || !student) {
+  if (!analytics || error) {
     return (
-      <Card>
-        <h1 className="text-2xl font-bold text-slate-900">
-          Student not found
+      <Card className="rounded-3xl border border-red-200 bg-red-50 p-8 text-center">
+        <AlertCircle className="mx-auto h-10 w-10 text-red-600" />
+
+        <h1 className="mt-5 text-2xl font-black text-red-950">
+          Student analytics unavailable
         </h1>
 
-        <p className="mt-3 text-slate-600">
-          This student profile does not exist or is not a student account.
+        <p className="mx-auto mt-3 max-w-xl text-sm text-red-800">
+          {error || "The student analytics could not be loaded."}
         </p>
 
-        <Link
-          href="/teacher/students"
-          className="mt-6 inline-flex rounded-xl bg-teal-600 px-5 py-3 font-bold text-white transition hover:bg-teal-700"
-        >
-          ← Back to students
-        </Link>
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => {
+              void loadAnalytics();
+            }}
+            className="rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white"
+          >
+            Try again
+          </button>
+
+          <Link
+            href="/teacher/students"
+            className="rounded-xl border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700"
+          >
+            Back to students
+          </Link>
+        </div>
       </Card>
     );
   }
 
+  const { student, classes, metrics } = analytics;
+
   return (
     <div className="space-y-8">
-      <Card className="border-0 bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 text-white">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-100">
-              Student Progress
-            </p>
+      <section className="rounded-3xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-700 p-7 text-white shadow-xl sm:p-9">
+        <Link
+          href="/teacher/students"
+          className="inline-flex items-center gap-2 text-sm font-bold text-emerald-100 hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          All students
+        </Link>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              {student.name}
-            </h1>
+        <div className="mt-7 flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white/15 text-2xl font-black">
+              {getInitials(student.name)}
+            </div>
 
-            <p className="mt-2 text-emerald-100">
-              {student.email}
-            </p>
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100">
+                Student analytics
+              </p>
+
+              <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+                {student.name}
+              </h1>
+
+              <p className="mt-2 text-emerald-100">
+                {student.email || "No email available"}
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {classes.map((studentClass) => (
+                  <span
+                    key={studentClass.id}
+                    className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold"
+                  >
+                    {studentClass.name}
+                  </span>
+                ))}
+
+                {classes.length === 0 && (
+                  <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">
+                    No teacher class
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
-          <Link
-            href="/teacher/students"
-            className="rounded-xl bg-white px-5 py-3 text-center font-bold text-teal-700 transition hover:bg-emerald-50"
-          >
-            ← All Students
-          </Link>
+          <div className="grid min-w-72 grid-cols-2 gap-3 rounded-3xl border border-white/20 bg-white/10 p-5">
+            <HeroMetric label="Current grade" value={metrics.currentGrade} />
+
+            <HeroMetric
+              label="Predicted grade"
+              value={metrics.predictedGrade}
+            />
+
+            <HeroMetric
+              label="Completion"
+              value={`${metrics.completionRate}%`}
+            />
+
+            <HeroMetric
+              label="Assessment average"
+              value={`${metrics.combinedAssessmentAverage}%`}
+            />
+          </div>
         </div>
-      </Card>
+      </section>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          label="Average Score"
-          value={`${averageScore}%`}
-          icon="📊"
+          label="Assignments"
+          value={`${metrics.completedAssignments}/${metrics.totalAssignments}`}
+          description="Completed activities"
+          icon={<CheckCircle2 className="h-6 w-6" />}
+          iconClassName="bg-emerald-50 text-emerald-600"
         />
 
         <SummaryCard
-          label="Current Grade"
-          value={getGrade(averageScore)}
-          icon="🎓"
+          label="Outstanding"
+          value={metrics.outstandingAssignments}
+          description={`${metrics.overdueAssignments} overdue`}
+          icon={<Clock3 className="h-6 w-6" />}
+          iconClassName="bg-amber-50 text-amber-600"
         />
 
         <SummaryCard
-          label="Assignments Completed"
-          value={completedAssignments.toString()}
-          icon="✅"
-        />
-
-        <SummaryCard
-          label="Current XP"
-          value={student.xp.toString()}
-          icon="⭐"
+          label="Quiz Average"
+          value={`${metrics.quizAverage}%`}
+          description={`${metrics.completedQuizAssignments} completed quizzes`}
+          icon={<Brain className="h-6 w-6" />}
+          iconClassName="bg-violet-50 text-violet-600"
         />
 
         <SummaryCard
           label="Highest Score"
-          value={`${highestScore}%`}
-          icon="🏆"
+          value={`${metrics.highestQuizScore}%`}
+          description={`Lowest ${metrics.lowestQuizScore}%`}
+          icon={<Award className="h-6 w-6" />}
+          iconClassName="bg-blue-50 text-blue-600"
         />
 
         <SummaryCard
-          label="Lowest Score"
-          value={`${lowestScore}%`}
-          icon="⚠️"
+          label="Written Exams"
+          value={`${metrics.completedExamAssignments}/${metrics.totalExamAssignments}`}
+          description={`${metrics.awaitingMarkingExamAssignments} awaiting marking`}
+          icon={<FileText className="h-6 w-6" />}
+          iconClassName="bg-indigo-50 text-indigo-600"
         />
 
         <SummaryCard
-          label="Current Streak"
-          value={student.streak.toString()}
-          icon="🔥"
+          label="Exam Average"
+          value={`${metrics.examAverage}%`}
+          description={
+            metrics.completedExamAssignments > 0
+              ? `Best ${metrics.highestExamScore}%`
+              : "No marked written exams yet"
+          }
+          icon={<BarChart3 className="h-6 w-6" />}
+          iconClassName="bg-cyan-50 text-cyan-600"
         />
 
         <SummaryCard
-          label="Badges"
-          value={student.badges.length.toString()}
-          icon="🏅"
+          label="XP"
+          value={metrics.totalXP}
+          description={`${metrics.assignmentXP} earned from assignments`}
+          icon={<Star className="h-6 w-6" />}
+          iconClassName="bg-yellow-50 text-yellow-600"
         />
-      </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
-          <p className="text-sm font-semibold uppercase tracking-wide text-green-600">
-            Strengths
-          </p>
+        <SummaryCard
+          label="Streak"
+          value={`${metrics.streak} days`}
+          description="Current learning streak"
+          icon={<Flame className="h-6 w-6" />}
+          iconClassName="bg-orange-50 text-orange-600"
+        />
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
-            Secure Areas
-          </h2>
+        <SummaryCard
+          label="Lessons"
+          value={metrics.completedLessons}
+          description={`${metrics.completedTopics} topics completed`}
+          icon={<BookOpen className="h-6 w-6" />}
+          iconClassName="bg-teal-50 text-teal-600"
+        />
 
-          {strengths.length === 0 ? (
-            <p className="mt-6 text-slate-600">
-              No secure assignment areas have been identified yet.
-            </p>
+        <SummaryCard
+          label="Trend"
+          value={
+            metrics.improvementTrend > 0
+              ? `+${metrics.improvementTrend}%`
+              : `${metrics.improvementTrend}%`
+          }
+          description={
+            metrics.improvementTrend >= 0
+              ? "Recent improvement"
+              : "Recent decline"
+          }
+          icon={
+            metrics.improvementTrend >= 0 ? (
+              <TrendingUp className="h-6 w-6" />
+            ) : (
+              <TrendingDown className="h-6 w-6" />
+            )
+          }
+          iconClassName={
+            metrics.improvementTrend >= 0
+              ? "bg-emerald-50 text-emerald-600"
+              : "bg-red-50 text-red-600"
+          }
+        />
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Performance"
+            title="Topic analysis"
+            description="Quiz and written-exam performance grouped by assessed topic."
+          />
+
+          {analytics.topicPerformance.length === 0 ? (
+            <EmptyMessage message="No topic performance data is available yet." />
           ) : (
-            <div className="mt-6 space-y-3">
-              {strengths.map(({ assignment, result }) => (
-                <div
-                  key={result.id}
-                  className="rounded-xl border border-green-200 bg-green-50 p-4"
-                >
-                  <p className="font-bold text-slate-900">
-                    {assignment?.title || "Assignment"}
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-green-700">
-                    {result.percentage}%
-                  </p>
-                </div>
+            <div className="mt-6 space-y-4">
+              {analytics.topicPerformance.map((topic) => (
+                <TopicRow key={topic.id} topic={topic} />
               ))}
             </div>
           )}
         </Card>
 
-        <Card>
-          <p className="text-sm font-semibold uppercase tracking-wide text-red-600">
-            Intervention
-          </p>
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Intervention"
+            title="Teacher recommendations"
+            description="Automatically generated from completion and assessment data."
+          />
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
-            Needs Support
-          </h2>
-
-          {needsSupport.length === 0 ? (
-            <p className="mt-6 text-slate-600">
-              No low-scoring assignment areas are currently identified.
-            </p>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {needsSupport.map(({ assignment, result }) => (
-                <div
-                  key={result.id}
-                  className="rounded-xl border border-red-200 bg-red-50 p-4"
-                >
-                  <p className="font-bold text-slate-900">
-                    {assignment?.title || "Assignment"}
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-red-700">
-                    {result.percentage}% — targeted revision recommended
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </div>
-
-      <Card>
-        <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-          Progress Timeline
-        </p>
-
-        <h2 className="mt-2 text-2xl font-bold text-slate-900">
-          Assignment History
-        </h2>
-
-        {progressRows.length === 0 ? (
-          <div className="mt-8 rounded-2xl bg-slate-50 p-10 text-center">
-            <div className="text-5xl">📈</div>
-
-            <h3 className="mt-4 text-2xl font-bold text-slate-900">
-              No completed assignments yet
-            </h3>
-
-            <p className="mt-2 text-slate-600">
-              Results will appear here once the student completes assigned work.
-            </p>
+          <div className="mt-6 space-y-4">
+            {analytics.recommendations.map((recommendation) => (
+              <RecommendationCard
+                key={recommendation.id}
+                recommendation={recommendation}
+              />
+            ))}
           </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Strengths"
+            title="Secure areas"
+            description="Topics currently assessed at 70% or higher."
+          />
+
+          {analytics.strongestTopics.length === 0 ? (
+            <EmptyMessage message="No secure assessed topics have been identified yet." />
+          ) : (
+            <div className="mt-6 space-y-3">
+              {analytics.strongestTopics.map((topic) => (
+                <TopicHighlight key={topic.id} topic={topic} positive />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Support"
+            title="Priority areas"
+            description="Topics currently assessed below 50%."
+          />
+
+          {analytics.weakestTopics.length === 0 ? (
+            <EmptyMessage message="No priority assessed topics are currently identified." />
+          ) : (
+            <div className="mt-6 space-y-3">
+              {analytics.weakestTopics.map((topic) => (
+                <TopicHighlight key={topic.id} topic={topic} positive={false} />
+              ))}
+            </div>
+          )}
+        </Card>
+      </section>
+
+      <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
+        <div className="border-b border-slate-200 p-6 sm:p-7">
+          <SectionHeading
+            eyebrow="Learning history"
+            title="Recent activity"
+            description="The student’s most recent completed learning activities."
+          />
+        </div>
+
+        {analytics.recentActivities.length === 0 ? (
+          <EmptyMessage message="No completed activity has been recorded yet." />
         ) : (
-          <div className="mt-8 overflow-x-auto">
-            <table className="min-w-full border-separate border-spacing-y-3">
-              <thead>
-                <tr className="text-left text-sm uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-2">Assignment</th>
-                  <th className="px-4 py-2">Type</th>
-                  <th className="px-4 py-2">Score</th>
-                  <th className="px-4 py-2">Percentage</th>
-                  <th className="px-4 py-2">Grade</th>
-                  <th className="px-4 py-2">XP</th>
-                  <th className="px-4 py-2">Completed</th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <th className="px-6 py-4">Activity</th>
+
+                  <th className="px-6 py-4">Type</th>
+
+                  <th className="px-6 py-4">Score</th>
+
+                  <th className="px-6 py-4">XP</th>
+
+                  <th className="px-6 py-4">Time</th>
+
+                  <th className="px-6 py-4">Completed</th>
                 </tr>
               </thead>
 
-              <tbody>
-                {progressRows.map(({ assignment, result }) => (
-                  <tr
-                    key={result.id}
-                    className="bg-slate-50 text-slate-700"
-                  >
-                    <td className="rounded-l-2xl px-4 py-4">
-                      <p className="font-bold text-slate-900">
-                        {assignment?.title || "Unknown Assignment"}
-                      </p>
-                    </td>
-
-                    <td className="px-4 py-4 font-semibold capitalize">
-                      {assignment?.type || "quiz"}
-                    </td>
-
-                    <td className="px-4 py-4 font-semibold">
-                      {result.score} / {result.totalQuestions}
-                    </td>
-
-                    <td className="px-4 py-4 font-semibold">
-                      {result.percentage}%
-                    </td>
-
-                    <td className="px-4 py-4 font-semibold">
-                      {getGrade(result.percentage)}
-                    </td>
-
-                    <td className="px-4 py-4 font-semibold">
-                      ⭐ {result.earnedXP}
-                    </td>
-
-                    <td className="rounded-r-2xl px-4 py-4 text-sm font-semibold">
-                      {formatDate(result.completedAt)}
-                    </td>
-                  </tr>
+              <tbody className="divide-y divide-slate-100">
+                {analytics.recentActivities.map((activity) => (
+                  <ActivityRow key={activity.id} activity={activity} />
                 ))}
               </tbody>
             </table>
@@ -511,66 +521,115 @@ export default function TeacherStudentProfilePage() {
         )}
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <Card>
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-            Course Details
-          </p>
+      <Card className="rounded-3xl border border-slate-200 p-6">
+        <SectionHeading
+          eyebrow="Outstanding work"
+          title="Assignments requiring attention"
+          description="Incomplete and overdue activities assigned to this student."
+        />
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
-            Learning Programme
-          </h2>
+        {sortedOutstanding.length === 0 ? (
+          <EmptyMessage message="There is no outstanding assigned work." />
+        ) : (
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            {sortedOutstanding.map((activity) => (
+              <OutstandingCard key={activity.id} activity={activity} />
+            ))}
+          </div>
+        )}
+      </Card>
 
-          <div className="mt-6 space-y-4">
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Programme"
+            title="Course details"
+            description="The student’s selected learning programme."
+          />
+
+          <div className="mt-6 space-y-3">
             <DetailRow
               label="Qualification"
-              value={student.qualification?.toUpperCase() || "Not selected"}
+              value={formatQualification(student.qualification)}
             />
 
             <DetailRow
               label="Exam Board"
-              value={student.examBoard?.toUpperCase() || "Not selected"}
+              value={student.examBoard.trim().toUpperCase() || "Not selected"}
             />
 
             <DetailRow
               label="Current Course"
-              value={student.currentCourse?.toUpperCase() || "Not selected"}
+              value={formatQualification(student.currentCourse)}
             />
 
             <DetailRow
-              label="Lessons Completed"
-              value={student.completedLessons.length.toString()}
+              label="Classes"
+              value={
+                classes.map((studentClass) => studentClass.name).join(", ") ||
+                "No classes"
+              }
+            />
+
+            <DetailRow
+              label="Average Quiz Time"
+              value={formatDuration(metrics.averageTimeTakenSeconds)}
             />
           </div>
         </Card>
 
-        <Card>
-          <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-            Achievements
-          </p>
+        <Card className="rounded-3xl border border-slate-200 p-6">
+          <SectionHeading
+            eyebrow="Progress"
+            title="Learning totals"
+            description="Recorded curriculum and assignment progress."
+          />
 
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
-            Badges Earned
-          </h2>
+          <div className="mt-6 grid grid-cols-2 gap-4">
+            <MiniMetric
+              label="Resources"
+              value={`${metrics.completedResourceAssignments}/${metrics.totalResourceAssignments}`}
+              icon={<BookOpen className="h-5 w-5" />}
+            />
 
-          {student.badges.length === 0 ? (
-            <p className="mt-6 text-slate-600">
-              This student has not earned any badges yet.
-            </p>
-          ) : (
-            <div className="mt-6 flex flex-wrap gap-3">
-              {student.badges.map((badge) => (
-                <span
-                  key={badge}
-                  className="rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700"
-                >
-                  🏆 {badge}
-                </span>
-              ))}
-            </div>
-          )}
+            <MiniMetric
+              label="Quizzes"
+              value={`${metrics.completedQuizAssignments}/${metrics.totalQuizAssignments}`}
+              icon={<Brain className="h-5 w-5" />}
+            />
+
+            <MiniMetric
+              label="Written Exams"
+              value={`${metrics.completedExamAssignments}/${metrics.totalExamAssignments}`}
+              icon={<FileText className="h-5 w-5" />}
+            />
+
+            <MiniMetric
+              label="Topics"
+              value={`${metrics.completedTopics}`}
+              icon={<Target className="h-5 w-5" />}
+            />
+
+            <MiniMetric
+              label="Units"
+              value={`${metrics.completedUnits}`}
+              icon={<GraduationCap className="h-5 w-5" />}
+            />
+          </div>
         </Card>
-      </div>
+      </section>
+    </div>
+  );
+}
+
+function HeroMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/10 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-emerald-100">
+        {label}
+      </p>
+
+      <p className="mt-2 text-2xl font-black">{value}</p>
     </div>
   );
 }
@@ -578,47 +637,302 @@ export default function TeacherStudentProfilePage() {
 function SummaryCard({
   label,
   value,
+  description,
   icon,
+  iconClassName,
 }: {
   label: string;
-  value: string;
-  icon: string;
+  value: number | string;
+  description: string;
+  icon: React.ReactNode;
+  iconClassName: string;
 }) {
   return (
-    <Card>
+    <Card className="rounded-3xl border border-slate-200 p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-bold text-slate-500">{label}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+
+          <p className="mt-1 text-sm text-slate-500">{description}</p>
         </div>
 
-        <div className="text-3xl">{icon}</div>
+        <div
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}
+        >
+          {icon}
+        </div>
       </div>
     </Card>
   );
 }
 
-function DetailRow({
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div>
+      <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-600">
+        {eyebrow}
+      </p>
+
+      <h2 className="mt-2 text-2xl font-black text-slate-950">{title}</h2>
+
+      <p className="mt-2 text-sm text-slate-500">{description}</p>
+    </div>
+  );
+}
+
+function TopicRow({ topic }: { topic: StudentTopicPerformance }) {
+  const barClassName =
+    topic.classification === "strength"
+      ? "bg-emerald-500"
+      : topic.classification === "support"
+        ? "bg-red-500"
+        : "bg-amber-500";
+
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="font-bold text-slate-900">{topic.topic}</p>
+
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            {topic.attempts} attempt
+            {topic.attempts === 1 ? "" : "s"}
+          </p>
+        </div>
+
+        <p className="font-black text-slate-900">{topic.averageScore}%</p>
+      </div>
+
+      <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={`h-full rounded-full ${barClassName}`}
+          style={{
+            width: `${Math.min(100, Math.max(0, topic.averageScore))}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TopicHighlight({
+  topic,
+  positive,
+}: {
+  topic: StudentTopicPerformance;
+  positive: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-4 ${
+        positive
+          ? "border-emerald-200 bg-emerald-50"
+          : "border-red-200 bg-red-50"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <p className="font-bold text-slate-900">{topic.topic}</p>
+
+        <p
+          className={`font-black ${
+            positive ? "text-emerald-700" : "text-red-700"
+          }`}
+        >
+          {topic.averageScore}%
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function RecommendationCard({
+  recommendation,
+}: {
+  recommendation: StudentAnalyticsRecommendation;
+}) {
+  const classes =
+    recommendation.priority === "high"
+      ? "border-red-200 bg-red-50"
+      : recommendation.priority === "medium"
+        ? "border-amber-200 bg-amber-50"
+        : "border-emerald-200 bg-emerald-50";
+
+  return (
+    <div className={`rounded-2xl border p-5 ${classes}`}>
+      <div className="flex items-start gap-3">
+        {recommendation.priority === "positive" ? (
+          <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+        ) : (
+          <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+        )}
+
+        <div>
+          <p className="font-black text-slate-950">{recommendation.title}</p>
+
+          <p className="mt-2 text-sm leading-6 text-slate-700">
+            {recommendation.description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivityRow({ activity }: { activity: StudentAnalyticsActivity }) {
+  return (
+    <tr className="hover:bg-slate-50">
+      <td className="px-6 py-5">
+        <p className="font-bold text-slate-950">{activity.title}</p>
+
+        <p className="mt-1 text-sm text-slate-500">{activity.className}</p>
+      </td>
+
+      <td className="px-6 py-5">
+        <span
+          className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+            activity.type === "quiz"
+              ? "bg-violet-100 text-violet-700"
+              : activity.type === "exam"
+                ? "bg-indigo-100 text-indigo-700"
+                : "bg-teal-100 text-teal-700"
+          }`}
+        >
+          {activity.type === "quiz"
+            ? "Quiz"
+            : activity.type === "exam"
+              ? "Written Exam"
+              : "Resource"}
+        </span>
+      </td>
+
+      <td className="px-6 py-5 font-semibold text-slate-700">
+        {activity.percentage !== null ? `${activity.percentage}%` : "Completed"}
+      </td>
+
+      <td className="px-6 py-5 font-semibold text-slate-700">
+        {activity.earnedXP > 0 ? `⭐ ${activity.earnedXP}` : "—"}
+      </td>
+
+      <td className="px-6 py-5 font-semibold text-slate-700">
+        {formatDuration(activity.timeTakenSeconds)}
+      </td>
+
+      <td className="px-6 py-5 text-sm text-slate-600">
+        {formatDate(activity.completedAt, true)}
+      </td>
+    </tr>
+  );
+}
+
+function OutstandingCard({ activity }: { activity: StudentAnalyticsActivity }) {
+  const overdue = activity.status === "overdue";
+
+  return (
+    <div
+      className={`rounded-2xl border p-5 ${
+        overdue ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="font-black text-slate-950">{activity.title}</p>
+
+          <p className="mt-1 text-sm text-slate-600">{activity.className}</p>
+        </div>
+
+        <StatusBadge status={activity.status} />
+      </div>
+
+      <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-600">
+        <CalendarDays className="h-4 w-4" />
+        Due {formatDate(activity.dueDate)}
+      </p>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: AnalyticsAssignmentStatus }) {
+  if (status === "overdue") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+        <AlertCircle className="h-3.5 w-3.5" />
+        Overdue
+      </span>
+    );
+  }
+
+  if (status === "in_progress") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+        <Clock3 className="h-3.5 w-3.5" />
+        In progress
+      </span>
+    );
+  }
+
+  if (status === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        Completed
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">
+      <XCircle className="h-3.5 w-3.5" />
+      Not started
+    </span>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4">
+      <p className="font-semibold text-slate-600">{label}</p>
+
+      <p className="text-right font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function MiniMetric({
   label,
   value,
+  icon,
 }: {
   label: string;
   value: string;
+  icon: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-xl bg-slate-50 p-4">
-      <span className="font-semibold text-slate-600">
-        {label}
-      </span>
+    <div className="rounded-2xl bg-slate-50 p-5">
+      <div className="text-teal-600">{icon}</div>
 
-      <span className="text-right font-bold text-slate-900">
-        {value}
-      </span>
+      <p className="mt-3 text-2xl font-black text-slate-950">{value}</p>
+
+      <p className="mt-1 text-sm font-semibold text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+function EmptyMessage({ message }: { message: string }) {
+  return (
+    <div className="mt-6 rounded-2xl bg-slate-50 p-8 text-center">
+      <UserRound className="mx-auto h-8 w-8 text-slate-400" />
+
+      <p className="mt-3 text-sm text-slate-500">{message}</p>
     </div>
   );
 }

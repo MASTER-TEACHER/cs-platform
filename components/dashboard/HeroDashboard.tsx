@@ -34,7 +34,8 @@ export default function HeroDashboard({
           <h1 className="mt-3 text-4xl font-bold">{name} 👋</h1>
 
           <p className="mt-3 max-w-2xl text-blue-100">
-            Keep building your Computer Science mastery. Your next lesson is waiting.
+            Keep building your Computer Science mastery. Your next lesson is
+            waiting.
           </p>
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">

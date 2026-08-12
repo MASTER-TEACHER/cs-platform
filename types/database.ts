@@ -1,3 +1,5 @@
+import type { ExamBoard, Qualification } from "@/types/user";
+
 export type UserRole = "student" | "teacher" | "admin";
 
 export interface UserProfile {
@@ -6,21 +8,24 @@ export interface UserProfile {
   email: string;
   role: UserRole;
 
+  onboardingComplete: boolean;
+
   classIds: string[];
 
-  qualification?: string;
-  examBoard?: string;
-  currentCourse?: string;
+  qualification: Qualification | "";
+  examBoard: ExamBoard | "";
+  currentCourse: string;
 
-  xp?: number;
-  streak?: number;
+  xp: number;
+  streak: number;
 
-  completedLessons?: string[];
-  completedTopics?: string[];
-  completedUnits?: string[];
-  completedPapers?: string[];
+  completedLessons: string[];
+  completedTopics: string[];
+  completedUnits: string[];
+  completedPapers: string[];
 
-  badges?: string[];
+  badges: string[];
 
   createdAt: Date;
+  updatedAt: Date;
 }

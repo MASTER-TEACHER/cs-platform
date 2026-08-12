@@ -1,0 +1,82 @@
+# Knowledge Map and Curriculum Normalisation
+
+## New routes
+
+- `/knowledge-map`
+- `/teacher/knowledge-map`
+
+## What this fixes
+
+These values now resolve to one topic:
+
+- `hex-intro`
+- `hex-conversion`
+- `Hexadecimal Demo Quiz`
+- `hexadecimal`
+
+They all become **Hexadecimal**.
+
+Likewise:
+
+- `binary-intro`
+- `binary-conversion`
+- `binary-addition`
+- `Binary Numbers`
+
+all become **Binary Numbers**.
+
+## Replacement files
+
+- `services/adaptiveLearningService.ts`
+- `components/layout/Sidebar.tsx`
+
+All other files are new.
+
+## Firestore
+
+No new collection is created and no rules change is required.
+
+The teacher heat map reads the same student evidence already used by the
+adaptive learning engine.
+
+## Build
+
+```powershell
+Remove-Item -Recurse -Force ".next" -ErrorAction SilentlyContinue
+npm run build
+```
+
+## Test
+
+### Student
+
+1. Sign in as a student.
+2. Open Adaptive Learning.
+3. Confirm `hex-intro` and `Hexadecimal Demo Quiz` are merged into
+   **Hexadecimal**.
+4. Open Knowledge Map.
+5. Confirm Data Representation contains Binary Numbers and Hexadecimal.
+6. Confirm Hexadecimal lists Binary Numbers as its prerequisite.
+
+### Teacher
+
+1. Sign in as a teacher.
+2. Open Class Knowledge Map.
+3. Confirm mastery, confidence, priority-student and secure-student counts
+   appear for each curriculum topic.
+
+## Extending the registry
+
+Add future curriculum topics to:
+
+`data/curriculum/curriculumRegistry.ts`
+
+Each topic should include:
+
+- stable ID
+- display title
+- unit
+- aliases
+- lesson IDs
+- prerequisites
+- display order

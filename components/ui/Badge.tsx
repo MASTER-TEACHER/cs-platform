@@ -2,11 +2,10 @@ type BadgeProps = {
   children: React.ReactNode;
 };
 
-export default function Badge({
-  children,
-}: BadgeProps) {
+export default function Badge({ children }: BadgeProps) {
   return (
-    <span className="
+    <span
+      className="
       inline-flex
       items-center
       rounded-full
@@ -16,7 +15,8 @@ export default function Badge({
       text-sm
       font-semibold
       text-blue-700
-    ">
+    "
+    >
       {children}
     </span>
   );

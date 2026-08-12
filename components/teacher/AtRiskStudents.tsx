@@ -12,9 +12,7 @@ type AtRiskStudentsProps = {
   students: AtRiskStudent[];
 };
 
-export default function AtRiskStudents({
-  students,
-}: AtRiskStudentsProps) {
+export default function AtRiskStudents({ students }: AtRiskStudentsProps) {
   return (
     <Card>
       <p className="text-sm font-semibold uppercase tracking-wide text-red-600">

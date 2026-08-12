@@ -59,45 +59,40 @@ export default function TeacherQuizLibraryPage() {
 
     const quizzesQuery = query(
       collection(db, "generatedQuizzes"),
-      where("teacherId", "==", teacherId)
+      where("teacherId", "==", teacherId),
     );
 
     const unsubscribe = onSnapshot(
       quizzesQuery,
       (snapshot) => {
-        const loadedQuizzes: SavedQuiz[] = snapshot.docs.map(
-          (quizDocument) => {
-            const data = quizDocument.data();
+        const loadedQuizzes: SavedQuiz[] = snapshot.docs.map((quizDocument) => {
+          const data = quizDocument.data();
 
-            return {
-              id: quizDocument.id,
-              teacherId: data.teacherId || "",
-              title: data.title || "Untitled Quiz",
-              description: data.description || "",
-              topicId: data.topicId || "",
-              qualification: data.qualification || "GCSE",
-              examBoard: data.examBoard || "AQA",
-              difficulty:
-                data.difficulty === "foundation" ||
-                data.difficulty === "higher"
-                  ? data.difficulty
-                  : "standard",
-              estimatedTime: data.estimatedTime || "10 minutes",
-              questions: Array.isArray(data.questions)
-                ? data.questions
-                : [],
-              questionCount:
-                typeof data.questionCount === "number"
-                  ? data.questionCount
-                  : Array.isArray(data.questions)
-                    ? data.questions.length
-                    : 0,
-              status: data.status || "draft",
-              source: data.source || "ai",
-              createdAt: data.createdAt,
-            };
-          }
-        );
+          return {
+            id: quizDocument.id,
+            teacherId: data.teacherId || "",
+            title: data.title || "Untitled Quiz",
+            description: data.description || "",
+            topicId: data.topicId || "",
+            qualification: data.qualification || "GCSE",
+            examBoard: data.examBoard || "AQA",
+            difficulty:
+              data.difficulty === "foundation" || data.difficulty === "higher"
+                ? data.difficulty
+                : "standard",
+            estimatedTime: data.estimatedTime || "10 minutes",
+            questions: Array.isArray(data.questions) ? data.questions : [],
+            questionCount:
+              typeof data.questionCount === "number"
+                ? data.questionCount
+                : Array.isArray(data.questions)
+                  ? data.questions.length
+                  : 0,
+            status: data.status || "draft",
+            source: data.source || "ai",
+            createdAt: data.createdAt,
+          };
+        });
 
         loadedQuizzes.sort((a, b) => {
           const aTime = a.createdAt?.toMillis() || 0;
@@ -114,7 +109,7 @@ export default function TeacherQuizLibraryPage() {
         toast.error("Could not load your quiz library.");
         setQuizzes([]);
         setLoadingQuizzes(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -131,17 +126,13 @@ export default function TeacherQuizLibraryPage() {
       (quiz) =>
         quiz.title.toLowerCase().includes(search) ||
         quiz.topicId.toLowerCase().includes(search) ||
-        quiz.examBoard.toLowerCase().includes(search)
+        quiz.examBoard.toLowerCase().includes(search),
     );
   }, [quizzes, searchTerm]);
 
   const totalQuestions = useMemo(
-    () =>
-      quizzes.reduce(
-        (total, quiz) => total + quiz.questionCount,
-        0
-      ),
-    [quizzes]
+    () => quizzes.reduce((total, quiz) => total + quiz.questionCount, 0),
+    [quizzes],
   );
 
   if (authLoading || loadingQuizzes) {
@@ -169,9 +160,7 @@ export default function TeacherQuizLibraryPage() {
               AI Teacher Tools
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Quiz Library
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">Quiz Library</h1>
 
             <p className="mt-3 max-w-2xl text-violet-100">
               Review saved AI quizzes and prepare them for your classes.
@@ -318,13 +307,9 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">
-            {label}
-          </p>
+          <p className="text-sm font-semibold text-slate-500">{label}</p>
 
-          <p className="mt-2 text-3xl font-bold text-slate-900">
-            {value}
-          </p>
+          <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
         </div>
 
         <div className="text-3xl">{icon}</div>

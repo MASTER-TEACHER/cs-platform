@@ -20,7 +20,7 @@ export default function QuizGeneratorForm({
 }: QuizGeneratorFormProps) {
   function updateSetting<K extends keyof QuizGeneratorSettings>(
     key: K,
-    value: QuizGeneratorSettings[K]
+    value: QuizGeneratorSettings[K],
   ) {
     onChange({
       ...settings,
@@ -37,16 +37,12 @@ export default function QuizGeneratorForm({
       className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2"
     >
       <label className="block md:col-span-2">
-        <span className="text-sm font-semibold text-slate-700">
-          Topic
-        </span>
+        <span className="text-sm font-semibold text-slate-700">Topic</span>
 
         <input
           type="text"
           value={settings.topic}
-          onChange={(event) =>
-            updateSetting("topic", event.target.value)
-          }
+          onChange={(event) => updateSetting("topic", event.target.value)}
           placeholder="Example: Binary addition"
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           required
@@ -71,15 +67,11 @@ export default function QuizGeneratorForm({
       </label>
 
       <label className="block">
-        <span className="text-sm font-semibold text-slate-700">
-          Exam board
-        </span>
+        <span className="text-sm font-semibold text-slate-700">Exam board</span>
 
         <select
           value={settings.examBoard}
-          onChange={(event) =>
-            updateSetting("examBoard", event.target.value)
-          }
+          onChange={(event) => updateSetting("examBoard", event.target.value)}
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="AQA">AQA</option>
@@ -89,17 +81,12 @@ export default function QuizGeneratorForm({
       </label>
 
       <label className="block">
-        <span className="text-sm font-semibold text-slate-700">
-          Difficulty
-        </span>
+        <span className="text-sm font-semibold text-slate-700">Difficulty</span>
 
         <select
           value={settings.difficulty}
           onChange={(event) =>
-            updateSetting(
-              "difficulty",
-              event.target.value as QuizDifficulty
-            )
+            updateSetting("difficulty", event.target.value as QuizDifficulty)
           }
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         >
@@ -117,10 +104,7 @@ export default function QuizGeneratorForm({
         <select
           value={settings.questionCount}
           onChange={(event) =>
-            updateSetting(
-              "questionCount",
-              Number(event.target.value)
-            )
+            updateSetting("questionCount", Number(event.target.value))
           }
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         >

@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserProfile } from "@/hooks/useUserProfile";
 
-const PUBLIC_ROUTES = [
+type RequireCourseProps = {
+  children: ReactNode;
+};
+
+const publicRoutes = new Set([
   "/",
   "/landing",
   "/login",
@@ -14,134 +17,106 @@ const PUBLIC_ROUTES = [
   "/forgot-password",
   "/auth-test",
   "/teacher-access",
-];
+]);
 
-function isPublicRoute(pathname: string) {
-  return PUBLIC_ROUTES.includes(pathname);
-}
-
-function isTeacherRoute(pathname: string) {
+function isTeacherRoute(pathname: string): boolean {
   return pathname === "/teacher" || pathname.startsWith("/teacher/");
 }
 
-function isAdminRoute(pathname: string) {
+function isAdminRoute(pathname: string): boolean {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
-export default function RequireCourse({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RequireCourse({ children }: RequireCourseProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const { user, loading: authLoading } = useAuth();
-  const { profile, loading: profileLoading } = useUserProfile();
+  const { user, profile, loading, profileReady, profileError } = useAuth();
 
-  const publicRoute = isPublicRoute(pathname);
+  const isPublicRoute = publicRoutes.has(pathname);
   const teacherRoute = isTeacherRoute(pathname);
   const adminRoute = isAdminRoute(pathname);
 
-  const isAdmin = profile?.role === "admin";
+  const curriculumComplete =
+    profile?.onboardingComplete === true &&
+    Boolean(profile.qualification) &&
+    Boolean(profile.examBoard);
 
-  const isTeacher =
-    profile?.role === "teacher" || profile?.role === "admin";
+  let redirectTarget: string | null = null;
 
-  const loading =
-    authLoading ||
-    (!publicRoute && user !== null && profileLoading);
+  if (!loading && !user && !isPublicRoute) {
+    redirectTarget = "/login";
+  }
+
+  if (!loading && user && profileReady && profile) {
+    if (profile.role === "admin") {
+      if (!adminRoute) {
+        redirectTarget = "/admin";
+      }
+    } else if (profile.role === "teacher") {
+      if (isPublicRoute || pathname === "/onboarding" || adminRoute) {
+        redirectTarget = "/teacher";
+      }
+    } else {
+      if (teacherRoute || adminRoute) {
+        redirectTarget = "/dashboard";
+      } else if (isPublicRoute) {
+        redirectTarget = curriculumComplete ? "/dashboard" : "/onboarding";
+      } else if (pathname === "/onboarding" && curriculumComplete) {
+        redirectTarget = "/dashboard";
+      } else if (pathname !== "/onboarding" && !curriculumComplete) {
+        redirectTarget = "/onboarding";
+      }
+    }
+  }
 
   useEffect(() => {
-    if (loading) {
-      return;
+    if (redirectTarget) {
+      router.replace(redirectTarget);
     }
+  }, [redirectTarget, router]);
 
-    if (publicRoute) {
-      return;
-    }
+  if (loading) {
+    return <LoadingScreen message="Loading CS Master..." />;
+  }
 
-    if (!user) {
-      router.replace("/login");
-      return;
-    }
-
-    if (!profile) {
-      return;
-    }
-
-    // Admin pages are restricted to administrators only.
-    if (adminRoute && !isAdmin) {
-      router.replace(isTeacher ? "/teacher" : "/dashboard");
-      return;
-    }
-
-    // Teacher pages are available to teachers and administrators.
-    if (teacherRoute && !isTeacher) {
-      router.replace("/dashboard");
-      return;
-    }
-
-    // Teachers and administrators do not need student onboarding.
-    if (isTeacher) {
-      return;
-    }
-
-    // Students must select a course before using protected student pages.
-    if (
-      pathname !== "/onboarding" &&
-      !profile.currentCourse
-    ) {
-      router.replace("/onboarding");
-    }
-  }, [
-    loading,
-    publicRoute,
-    user,
-    profile,
-    adminRoute,
-    isAdmin,
-    teacherRoute,
-    isTeacher,
-    pathname,
-    router,
-  ]);
-
-  if (loading && !publicRoute) {
+  if (profileError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-blue-600" />
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
+        <section className="w-full max-w-xl rounded-3xl border border-red-200 bg-red-50 p-8">
+          <h1 className="text-2xl font-black text-red-950">
+            Your account could not be loaded
+          </h1>
 
-          <p className="mt-4 font-semibold text-slate-600">
-            Loading CS Master...
-          </p>
-        </div>
+          <p className="mt-3 text-red-800">{profileError}</p>
+        </section>
       </main>
     );
   }
 
-  if (!publicRoute && !user) {
-    return null;
+  if (user && (!profileReady || !profile)) {
+    return <LoadingScreen message="Preparing your account..." />;
   }
 
-  if (!publicRoute && user && !profile) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="font-semibold text-slate-600">
-          Loading your profile...
-        </p>
-      </main>
-    );
-  }
-
-  if (adminRoute && !isAdmin) {
-    return null;
-  }
-
-  if (teacherRoute && !isTeacher) {
-    return null;
+  /*
+   * Never render a route that the current role is not
+   * permitted to see while the redirect is pending.
+   */
+  if (redirectTarget) {
+    return <LoadingScreen message="Opening the correct portal..." />;
   }
 
   return <>{children}</>;
+}
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
+      <div className="text-center">
+        <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+
+        <p className="mt-4 font-bold text-slate-700">{message}</p>
+      </div>
+    </main>
+  );
 }

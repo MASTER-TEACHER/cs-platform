@@ -1,27 +1,30 @@
-export interface Topic {
+import type { ExamBoard, Qualification } from "@/types/user";
+
+export type CurriculumTopicReference = {
   id: string;
   title: string;
-  description: string;
-  simulator?: string;
+  description?: string;
   lessonIds: string[];
-}
+};
 
-export interface Unit {
+export type CurriculumUnit = {
   id: string;
   title: string;
+  description?: string;
   topicIds: string[];
-}
+};
 
-export interface Paper {
+export type CurriculumPaper = {
   id: string;
   title: string;
-  units: Unit[];
-}
+  description?: string;
+  units: CurriculumUnit[];
+};
 
-export interface Course {
+export type CurriculumCourse = {
   id: string;
   title: string;
-  qualification: string;
-  examBoard: string;
-  papers: Paper[];
-}
+  qualification: Qualification;
+  examBoard: ExamBoard;
+  papers: CurriculumPaper[];
+};

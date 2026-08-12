@@ -14,7 +14,7 @@ export default function NextBadgeCard({
   completedLessons,
 }: Props) {
   const nextBadge = achievements.find(
-    (achievement) => !unlockedBadges.includes(achievement.id)
+    (achievement) => !unlockedBadges.includes(achievement.id),
   );
 
   if (!nextBadge) {
@@ -31,18 +31,25 @@ export default function NextBadgeCard({
   let progress = 0;
 
   if (nextBadge.condition.type === "xp") {
-    progress = Math.min(100, Math.round((xp / Number(nextBadge.condition.value)) * 100));
+    progress = Math.min(
+      100,
+      Math.round((xp / Number(nextBadge.condition.value)) * 100),
+    );
   }
 
   if (nextBadge.condition.type === "completedLessons") {
     progress = Math.min(
       100,
-      Math.round((completedLessons.length / Number(nextBadge.condition.value)) * 100)
+      Math.round(
+        (completedLessons.length / Number(nextBadge.condition.value)) * 100,
+      ),
     );
   }
 
   if (nextBadge.condition.type === "lessonCompleted") {
-    progress = completedLessons.includes(String(nextBadge.condition.value)) ? 100 : 0;
+    progress = completedLessons.includes(String(nextBadge.condition.value))
+      ? 100
+      : 0;
   }
 
   return (

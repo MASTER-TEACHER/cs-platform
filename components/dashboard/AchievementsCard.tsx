@@ -17,13 +17,18 @@ export default function AchievementsCard({
 }: Props) {
   function getProgress(achievement: any) {
     if (achievement.condition.type === "xp") {
-      return Math.min(100, Math.round((xp / achievement.condition.value) * 100));
+      return Math.min(
+        100,
+        Math.round((xp / achievement.condition.value) * 100),
+      );
     }
 
     if (achievement.condition.type === "completedLessons") {
       return Math.min(
         100,
-        Math.round((completedLessons.length / achievement.condition.value) * 100)
+        Math.round(
+          (completedLessons.length / achievement.condition.value) * 100,
+        ),
       );
     }
 

@@ -35,9 +35,7 @@ export default function TeacherQuickActions() {
         Teacher Tools
       </p>
 
-      <h2 className="mt-2 text-2xl font-bold text-slate-900">
-        Quick Actions
-      </h2>
+      <h2 className="mt-2 text-2xl font-bold text-slate-900">Quick Actions</h2>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {actions.map((action) => (

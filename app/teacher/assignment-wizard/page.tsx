@@ -42,8 +42,7 @@ export default function AssignmentWizardPage() {
 
   const quizId = searchParams.get("quizId");
 
-  const [step, setStep] =
-    useState<AssignmentWizardStep>("resource");
+  const [step, setStep] = useState<AssignmentWizardStep>("resource");
 
   const [wizardData, setWizardData] =
     useState<AssignmentWizardData>(initialWizardData);
@@ -68,14 +67,14 @@ export default function AssignmentWizardPage() {
 
     const classesQuery = query(
       collection(db, "classes"),
-      where("teacherId", "==", teacherId)
+      where("teacherId", "==", teacherId),
     );
 
     const unsubscribe = onSnapshot(
       classesQuery,
       (snapshot) => {
-        const loadedClasses: AssignmentWizardClass[] =
-          snapshot.docs.map((classDocument) => {
+        const loadedClasses: AssignmentWizardClass[] = snapshot.docs.map(
+          (classDocument) => {
             const data = classDocument.data();
 
             return {
@@ -83,11 +82,10 @@ export default function AssignmentWizardPage() {
               name: data.name || "Untitled Class",
               yearGroup: data.yearGroup || "Not specified",
             };
-          });
-
-        loadedClasses.sort((a, b) =>
-          a.name.localeCompare(b.name)
+          },
         );
+
+        loadedClasses.sort((a, b) => a.name.localeCompare(b.name));
 
         setClasses(loadedClasses);
         setLoadingClasses(false);
@@ -97,7 +95,7 @@ export default function AssignmentWizardPage() {
         toast.error("Could not load your classes.");
         setClasses([]);
         setLoadingClasses(false);
-      }
+      },
     );
 
     return unsubscribe;
@@ -115,7 +113,7 @@ export default function AssignmentWizardPage() {
 
       try {
         const quizSnapshot = await getDoc(
-          doc(db, "generatedQuizzes", quizId as string)
+          doc(db, "generatedQuizzes", quizId as string),
         );
 
         if (cancelled) {
@@ -137,8 +135,7 @@ export default function AssignmentWizardPage() {
         const resource: AssignmentWizardResource = {
           id: quizSnapshot.id,
           title: data.title || "Untitled AI Quiz",
-          description:
-            data.description || "Complete the assigned AI quiz.",
+          description: data.description || "Complete the assigned AI quiz.",
           resourceType: "ai-quiz",
           resourceId: quizSnapshot.id,
         };
@@ -175,21 +172,19 @@ export default function AssignmentWizardPage() {
     setWizardData((current) => ({
       ...current,
       resource,
-      instructions:
-        current.instructions || resource.description,
+      instructions: current.instructions || resource.description,
     }));
   }
 
   function toggleClass(classId: string) {
     setWizardData((current) => {
-      const alreadySelected =
-        current.selectedClassIds.includes(classId);
+      const alreadySelected = current.selectedClassIds.includes(classId);
 
       return {
         ...current,
         selectedClassIds: alreadySelected
           ? current.selectedClassIds.filter(
-              (selectedId) => selectedId !== classId
+              (selectedId) => selectedId !== classId,
             )
           : [...current.selectedClassIds, classId],
       };
@@ -225,9 +220,7 @@ export default function AssignmentWizardPage() {
 
     try {
       const assignmentType =
-        wizardData.resource.resourceType === "lesson"
-          ? "lesson"
-          : "quiz";
+        wizardData.resource.resourceType === "lesson" ? "lesson" : "quiz";
 
       await Promise.all(
         wizardData.selectedClassIds.map((selectedClassId) =>
@@ -239,16 +232,14 @@ export default function AssignmentWizardPage() {
             type: assignmentType,
             resourceId: wizardData.resource!.resourceId,
             dueDate: wizardData.dueDate,
-          })
-        )
+          }),
+        ),
       );
 
       toast.success(
         `Assignment created for ${wizardData.selectedClassIds.length} ${
-          wizardData.selectedClassIds.length === 1
-            ? "class"
-            : "classes"
-        }.`
+          wizardData.selectedClassIds.length === 1 ? "class" : "classes"
+        }.`,
       );
 
       setWizardData(initialWizardData);
@@ -259,7 +250,7 @@ export default function AssignmentWizardPage() {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Could not create the assignments."
+          : "Could not create the assignments.",
       );
     } finally {
       setSubmitting(false);
@@ -289,9 +280,7 @@ export default function AssignmentWizardPage() {
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Assignment Wizard
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">Assignment Wizard</h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
               Choose a resource, select classes, add a deadline and create
@@ -378,9 +367,7 @@ function WizardProgress({
     { id: "review", label: "Review" },
   ];
 
-  const currentIndex = steps.findIndex(
-    (item) => item.id === currentStep
-  );
+  const currentIndex = steps.findIndex((item) => item.id === currentStep);
 
   return (
     <Card>
@@ -400,13 +387,9 @@ function WizardProgress({
                     : "border-slate-200 bg-slate-50 text-slate-500"
               }`}
             >
-              <p className="text-sm font-bold">
-                {complete ? "✓" : index + 1}
-              </p>
+              <p className="text-sm font-bold">{complete ? "✓" : index + 1}</p>
 
-              <p className="mt-1 font-semibold">
-                {item.label}
-              </p>
+              <p className="mt-1 font-semibold">{item.label}</p>
             </div>
           );
         })}

@@ -27,24 +27,16 @@ function isValidBody(value: unknown): value is TeacherRequestAction {
   );
 }
 
-export async function POST(
-  request: NextRequest,
-  context: RouteContext
-) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const { requestedId } = await context.params;
     const body: unknown = await request.json();
 
     if (!isValidBody(body)) {
-      return NextResponse.json(
-        { error: "Invalid request." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid request." }, { status: 400 });
     }
 
-    const decodedToken = await adminAuth.verifyIdToken(
-      body.adminIdToken
-    );
+    const decodedToken = await adminAuth.verifyIdToken(body.adminIdToken);
 
     const adminUserSnapshot = await adminDb
       .collection("users")
@@ -54,7 +46,7 @@ export async function POST(
     if (!adminUserSnapshot.exists) {
       return NextResponse.json(
         { error: "Admin profile not found." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -63,7 +55,7 @@ export async function POST(
     if (adminUser?.role !== "admin") {
       return NextResponse.json(
         { error: "Admin access required." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -71,13 +63,12 @@ export async function POST(
       .collection("teacherRequests")
       .doc(requestedId);
 
-    const teacherRequestSnapshot =
-      await teacherRequestReference.get();
+    const teacherRequestSnapshot = await teacherRequestReference.get();
 
     if (!teacherRequestSnapshot.exists) {
       return NextResponse.json(
         { error: "Teacher request not found." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -86,14 +77,14 @@ export async function POST(
     if (!teacherRequest?.userId) {
       return NextResponse.json(
         { error: "Teacher request is missing a user ID." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (teacherRequest.status !== "pending") {
       return NextResponse.json(
         { error: "This request has already been reviewed." },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -105,9 +96,7 @@ export async function POST(
       });
 
       await adminDb.runTransaction(async (transaction) => {
-        const userReference = adminDb
-          .collection("users")
-          .doc(requestedUserId);
+        const userReference = adminDb.collection("users").doc(requestedUserId);
 
         transaction.update(userReference, {
           role: "teacher",
@@ -151,7 +140,7 @@ export async function POST(
             ? error.message
             : "The request could not be reviewed.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -26,9 +26,7 @@ export default function AssignmentClassStep({
         Step 2 of 4
       </p>
 
-      <h2 className="mt-2 text-2xl font-bold text-slate-900">
-        Choose Classes
-      </h2>
+      <h2 className="mt-2 text-2xl font-bold text-slate-900">Choose Classes</h2>
 
       <p className="mt-2 text-slate-600">
         Select one or more classes that should receive this assignment.

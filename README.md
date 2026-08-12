@@ -74,15 +74,15 @@ Students can monitor:
 
 ## 🛠️ Tech Stack
 
-| Technology | Purpose |
-|------------|---------|
-| Next.js 16 | Frontend Framework |
-| TypeScript | Type Safety |
-| Tailwind CSS | UI Styling |
+| Technology              | Purpose             |
+| ----------------------- | ------------------- |
+| Next.js 16              | Frontend Framework  |
+| TypeScript              | Type Safety         |
+| Tailwind CSS            | UI Styling          |
 | Firebase Authentication | User Authentication |
-| Firestore | Database |
-| Vercel | Hosting |
-| GitHub | Version Control |
+| Firestore               | Database            |
+| Vercel                  | Hosting             |
+| GitHub                  | Version Control     |
 
 ---
 
@@ -104,7 +104,7 @@ public/
 
 # 📸 Screenshots
 
-*(To be added in Version 1.0.1)*
+_(To be added in Version 1.0.1)_
 
 - Landing Page
 - Dashboard

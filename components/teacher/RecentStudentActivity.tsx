@@ -47,13 +47,9 @@ export default function RecentStudentActivity({
               </div>
 
               <div className="sm:text-right">
-                <p className="font-bold text-emerald-700">
-                  {activity.result}
-                </p>
+                <p className="font-bold text-emerald-700">{activity.result}</p>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  {activity.time}
-                </p>
+                <p className="mt-1 text-xs text-slate-500">{activity.time}</p>
               </div>
             </div>
           ))}

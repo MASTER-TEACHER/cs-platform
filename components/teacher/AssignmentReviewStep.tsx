@@ -22,7 +22,7 @@ export default function AssignmentReviewStep({
   onSubmit,
 }: AssignmentReviewStepProps) {
   const selectedClasses = classes.filter((classItem) =>
-    data.selectedClassIds.includes(classItem.id)
+    data.selectedClassIds.includes(classItem.id),
   );
 
   return (
@@ -78,9 +78,7 @@ export default function AssignmentReviewStep({
             Instructions
           </p>
 
-          <p className="mt-3 leading-7 text-slate-700">
-            {data.instructions}
-          </p>
+          <p className="mt-3 leading-7 text-slate-700">{data.instructions}</p>
         </div>
       </div>
 
@@ -117,22 +115,14 @@ export default function AssignmentReviewStep({
   );
 }
 
-function ReviewSection({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function ReviewSection({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
 
-      <p className="mt-3 font-bold capitalize text-slate-900">
-        {value}
-      </p>
+      <p className="mt-3 font-bold capitalize text-slate-900">{value}</p>
     </div>
   );
 }

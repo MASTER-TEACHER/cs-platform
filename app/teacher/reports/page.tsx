@@ -47,9 +47,7 @@ export default function TeacherReportsPage() {
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">
-              Reports
-            </h1>
+            <h1 className="mt-3 text-4xl font-extrabold">Reports</h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
               Review whole-platform performance, completion and student support
@@ -67,7 +65,11 @@ export default function TeacherReportsPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Students" value={studentCount.toString()} icon="👨‍🎓" />
+        <SummaryCard
+          label="Students"
+          value={studentCount.toString()}
+          icon="👨‍🎓"
+        />
         <SummaryCard label="Classes" value={classCount.toString()} icon="🏫" />
         <SummaryCard
           label="Assignments"
@@ -168,9 +170,7 @@ export default function TeacherReportsPage() {
                     </p>
                   </div>
 
-                  <p className="font-bold text-amber-700">
-                    ⭐ {student.xp} XP
-                  </p>
+                  <p className="font-bold text-amber-700">⭐ {student.xp} XP</p>
                 </div>
               ))}
             </div>
@@ -212,7 +212,7 @@ export default function TeacherReportsPage() {
                     style={{
                       width: `${Math.min(
                         100,
-                        Math.max(0, topic.averageScore)
+                        Math.max(0, topic.averageScore),
                       )}%`,
                     }}
                   />

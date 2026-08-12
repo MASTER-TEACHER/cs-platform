@@ -16,8 +16,7 @@ function initialiseFirebaseAdmin() {
 
   const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_ADMIN_CLIENT_EMAIL;
-  const privateKeyBase64 =
-    process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64;
+  const privateKeyBase64 = process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64;
 
   const runningOnVercel = Boolean(process.env.VERCEL);
 
@@ -30,21 +29,20 @@ function initialiseFirebaseAdmin() {
 
     if (missingVariables.length > 0) {
       throw new Error(
-        `Missing Firebase Admin variables: ${missingVariables.join(", ")}`
+        `Missing Firebase Admin variables: ${missingVariables.join(", ")}`,
       );
     }
 
-    const privateKey = Buffer.from(
-      privateKeyBase64!,
-      "base64"
-    ).toString("utf8");
+    const privateKey = Buffer.from(privateKeyBase64!, "base64").toString(
+      "utf8",
+    );
 
     if (
       !privateKey.includes("-----BEGIN PRIVATE KEY-----") ||
       !privateKey.includes("-----END PRIVATE KEY-----")
     ) {
       throw new Error(
-        "FIREBASE_ADMIN_PRIVATE_KEY_BASE64 did not decode to a valid PEM key."
+        "FIREBASE_ADMIN_PRIVATE_KEY_BASE64 did not decode to a valid PEM key.",
       );
     }
 

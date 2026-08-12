@@ -13,6 +13,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     "/register",
     "/forgot-password",
     "/auth-test",
+    "/onboarding",
   ];
 
   const isPublicPage = publicPages.includes(pathname);

@@ -61,13 +61,13 @@ export default function QuizPlayer({ quiz }: Props) {
   const selectedAnswer = answers[currentQuestion.id] || "";
 
   const progress = Math.round(
-    ((currentIndex + 1) / quiz.questions.length) * 100
+    ((currentIndex + 1) / quiz.questions.length) * 100,
   );
 
   const totalXP = useMemo(() => {
     return quiz.questions.reduce(
       (total, question) => total + question.xpReward,
-      0
+      0,
     );
   }, [quiz.questions]);
 
@@ -78,17 +78,13 @@ export default function QuizPlayer({ quiz }: Props) {
     return userAnswer === correctAnswer;
   }).length;
 
-  const scorePercent = Math.round(
-    (correctCount / quiz.questions.length) * 100
-  );
+  const scorePercent = Math.round((correctCount / quiz.questions.length) * 100);
 
   const earnedXP = quiz.questions.reduce((total, question) => {
     const userAnswer = answers[question.id]?.trim().toLowerCase();
     const correctAnswer = question.correctAnswer.trim().toLowerCase();
 
-    return userAnswer === correctAnswer
-      ? total + question.xpReward
-      : total;
+    return userAnswer === correctAnswer ? total + question.xpReward : total;
   }, 0);
 
   const strengths = quiz.questions
@@ -131,12 +127,7 @@ export default function QuizPlayer({ quiz }: Props) {
 
   useEffect(() => {
     async function saveNormalQuizResult() {
-      if (
-        !showResults ||
-        resultSaved ||
-        !user ||
-        quizSaveInProgress.current
-      ) {
+      if (!showResults || resultSaved || !user || quizSaveInProgress.current) {
         return;
       }
 
@@ -205,7 +196,7 @@ export default function QuizPlayer({ quiz }: Props) {
 
         if (!assignment.classId || !assignment.teacherId) {
           throw new Error(
-            "The assignment is missing its class or teacher information."
+            "The assignment is missing its class or teacher information.",
           );
         }
 
@@ -231,7 +222,7 @@ export default function QuizPlayer({ quiz }: Props) {
         toast.error(
           error instanceof Error
             ? error.message
-            : "Could not mark the assignment as completed."
+            : "Could not mark the assignment as completed.",
         );
       } finally {
         assignmentSaveInProgress.current = false;
@@ -287,27 +278,17 @@ export default function QuizPlayer({ quiz }: Props) {
         <Card className="border-0 bg-gradient-to-r from-blue-700 to-indigo-700 text-center text-white">
           <div className="text-6xl">🎉</div>
 
-          <h1 className="mt-4 text-4xl font-bold">
-            Quiz Complete
-          </h1>
+          <h1 className="mt-4 text-4xl font-bold">Quiz Complete</h1>
 
-          <p className="mt-3 text-blue-100">
-            {getMessage(scorePercent)}
-          </p>
+          <p className="mt-3 text-blue-100">{getMessage(scorePercent)}</p>
 
-          <p className="mt-6 text-6xl font-extrabold">
-            {scorePercent}%
-          </p>
+          <p className="mt-6 text-6xl font-extrabold">{scorePercent}%</p>
 
-          <p className="mt-3 text-2xl font-bold">
-            {getGrade(scorePercent)}
-          </p>
+          <p className="mt-3 text-2xl font-bold">{getGrade(scorePercent)}</p>
 
           <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">
-                Correct Answers
-              </p>
+              <p className="text-sm text-blue-100">Correct Answers</p>
 
               <p className="mt-1 text-2xl font-bold">
                 {correctCount} / {quiz.questions.length}
@@ -315,34 +296,22 @@ export default function QuizPlayer({ quiz }: Props) {
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">
-                XP Earned
-              </p>
+              <p className="text-sm text-blue-100">XP Earned</p>
 
-              <p className="mt-1 text-2xl font-bold">
-                ⭐ {earnedXP}
-              </p>
+              <p className="mt-1 text-2xl font-bold">⭐ {earnedXP}</p>
             </div>
 
             <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-blue-100">
-                Saved
-              </p>
+              <p className="text-sm text-blue-100">Saved</p>
 
               <p className="mt-1 text-2xl font-bold">
-                {resultSaved
-                  ? "✅ Yes"
-                  : user
-                    ? "Saving..."
-                    : "Login needed"}
+                {resultSaved ? "✅ Yes" : user ? "Saving..." : "Login needed"}
               </p>
 
               {assignmentId && (
                 <p className="mt-2 text-sm text-blue-100">
                   Assignment:{" "}
-                  {assignmentResultSaved
-                    ? "✅ Completed"
-                    : "Saving..."}
+                  {assignmentResultSaved ? "✅ Completed" : "Saving..."}
                 </p>
               )}
             </div>
@@ -351,9 +320,7 @@ export default function QuizPlayer({ quiz }: Props) {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Card>
-            <h2 className="text-2xl font-bold text-slate-900">
-              ✅ Strengths
-            </h2>
+            <h2 className="text-2xl font-bold text-slate-900">✅ Strengths</h2>
 
             {strengths.length > 0 ? (
               <div className="mt-4 space-y-3">
@@ -368,8 +335,7 @@ export default function QuizPlayer({ quiz }: Props) {
               </div>
             ) : (
               <p className="mt-4 text-slate-600">
-                No strengths identified yet. Try the quiz again after
-                revising.
+                No strengths identified yet. Try the quiz again after revising.
               </p>
             )}
           </Card>
@@ -399,14 +365,11 @@ export default function QuizPlayer({ quiz }: Props) {
         </div>
 
         <Card>
-          <h2 className="text-2xl font-bold text-slate-900">
-            Review Answers
-          </h2>
+          <h2 className="text-2xl font-bold text-slate-900">Review Answers</h2>
 
           <div className="mt-6 space-y-4">
             {quiz.questions.map((question, index) => {
-              const userAnswer =
-                answers[question.id] || "No answer";
+              const userAnswer = answers[question.id] || "No answer";
 
               const isCorrect =
                 userAnswer.trim().toLowerCase() ===
@@ -452,13 +415,9 @@ export default function QuizPlayer({ quiz }: Props) {
           Quiz
         </p>
 
-        <h1 className="mt-2 text-3xl font-bold">
-          {quiz.title}
-        </h1>
+        <h1 className="mt-2 text-3xl font-bold">{quiz.title}</h1>
 
-        <p className="mt-2 text-blue-100">
-          {quiz.description}
-        </p>
+        <p className="mt-2 text-blue-100">{quiz.description}</p>
 
         <div className="mt-6">
           <div className="mb-2 flex justify-between text-sm font-semibold text-blue-100">
@@ -474,33 +433,21 @@ export default function QuizPlayer({ quiz }: Props) {
 
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">
-              ⏱ Time Left
-            </p>
+            <p className="text-sm text-blue-100">⏱ Time Left</p>
 
-            <p className="mt-1 text-2xl font-bold">
-              {formatTime(timeLeft)}
-            </p>
+            <p className="mt-1 text-2xl font-bold">{formatTime(timeLeft)}</p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">
-              ⭐ XP Available
-            </p>
+            <p className="text-sm text-blue-100">⭐ XP Available</p>
 
-            <p className="mt-1 text-2xl font-bold">
-              {totalXP}
-            </p>
+            <p className="mt-1 text-2xl font-bold">{totalXP}</p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-4">
-            <p className="text-sm text-blue-100">
-              📚 Estimated Time
-            </p>
+            <p className="text-sm text-blue-100">📚 Estimated Time</p>
 
-            <p className="mt-1 text-2xl font-bold">
-              {quiz.estimatedTime}
-            </p>
+            <p className="mt-1 text-2xl font-bold">{quiz.estimatedTime}</p>
           </div>
         </div>
       </Card>

@@ -1,7 +1,4 @@
-export type QuizDifficulty =
-  | "foundation"
-  | "standard"
-  | "higher";
+export type QuizDifficulty = "foundation" | "standard" | "higher";
 
 export type GeneratedQuizQuestion = {
   id: string;

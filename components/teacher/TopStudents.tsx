@@ -19,9 +19,7 @@ export default function TopStudents({ students }: TopStudentsProps) {
         Leaderboard
       </p>
 
-      <h2 className="mt-2 text-2xl font-bold text-slate-900">
-        Top Students
-      </h2>
+      <h2 className="mt-2 text-2xl font-bold text-slate-900">Top Students</h2>
 
       {students.length === 0 ? (
         <p className="mt-6 text-slate-500">
