@@ -6,7 +6,12 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
+
+export type QuizAssignmentSource =
+  | "built-in"
+  | "ai-generated";
 
 export type CreateAssignmentInput = {
   teacherId: string;
@@ -16,6 +21,7 @@ export type CreateAssignmentInput = {
   type: "lesson" | "quiz";
   resourceId: string;
   dueDate: string;
+  quizSource?: QuizAssignmentSource;
 };
 
 export async function createAssignment({
@@ -26,22 +32,37 @@ export async function createAssignment({
   type,
   resourceId,
   dueDate,
+  quizSource,
 }: CreateAssignmentInput) {
-  const assignmentRef = await addDoc(collection(db, "assignments"), {
-    teacherId,
-    classId,
-    title,
-    description,
-    type,
-    resourceId,
-    dueDate,
-    status: "active",
-    createdAt: serverTimestamp(),
-  });
+  const assignmentRef = await addDoc(
+    collection(db, "assignments"),
+    {
+      teacherId,
+      classId,
+      title,
+      description,
+      type,
+      resourceId,
+      dueDate,
+      ...(type === "quiz"
+        ? {
+            quizSource:
+              quizSource || "built-in",
+          }
+        : {}),
+      status: "active",
+      createdAt: serverTimestamp(),
+    },
+  );
 
-  await updateDoc(doc(db, "classes", classId), {
-    assignmentIds: arrayUnion(assignmentRef.id),
-  });
+  await updateDoc(
+    doc(db, "classes", classId),
+    {
+      assignmentIds: arrayUnion(
+        assignmentRef.id,
+      ),
+    },
+  );
 
   return assignmentRef.id;
 }

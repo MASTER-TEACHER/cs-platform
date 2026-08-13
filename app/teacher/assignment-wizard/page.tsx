@@ -169,20 +169,41 @@ export default function AssignmentWizardPage() {
           return;
         }
 
-        const resource: AssignmentWizardResource =
-          {
-            id: quizSnapshot.id,
-            title:
-              data.title ||
-              "Untitled AI Quiz",
-            description:
-              data.description ||
-              "Complete the assigned AI quiz.",
-            resourceType:
-              "ai-quiz",
-            resourceId:
-              quizSnapshot.id,
-          };
+        const questionCount =
+          typeof data.questionCount === "number"
+            ? data.questionCount
+            : Array.isArray(data.questions)
+              ? data.questions.length
+              : 0;
+
+        const resource: AssignmentWizardResource = {
+          id: quizSnapshot.id,
+          title:
+            data.title ||
+            "Untitled AI Quiz",
+          description:
+            data.description ||
+            "Complete the assigned AI quiz.",
+          resourceType:
+            "ai-quiz",
+          resourceId:
+            quizSnapshot.id,
+          questionCount,
+          examBoard:
+            typeof data.examBoard === "string"
+              ? data.examBoard
+              : undefined,
+          qualification:
+            data.qualification === "A_LEVEL"
+              ? "A_LEVEL"
+              : data.qualification === "GCSE"
+                ? "GCSE"
+                : undefined,
+          estimatedTime:
+            typeof data.estimatedTime === "string"
+              ? data.estimatedTime
+              : undefined,
+        };
 
         setWizardData(
           (current) => ({
@@ -513,30 +534,35 @@ export default function AssignmentWizardPage() {
             },
           ),
         );
-      } else {
-  const assignmentType = "quiz";
+      } else if (
+        wizardData.resource.resourceType === "quiz" ||
+        wizardData.resource.resourceType === "ai-quiz"
+      ) {
+        const isAIQuiz =
+          wizardData.resource.resourceType === "ai-quiz";
 
-  await Promise.all(
+        await Promise.all(
           wizardData.selectedClassIds.map(
             (selectedClassId) =>
               createAssignment({
-                teacherId:
-                  user.uid,
-                classId:
-                  selectedClassId,
-                title:
-                  wizardData.resource!
-                    .title,
+                teacherId: user.uid,
+                classId: selectedClassId,
+                title: wizardData.resource!.title,
                 description:
                   wizardData.instructions.trim(),
-                type: assignmentType,
+                type: "quiz",
                 resourceId:
-                  wizardData.resource!
-                    .resourceId,
-                dueDate:
-                  wizardData.dueDate,
+                  wizardData.resource!.resourceId,
+                dueDate: wizardData.dueDate,
+                quizSource: isAIQuiz
+                  ? "ai-generated"
+                  : "built-in",
               }),
           ),
+        );
+      } else {
+        throw new Error(
+          "This assignment type is not yet supported.",
         );
       }
 
@@ -551,7 +577,13 @@ export default function AssignmentWizardPage() {
               : wizardData.resource.resourceType ===
                   "exam-paper"
                 ? "Exam assignment"
-                : "Assignment"
+                : wizardData.resource.resourceType ===
+                    "ai-quiz"
+                  ? "AI quiz assignment"
+                  : wizardData.resource.resourceType ===
+                      "quiz"
+                    ? "Quiz assignment"
+                    : "Assignment"
         } created for ${
           wizardData.selectedClassIds.length
         } ${

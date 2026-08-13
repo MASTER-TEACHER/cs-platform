@@ -14,6 +14,8 @@ export type QuizAssignmentStatus = "active" | "closed" | "cancelled";
 
 export type QuizStudentResultStatus = "not_started" | "completed";
 
+export type QuizAssignmentSource = "built-in" | "ai-generated";
+
 export type TeacherQuizAssignmentSummary = {
   id: string;
 
@@ -24,6 +26,7 @@ export type TeacherQuizAssignmentSummary = {
   title: string;
   description: string;
   resourceId: string;
+  quizSource: QuizAssignmentSource;
 
   dueDate: Date | null;
   createdAt: Date | null;
@@ -68,6 +71,7 @@ type FirestoreAssignment = {
 
   type?: string;
   resourceId?: string;
+  quizSource?: string;
 
   dueDate?: FirestoreDate;
   createdAt?: FirestoreDate;
@@ -115,6 +119,10 @@ function convertDate(value: FirestoreDate): Date | null {
   }
 
   return null;
+}
+
+function normaliseQuizSource(value: unknown): QuizAssignmentSource {
+  return value === "ai-generated" ? "ai-generated" : "built-in";
 }
 
 function normaliseStatus(value: unknown): QuizAssignmentStatus {
@@ -293,6 +301,8 @@ export async function getTeacherQuizAssignments(
 
         resourceId: assignment.resourceId || "",
 
+        quizSource: normaliseQuizSource(assignment.quizSource),
+
         dueDate: convertDate(assignment.dueDate),
 
         createdAt: convertDate(assignment.createdAt),
@@ -426,6 +436,8 @@ export async function getTeacherQuizAssignmentDetail(
     description: assignment.description || "",
 
     resourceId: assignment.resourceId || "",
+
+    quizSource: normaliseQuizSource(assignment.quizSource),
 
     dueDate: convertDate(assignment.dueDate),
 

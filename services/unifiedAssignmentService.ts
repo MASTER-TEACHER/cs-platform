@@ -56,30 +56,22 @@ function convertResource(
   assignment: StudentAssignmentWithProgress,
 ): UnifiedAssignment {
   const isProgramming =
-    assignment.resourceType ===
-    "programming-challenge";
+    assignment.resourceType === "programming-challenge";
 
   return {
-    kind: isProgramming
-      ? "programming"
-      : "resource",
+    kind: isProgramming ? "programming" : "resource",
     id: assignment.id,
     title: assignment.resourceTitle,
     topic: assignment.resourceTopic,
-    description:
-      assignment.instructions || "",
-    resourceType:
-      assignment.resourceType,
+    description: assignment.instructions || "",
+    resourceType: assignment.resourceType,
     resourceId: assignment.resourceId,
     className: assignment.className,
     teacherName: assignment.teacherName,
     dueDate: assignment.dueDate,
     createdAt: assignment.createdAt,
-    status:
-      assignment.studentProgress.status,
-    completedAt:
-      assignment.studentProgress
-        .completedAt,
+    status: assignment.studentProgress.status,
+    completedAt: assignment.studentProgress.completedAt,
     percentage: null,
     score: null,
     totalQuestions: null,
@@ -95,25 +87,25 @@ function convertResource(
 function convertQuiz(
   assignment: StudentQuizAssignment,
 ): UnifiedAssignment {
+  const isAIQuiz = assignment.quizSource === "ai-generated";
+
   return {
     kind: "quiz",
     id: assignment.id,
     title: assignment.title,
-    topic: "Assigned quiz",
+    topic: isAIQuiz ? "Assigned AI quiz" : "Assigned quiz",
     description: assignment.description,
-    resourceType: "Quiz",
+    resourceType: isAIQuiz ? "AI Quiz" : "Quiz",
     resourceId: assignment.resourceId,
     className: assignment.className,
-    teacherName:
-      assignment.teacherName,
+    teacherName: assignment.teacherName,
     dueDate: assignment.dueDate,
     createdAt: assignment.createdAt,
     status: assignment.resultStatus,
     completedAt: assignment.completedAt,
     percentage: assignment.percentage,
     score: assignment.score,
-    totalQuestions:
-      assignment.totalQuestions,
+    totalQuestions: assignment.totalQuestions,
     earnedXP: assignment.earnedXP,
     questionCount: null,
     totalMarks: null,
@@ -132,22 +124,16 @@ function convertExam(
     id: assignment.id,
     title: assignment.title,
     topic:
-      assignment.questionSetSnapshot
-        .topic ||
+      assignment.questionSetSnapshot.topic ||
       assignment.questionSetTitle,
-    description:
-      assignment.instructions || "",
+    description: assignment.instructions || "",
     resourceType: "Written Exam",
-    resourceId:
-      assignment.questionSetId,
+    resourceId: assignment.questionSetId,
     className: assignment.className,
-    teacherName:
-      assignment.teacherName,
+    teacherName: assignment.teacherName,
     dueDate: assignment.dueDate,
     createdAt: assignment.createdAt,
-    status:
-      submission?.status ||
-      "not_started",
+    status: submission?.status || "not_started",
     completedAt:
       submission?.markedAt ||
       submission?.submittedAt ||
@@ -162,15 +148,11 @@ function convertExam(
         : null,
     totalQuestions: null,
     earnedXP: null,
-    questionCount:
-      assignment.questionCount,
+    questionCount: assignment.questionCount,
     totalMarks: assignment.totalMarks,
-    submittedAt:
-      submission?.submittedAt || null,
-    markedAt:
-      submission?.markedAt || null,
-    overallFeedback:
-      submission?.overallFeedback || "",
+    submittedAt: submission?.submittedAt || null,
+    markedAt: submission?.markedAt || null,
+    overallFeedback: submission?.overallFeedback || "",
   };
 }
 
@@ -179,98 +161,61 @@ export function isUnifiedAssignmentComplete(
 ): boolean {
   return assignment.kind === "exam"
     ? assignment.status === "marked"
-    : assignment.status ===
-        "completed";
+    : assignment.status === "completed";
 }
 
 export function isUnifiedAssignmentOverdue(
   assignment: UnifiedAssignment,
 ): boolean {
-  if (
-    !assignment.dueDate ||
-    isUnifiedAssignmentComplete(
-      assignment,
-    )
-  ) {
+  if (!assignment.dueDate || isUnifiedAssignmentComplete(assignment)) {
     return false;
   }
 
-  const dueDate = new Date(
-    assignment.dueDate,
-  );
+  const dueDate = new Date(assignment.dueDate);
+  dueDate.setHours(23, 59, 59, 999);
 
-  dueDate.setHours(
-    23,
-    59,
-    59,
-    999,
-  );
-
-  return (
-    dueDate.getTime() < Date.now()
-  );
+  return dueDate.getTime() < Date.now();
 }
 
 export async function getUnifiedStudentAssignments(
   studentId: string,
 ): Promise<UnifiedAssignment[]> {
-  const [
-    resources,
-    quizzes,
-    exams,
-  ] = await Promise.all([
+  const [resources, quizzes, exams] = await Promise.all([
     getStudentAssignments(studentId),
     getStudentQuizAssignments(studentId),
     getStudentExamAssignments(studentId),
   ]);
 
-  const examItems =
-    await Promise.all(
-      exams.map(
-        async (assignment) =>
-          convertExam(
-            assignment,
-            await getExamSubmission(
-              assignment.id,
-              studentId,
-            ),
-          ),
+  const examItems = await Promise.all(
+    exams.map(async (assignment) =>
+      convertExam(
+        assignment,
+        await getExamSubmission(
+          assignment.id,
+          studentId,
+        ),
       ),
-    );
+    ),
+  );
 
   return [
-    ...resources.map(
-      convertResource,
-    ),
+    ...resources.map(convertResource),
     ...quizzes.map(convertQuiz),
     ...examItems,
   ].sort((a, b) => {
-    const aComplete =
-      isUnifiedAssignmentComplete(a);
-    const bComplete =
-      isUnifiedAssignmentComplete(b);
+    const aComplete = isUnifiedAssignmentComplete(a);
+    const bComplete = isUnifiedAssignmentComplete(b);
 
-    if (aComplete !== bComplete) {
-      return aComplete ? 1 : -1;
-    }
+    if (aComplete !== bComplete) return aComplete ? 1 : -1;
 
-    const aDue =
-      a.dueDate?.getTime() ??
-      Number.MAX_SAFE_INTEGER;
+    const aDue = a.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const bDue = b.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER;
 
-    const bDue =
-      b.dueDate?.getTime() ??
-      Number.MAX_SAFE_INTEGER;
-
-    if (aDue !== bDue) {
-      return aDue - bDue;
-    }
+    if (aDue !== bDue) return aDue - bDue;
 
     return (
-      (b.createdAt?.getTime() ??
-        0) -
-      (a.createdAt?.getTime() ??
-        0)
+      (b.createdAt?.getTime() ?? 0) -
+      (a.createdAt?.getTime() ?? 0)
     );
   });
 }
