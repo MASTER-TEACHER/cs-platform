@@ -7,6 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
 import { getAssignmentSubmissions } from "@/services/examSubmissionService";
@@ -116,6 +117,12 @@ export default function ExamAssignmentMarkbookPage() {
     assignmentId: string;
   }>();
 
+  const {
+    user,
+    loading: authLoading,
+    profileReady,
+  } = useAuth();
+
   const [assignment, setAssignment] = useState<ExamAssignment | null>(null);
 
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
@@ -127,7 +134,28 @@ export default function ExamAssignmentMarkbookPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadMarkbook() {
+      /*
+       * Do not query protected Firestore collections until Firebase Auth has
+       * finished restoring the signed-in teacher on a hard refresh.
+       */
+      if (authLoading || !profileReady) {
+        return;
+      }
+
+      if (!user?.uid) {
+        if (!cancelled) {
+          setAssignment(null);
+          setSubmissions([]);
+          setStudents([]);
+          setLoading(false);
+        }
+
+        return;
+      }
+
       try {
         setLoading(true);
         setError("");
@@ -136,16 +164,28 @@ export default function ExamAssignmentMarkbookPage() {
           params.assignmentId,
         );
 
-        setAssignment(loadedAssignment);
+        if (cancelled) {
+          return;
+        }
 
         if (!loadedAssignment) {
+          setAssignment(null);
           return;
+        }
+
+        /*
+         * Match the Firestore ownership rule before querying submissions.
+         */
+        if (loadedAssignment.teacherId !== user.uid) {
+          throw new Error(
+            "You do not have permission to view this exam markbook.",
+          );
         }
 
         const [loadedSubmissions, loadedStudents] = await Promise.all([
           getAssignmentSubmissions(
             loadedAssignment.id,
-            loadedAssignment.teacherId,
+            user.uid,
           ),
 
           Promise.all(
@@ -155,6 +195,11 @@ export default function ExamAssignmentMarkbookPage() {
           ),
         ]);
 
+        if (cancelled) {
+          return;
+        }
+
+        setAssignment(loadedAssignment);
         setSubmissions(loadedSubmissions);
 
         setStudents(
@@ -168,22 +213,35 @@ export default function ExamAssignmentMarkbookPage() {
       } catch (caughtError) {
         console.error("Unable to load exam markbook:", caughtError);
 
-        setAssignment(null);
-        setSubmissions([]);
-        setStudents([]);
+        if (!cancelled) {
+          setAssignment(null);
+          setSubmissions([]);
+          setStudents([]);
 
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "The markbook could not be loaded.",
-        );
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "The markbook could not be loaded.",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     void loadMarkbook();
-  }, [params.assignmentId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authLoading,
+    params.assignmentId,
+    profileReady,
+    user?.uid,
+  ]);
 
   const submissionsByStudent = useMemo(
     () =>
@@ -227,7 +285,7 @@ export default function ExamAssignmentMarkbookPage() {
     };
   }, [assignment?.studentIds.length, submissions]);
 
-  if (loading) {
+  if (authLoading || !profileReady || loading) {
     return <Skeleton className="h-96" />;
   }
 

@@ -21,6 +21,11 @@ export type AssignmentWizardResource = {
   quizTopicId?: string;
   questionCount?: number;
   estimatedTime?: string;
+
+  // Exact exam-paper metadata
+  examTopic?: string;
+  examQualification?: string;
+  totalMarks?: number;
 };
 
 export type AssignmentWizardClass = {

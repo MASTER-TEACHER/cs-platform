@@ -22,6 +22,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { createAssignment } from "@/services/assignmentService";
 import { createProgrammingAssignment } from "@/services/programmingAssignmentService";
+import { createExamAssignment } from "@/services/examAssignmentService";
+import { getExamQuestionSetById } from "@/services/examQuestionService";
 import { createResourceAssignment } from "@/services/resourceAssignmentService";
 
 import type {
@@ -412,6 +414,105 @@ export default function AssignmentWizardPage() {
             },
           ),
         );
+      } else if (
+        wizardData.resource.resourceType ===
+        "exam-paper"
+      ) {
+        const questionSet =
+          await getExamQuestionSetById(
+            wizardData.resource.resourceId,
+          );
+
+        if (!questionSet) {
+          throw new Error(
+            "The selected exam paper could not be found in the Question Bank.",
+          );
+        }
+
+        await Promise.all(
+          wizardData.selectedClassIds.map(
+            async (
+              selectedClassId,
+            ) => {
+              const selectedClass =
+                classes.find(
+                  (item) =>
+                    item.id ===
+                    selectedClassId,
+                );
+
+              if (!selectedClass) {
+                throw new Error(
+                  "A selected class could not be found.",
+                );
+              }
+
+              const classSnapshot =
+                await getDoc(
+                  doc(
+                    db,
+                    "classes",
+                    selectedClassId,
+                  ),
+                );
+
+              if (
+                !classSnapshot.exists()
+              ) {
+                throw new Error(
+                  "A selected class could not be found.",
+                );
+              }
+
+              const classData =
+                classSnapshot.data();
+
+              const studentIds =
+                Array.isArray(
+                  classData.studentIds,
+                )
+                  ? classData.studentIds.filter(
+                      (
+                        value,
+                      ): value is string =>
+                        typeof value ===
+                          "string" &&
+                        Boolean(
+                          value.trim(),
+                        ),
+                    )
+                  : [];
+
+              await createExamAssignment({
+                teacherId:
+                  user.uid,
+                teacherName:
+                  user.displayName ||
+                  "Teacher",
+                classId:
+                  selectedClassId,
+                className:
+                  selectedClass.name,
+                studentIds,
+                questionSetId:
+                  questionSet.id,
+                questionSetTitle:
+                  questionSet.title,
+                questionSetSnapshot:
+                  questionSet.content,
+                title:
+                  wizardData.resource!
+                    .title,
+                instructions:
+                  wizardData.instructions.trim(),
+                dueDate:
+                  new Date(
+                    `${wizardData.dueDate}T23:59:59`,
+                  ),
+              });
+            },
+          ),
+        );
       } else {
   const assignmentType = "quiz";
 
@@ -447,7 +548,10 @@ export default function AssignmentWizardPage() {
             : wizardData.resource.resourceType ===
                 "lesson"
               ? "Lesson assignment"
-              : "Assignment"
+              : wizardData.resource.resourceType ===
+                  "exam-paper"
+                ? "Exam assignment"
+                : "Assignment"
         } created for ${
           wizardData.selectedClassIds.length
         } ${

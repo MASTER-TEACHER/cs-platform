@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
 import {
   finaliseExamMarking,
@@ -80,6 +81,12 @@ export default function MarkExamSubmissionPage() {
 
   const router = useRouter();
 
+  const {
+    user,
+    loading: authLoading,
+    profileReady,
+  } = useAuth();
+
   const [assignment, setAssignment] = useState<ExamAssignment | null>(null);
 
   const [submission, setSubmission] = useState<ExamSubmission | null>(null);
@@ -97,31 +104,101 @@ export default function MarkExamSubmissionPage() {
   const [aiMarking, setAiMarking] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
+      /*
+       * Firestore rules require an authenticated teacher. On a hard refresh,
+       * Firebase Auth restores asynchronously, so do not issue protected reads
+       * until AuthContext has finished restoring the session and profile.
+       */
+      if (authLoading || !profileReady) {
+        return;
+      }
+
+      if (!user?.uid) {
+        if (!cancelled) {
+          setAssignment(null);
+          setSubmission(null);
+          setLoading(false);
+        }
+
+        return;
+      }
+
       try {
-        const [loadedAssignment, loadedSubmission] = await Promise.all([
-          getExamAssignmentById(params.assignmentId),
-          getExamSubmission(params.assignmentId, params.studentId),
-        ]);
+        setLoading(true);
+
+        const loadedAssignment = await getExamAssignmentById(
+          params.assignmentId,
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!loadedAssignment) {
+          setAssignment(null);
+          setSubmission(null);
+          return;
+        }
+
+        /*
+         * Defensive ownership check before reading a student's submission.
+         * This mirrors the Firestore teacherId rule instead of relying on the
+         * UI route alone.
+         */
+        if (loadedAssignment.teacherId !== user.uid) {
+          throw new Error(
+            "You do not have permission to mark this assessment.",
+          );
+        }
+
+        const loadedSubmission = await getExamSubmission(
+          params.assignmentId,
+          params.studentId,
+        );
+
+        if (cancelled) {
+          return;
+        }
 
         setAssignment(loadedAssignment);
-
         setSubmission(loadedSubmission);
-
         setAnswers(loadedSubmission?.answers || []);
-
         setOverallFeedback(loadedSubmission?.overallFeedback || "");
       } catch (error) {
         console.error("Unable to load the marking workspace:", error);
 
-        toast.error("The submission could not be loaded.");
+        if (!cancelled) {
+          setAssignment(null);
+          setSubmission(null);
+
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "The submission could not be loaded.",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
     void load();
-  }, [params.assignmentId, params.studentId]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authLoading,
+    params.assignmentId,
+    params.studentId,
+    profileReady,
+    user?.uid,
+  ]);
 
   const totalAwarded = useMemo(
     () => answers.reduce((sum, answer) => sum + (answer.awardedMarks ?? 0), 0),
@@ -194,9 +271,35 @@ export default function MarkExamSubmissionPage() {
         );
       }
 
-      setAiResult(result as AIExamMarkingResult);
+      const aiMarkingResult = result as AIExamMarkingResult;
 
-      toast.success("AI marking suggestions are ready for teacher review.");
+      setAiResult(aiMarkingResult);
+
+      setAnswers((current) =>
+        current.map((answer) => {
+          const suggestion = aiMarkingResult.suggestions.find(
+            (item) => item.questionId === answer.questionId,
+          );
+
+          if (!suggestion) {
+            return answer;
+          }
+
+          return {
+            ...answer,
+            awardedMarks: suggestion.suggestedMarks,
+            teacherFeedback: suggestion.feedback,
+          };
+        }),
+      );
+
+      if (aiMarkingResult.overallFeedback) {
+        setOverallFeedback(aiMarkingResult.overallFeedback);
+      }
+
+      toast.success(
+        "AI marking has populated every suggested mark and feedback comment. Review and edit them before finalising.",
+      );
     } catch (error) {
       console.error("AI marking error:", error);
 
@@ -213,38 +316,6 @@ export default function MarkExamSubmissionPage() {
       awardedMarks: suggestion.suggestedMarks,
       teacherFeedback: suggestion.feedback,
     });
-  }
-
-  function applyAllSuggestions() {
-    if (!aiResult) {
-      return;
-    }
-
-    setAnswers((current) =>
-      current.map((answer) => {
-        const suggestion = aiResult.suggestions.find(
-          (item) => item.questionId === answer.questionId,
-        );
-
-        if (!suggestion) {
-          return answer;
-        }
-
-        return {
-          ...answer,
-          awardedMarks: suggestion.suggestedMarks,
-          teacherFeedback: suggestion.feedback,
-        };
-      }),
-    );
-
-    if (aiResult.overallFeedback) {
-      setOverallFeedback(aiResult.overallFeedback);
-    }
-
-    toast.success(
-      "AI suggestions applied. Review and edit them before finalising.",
-    );
   }
 
   async function saveDraft() {
@@ -319,7 +390,7 @@ export default function MarkExamSubmissionPage() {
     }
   }
 
-  if (loading) {
+  if (authLoading || !profileReady || loading) {
     return <Skeleton className="h-96" />;
   }
 
@@ -399,8 +470,9 @@ export default function MarkExamSubmissionPage() {
             </h2>
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-violet-800">
-              AI suggestions are provisional. Review every mark and feedback
-              comment before finalising.
+              One click populates a provisional mark and question-specific
+              feedback for every response, plus overall feedback. Review and
+              edit every suggestion before finalising.
             </p>
           </div>
 
@@ -415,16 +487,6 @@ export default function MarkExamSubmissionPage() {
             >
               {aiMarking ? "AI is marking..." : "✨ AI Mark Submission"}
             </button>
-
-            {aiResult && (
-              <button
-                type="button"
-                onClick={applyAllSuggestions}
-                className="rounded-xl border border-violet-300 bg-white px-5 py-3 font-bold text-violet-800"
-              >
-                Apply All Suggestions
-              </button>
-            )}
           </div>
         </div>
 
@@ -587,14 +649,22 @@ export default function MarkExamSubmissionPage() {
                   onClick={() => applySuggestion(suggestion)}
                   className="mt-4 rounded-xl bg-violet-700 px-4 py-2 font-bold text-white"
                 >
-                  Apply this suggestion
+                  Reapply AI suggestion
                 </button>
               </div>
             )}
 
             <div className="mt-5 grid gap-5 md:grid-cols-[180px_1fr]">
               <label>
-                <span className="text-sm font-bold">Awarded marks</span>
+                <span className="flex items-center gap-2 text-sm font-bold">
+                  Awarded marks
+                  {suggestion &&
+                    answer?.awardedMarks === suggestion.suggestedMarks && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-violet-700">
+                        ✨ AI suggested
+                      </span>
+                    )}
+                </span>
 
                 <input
                   type="number"
@@ -617,7 +687,15 @@ export default function MarkExamSubmissionPage() {
               </label>
 
               <label>
-                <span className="text-sm font-bold">Question feedback</span>
+                <span className="flex items-center gap-2 text-sm font-bold">
+                  Question feedback
+                  {suggestion &&
+                    answer?.teacherFeedback === suggestion.feedback && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-violet-700">
+                        ✨ AI suggested
+                      </span>
+                    )}
+                </span>
 
                 <textarea
                   rows={5}
@@ -637,7 +715,15 @@ export default function MarkExamSubmissionPage() {
 
       <Card>
         <label>
-          <span className="text-lg font-black">Overall feedback</span>
+          <span className="flex items-center gap-2 text-lg font-black">
+            Overall feedback
+            {aiResult?.overallFeedback &&
+              overallFeedback === aiResult.overallFeedback && (
+                <span className="rounded-full bg-violet-100 px-2 py-1 text-[11px] font-black uppercase tracking-wide text-violet-700">
+                  ✨ AI suggested
+                </span>
+              )}
+          </span>
 
           <textarea
             rows={6}
@@ -646,6 +732,11 @@ export default function MarkExamSubmissionPage() {
             className="mt-3 w-full rounded-xl border px-4 py-3"
           />
         </label>
+
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <strong>Teacher review required:</strong> AI marks and feedback remain
+          provisional until you review them and select Finalise Marking.
+        </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <button

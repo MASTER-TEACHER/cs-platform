@@ -45,7 +45,12 @@ export default function AssignmentReviewStep({
       : data.resource?.resourceType ===
           "lesson"
         ? "Assigned lesson"
-        : "Resource";
+        : data.resource?.resourceType === "exam-paper"
+          ? "Assigned exam paper"
+          : data.resource?.resourceType === "quiz" ||
+              data.resource?.resourceType === "ai-quiz"
+            ? "Assigned quiz"
+            : "Resource";
 
   return (
     <Card>
@@ -87,6 +92,29 @@ export default function AssignmentReviewStep({
                 data.resource.qualification === "A_LEVEL"
                   ? "A-Level"
                   : "GCSE"
+              }`}
+            />
+          </>
+        )}
+
+        {data.resource?.resourceType === "exam-paper" && (
+          <>
+            <ReviewSection
+              label="Topic"
+              value={data.resource.examTopic || "Not specified"}
+            />
+
+            <ReviewSection
+              label="Paper"
+              value={`${data.resource.questionCount ?? 0} questions · ${
+                data.resource.totalMarks ?? 0
+              } marks`}
+            />
+
+            <ReviewSection
+              label="Curriculum"
+              value={`${data.resource.examBoard || "Not specified"} · ${
+                data.resource.examQualification || "Not specified"
               }`}
             />
           </>
@@ -154,6 +182,20 @@ export default function AssignmentReviewStep({
             <p className="mt-2 text-sm leading-6 text-blue-800">
               The assignment will be completed only when the student
               completes this exact interactive lesson in CS Master.
+            </p>
+          </div>
+        )}
+
+        {data.resource?.resourceType === "exam-paper" && (
+          <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
+            <p className="font-black text-indigo-950">
+              Written assessment workflow
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-indigo-800">
+              Student answers are autosaved. Submission locks the paper.
+              AI marking suggestions remain provisional until the teacher
+              reviews the marks and finalises the result.
             </p>
           </div>
         )}

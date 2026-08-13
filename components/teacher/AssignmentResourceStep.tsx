@@ -10,6 +10,7 @@ import {
 
 import LessonAssignmentSelector from "@/components/teacher/lesson/LessonAssignmentSelector";
 import ExistingQuizSelector from "@/components/teacher/quiz/ExistingQuizSelector";
+import ExamPaperAssignmentSelector from "@/components/teacher/exam/ExamPaperAssignmentSelector";
 import ProgrammingChallengeSelector from "@/components/teacher/programming/ProgrammingChallengeSelector";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -174,6 +175,7 @@ export default function AssignmentResourceStep({
       option.type === "lesson" ||
       option.type === "quiz" ||
       option.type === "ai-quiz" ||
+      option.type === "exam-paper" ||
       option.type === "programming-challenge"
     ) {
       if (selectedResource?.resourceType !== option.type) {
@@ -184,6 +186,8 @@ export default function AssignmentResourceStep({
               ? "Choose a Lesson"
               : option.type === "quiz"
                 ? "Choose an Existing Quiz"
+                : option.type === "exam-paper"
+                ? "Choose an Exam Paper"
                 : option.type === "programming-challenge"
                   ? "Choose a Programming Challenge"
                   : "Choose an AI Quiz",
@@ -191,6 +195,8 @@ export default function AssignmentResourceStep({
               ? "Select an exact curriculum lesson from the library below."
               : option.type === "quiz"
                 ? "Select an exact built-in quiz from the library below."
+                : option.type === "exam-paper"
+                ? "Select an exact saved paper from your Question Bank below."
                 : option.type === "programming-challenge"
                   ? "Select an exact challenge from the library below."
                   : "Select a saved quiz from the list below.",
@@ -227,6 +233,7 @@ export default function AssignmentResourceStep({
     !(selectedResource.resourceType === "lesson" && selectedResource.resourceId === "lesson") &&
     !(selectedResource.resourceType === "quiz" && selectedResource.resourceId === "quiz") &&
     !(selectedResource.resourceType === "ai-quiz" && selectedResource.resourceId === "ai-quiz") &&
+    !(selectedResource.resourceType === "exam-paper" && selectedResource.resourceId === "exam-paper") &&
     !(
       selectedResource.resourceType === "programming-challenge" &&
       selectedResource.resourceId === "programming-challenge"
@@ -364,6 +371,16 @@ export default function AssignmentResourceStep({
         </div>
       )}
 
+      {selectedType === "exam-paper" && (
+        <ExamPaperAssignmentSelector
+          selectedResource={selectedResource}
+          onSelect={(resource) => {
+            setSelectedType("exam-paper");
+            onSelect(resource);
+          }}
+        />
+      )}
+
       {selectedType === "programming-challenge" && (
         <ProgrammingChallengeSelector
           selectedChallengeId={
@@ -406,6 +423,14 @@ export default function AssignmentResourceStep({
               {selectedResource.estimatedTime
                 ? ` · ${selectedResource.estimatedTime}`
                 : ""}
+            </p>
+          )}
+
+          {selectedResource.resourceType === "exam-paper" && (
+            <p className="mt-1 text-sm text-slate-600">
+              {selectedResource.examTopic || "Written assessment"} ·{" "}
+              {selectedResource.questionCount ?? 0} questions ·{" "}
+              {selectedResource.totalMarks ?? 0} marks
             </p>
           )}
         </div>

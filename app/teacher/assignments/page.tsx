@@ -28,6 +28,70 @@ import {
   getTeacherQuizAssignments,
   type TeacherQuizAssignmentSummary,
 } from "@/services/teacherQuizAssignmentService";
+import { getTeacherExamAssignments } from "@/services/examAssignmentService";
+import { getAssignmentSubmissions } from "@/services/examSubmissionService";
+import type {
+  ExamAssignment,
+  ExamSubmission,
+} from "@/types/examAssignment";
+
+
+type TeacherExamAssignmentSummary = {
+  assignment: ExamAssignment;
+  submittedCount: number;
+  awaitingMarkingCount: number;
+  markedCount: number;
+  averagePercentage: number | null;
+  submissionPercentage: number;
+  markingPercentage: number;
+};
+
+function summariseExamAssignment(
+  assignment: ExamAssignment,
+  submissions: ExamSubmission[],
+): TeacherExamAssignmentSummary {
+  const submittedCount = submissions.filter((submission) =>
+    ["submitted", "marking", "marked"].includes(submission.status),
+  ).length;
+
+  const awaitingMarkingCount = submissions.filter((submission) =>
+    ["submitted", "marking"].includes(submission.status),
+  ).length;
+
+  const markedSubmissions = submissions.filter(
+    (submission) => submission.status === "marked",
+  );
+
+  const markedCount = markedSubmissions.length;
+
+  const averagePercentage =
+    markedCount > 0
+      ? Math.round(
+          markedSubmissions.reduce(
+            (total, submission) => total + submission.percentage,
+            0,
+          ) / markedCount,
+        )
+      : null;
+
+  const studentCount = assignment.studentIds.length;
+
+  return {
+    assignment,
+    submittedCount,
+    awaitingMarkingCount,
+    markedCount,
+    averagePercentage,
+    submissionPercentage:
+      studentCount > 0
+        ? Math.round((submittedCount / studentCount) * 100)
+        : 0,
+    markingPercentage:
+      studentCount > 0
+        ? Math.round((markedCount / studentCount) * 100)
+        : 0,
+  };
+}
 
 function formatDate(value: Date | null): string {
   if (!value) return "No due date";
@@ -119,6 +183,9 @@ export default function TeacherAssignmentsPage() {
   const [quizAssignments, setQuizAssignments] =
     useState<TeacherQuizAssignmentSummary[]>([]);
 
+  const [examAssignments, setExamAssignments] =
+    useState<TeacherExamAssignmentSummary[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -130,13 +197,27 @@ export default function TeacherAssignmentsPage() {
       setLoading(true);
       setError("");
 
-      const [loadedResources, loadedQuizzes] = await Promise.all([
-        getTeacherAssignments(user.uid),
-        getTeacherQuizAssignments(user.uid),
-      ]);
+      const [loadedResources, loadedQuizzes, loadedExams] =
+        await Promise.all([
+          getTeacherAssignments(user.uid),
+          getTeacherQuizAssignments(user.uid),
+          getTeacherExamAssignments(user.uid),
+        ]);
+
+      const loadedExamSummaries = await Promise.all(
+        loadedExams.map(async (assignment) => {
+          const submissions = await getAssignmentSubmissions(
+            assignment.id,
+            user.uid,
+          );
+
+          return summariseExamAssignment(assignment, submissions);
+        }),
+      );
 
       setAssignments(loadedResources);
       setQuizAssignments(loadedQuizzes);
+      setExamAssignments(loadedExamSummaries);
     } catch (caughtError) {
       console.error(
         "Failed to load teacher assignments:",
@@ -145,6 +226,7 @@ export default function TeacherAssignmentsPage() {
 
       setAssignments([]);
       setQuizAssignments([]);
+      setExamAssignments([]);
 
       setError(
         caughtError instanceof Error
@@ -209,6 +291,21 @@ export default function TeacherAssignmentsPage() {
     (assignment) => assignment.status === "active",
   ).length;
 
+
+  const examStudentCount = examAssignments.reduce(
+    (total, item) => total + item.assignment.studentIds.length,
+    0,
+  );
+
+  const examMarkedCount = examAssignments.reduce(
+    (total, item) => total + item.markedCount,
+    0,
+  );
+
+  const activeExamAssignments = examAssignments.filter(
+    (item) => item.assignment.status === "active",
+  ).length;
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -236,13 +333,21 @@ export default function TeacherAssignmentsPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-100">
-              Review lessons, quizzes and programming
-              assignments, monitor completion and
-              identify students who may need support.
+              Review lessons, quizzes, programming challenges and written
+              exams, monitor completion and identify students who may need
+              support.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/exam-assignments"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
+            >
+              <FileText className="h-4 w-4" />
+              Exam markbooks
+            </Link>
+
             <Link
               href="/teacher/quiz-assignments"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
@@ -273,15 +378,23 @@ export default function TeacherAssignmentsPage() {
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
           label="Assignments"
-          value={assignments.length + quizAssignments.length}
-          description="Lessons, quizzes and programming"
+          value={
+            assignments.length +
+            quizAssignments.length +
+            examAssignments.length
+          }
+          description="Lessons, quizzes, programming and exams"
           icon={<FileText className="h-6 w-6" />}
           iconClassName="bg-blue-50 text-blue-600"
         />
 
         <SummaryCard
           label="Active"
-          value={activeAssignments + activeQuizAssignments}
+          value={
+            activeAssignments +
+            activeQuizAssignments +
+            activeExamAssignments
+          }
           description="Currently available"
           icon={<Clock3 className="h-6 w-6" />}
           iconClassName="bg-amber-50 text-amber-600"
@@ -289,7 +402,15 @@ export default function TeacherAssignmentsPage() {
 
         <SummaryCard
           label="Completed"
-          value={`${totalCompleted + quizCompletedCount}/${totalStudents + quizStudentCount}`}
+          value={`${
+            totalCompleted +
+            quizCompletedCount +
+            examMarkedCount
+          }/${
+            totalStudents +
+            quizStudentCount +
+            examStudentCount
+          }`}
           description="Student completions"
           icon={<CheckCircle2 className="h-6 w-6" />}
           iconClassName="bg-emerald-50 text-emerald-600"
@@ -614,6 +735,215 @@ export default function TeacherAssignmentsPage() {
           </div>
         )}
       </Card>
+
+      <Card className="rounded-3xl border border-indigo-200 p-6 sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-600">
+              Written exam assignments
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Submissions and marking
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Track submitted papers, assessments awaiting marking and
+              finalised results.
+            </p>
+          </div>
+
+          <Link
+            href="/teacher/exam-assignments"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+          >
+            <FileText className="h-4 w-4" />
+            Open exam markbooks
+          </Link>
+        </div>
+
+        {examAssignments.length === 0 ? (
+          <div className="mt-7 rounded-2xl bg-slate-50 p-8 text-center">
+            <FileText className="mx-auto h-9 w-9 text-slate-400" />
+            <p className="mt-3 font-bold text-slate-800">
+              No written exam assignments yet
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Assign a saved exam paper from the Assignment Wizard and it will
+              appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="mt-7 grid gap-6 lg:grid-cols-2">
+            {examAssignments.map((item) => {
+              const assignment = item.assignment;
+              const dueStatus = getDueStatus(assignment.dueDate);
+              const studentCount = assignment.studentIds.length;
+
+              return (
+                <article
+                  key={assignment.id}
+                  className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                          Written Exam
+                        </span>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {assignment.className}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-4 text-xl font-black text-slate-950">
+                        {assignment.title}
+                      </h3>
+
+                      <p className="mt-2 text-sm font-semibold text-indigo-700">
+                        {assignment.questionSetSnapshot.topic ||
+                          assignment.questionSetTitle}
+                      </p>
+                    </div>
+
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <ExamMetric label="Students" value={studentCount} />
+                    <ExamMetric label="Submitted" value={item.submittedCount} />
+                    <ExamMetric
+                      label="Awaiting marking"
+                      value={item.awaitingMarkingCount}
+                      tone="amber"
+                    />
+                    <ExamMetric
+                      label="Marked"
+                      value={item.markedCount}
+                      tone="green"
+                    />
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <ExamMetric
+                      label="Questions"
+                      value={assignment.questionCount}
+                    />
+                    <ExamMetric
+                      label="Total marks"
+                      value={assignment.totalMarks}
+                    />
+                    <ExamMetric
+                      label="Class average"
+                      value={
+                        item.averagePercentage !== null
+                          ? `${item.averagePercentage}%`
+                          : "Awaiting marks"
+                      }
+                      tone="indigo"
+                    />
+                  </div>
+
+                  <ExamProgress
+                    label="Submitted"
+                    value={item.submissionPercentage}
+                    barClassName="bg-gradient-to-r from-cyan-500 to-blue-600"
+                    valueClassName="text-cyan-700"
+                  />
+
+                  <ExamProgress
+                    label="Marked / completed"
+                    value={item.markingPercentage}
+                    barClassName="bg-gradient-to-r from-emerald-500 to-teal-600"
+                    valueClassName="text-emerald-700"
+                  />
+
+                  <div className="mt-4 flex flex-col gap-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between">
+                    <span
+                      className={
+                        dueStatus.overdue ? "text-red-600" : "text-slate-500"
+                      }
+                    >
+                      {formatDate(assignment.dueDate)} · {dueStatus.label}
+                    </span>
+
+                    {item.awaitingMarkingCount > 0 && (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
+                        {item.awaitingMarkingCount} awaiting marking
+                      </span>
+                    )}
+                  </div>
+
+                  <Link
+                    href={`/teacher/exam-assignments/${assignment.id}`}
+                    className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+                  >
+                    <Eye className="h-4 w-4" />
+                    {item.awaitingMarkingCount > 0
+                      ? "View submissions / Mark exam"
+                      : "Open exam markbook"}
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function ExamMetric({
+  label,
+  value,
+  tone = "slate",
+}: {
+  label: string;
+  value: number | string;
+  tone?: "slate" | "amber" | "green" | "indigo";
+}) {
+  const toneClasses = {
+    slate: "bg-slate-50 text-slate-900",
+    amber: "bg-amber-50 text-amber-900",
+    green: "bg-emerald-50 text-emerald-900",
+    indigo: "bg-indigo-50 text-indigo-900",
+  };
+
+  return (
+    <div className={`rounded-2xl p-4 ${toneClasses[tone]}`}>
+      <p className="text-xs font-bold uppercase tracking-wide opacity-60">
+        {label}
+      </p>
+      <p className="mt-2 font-black">{value}</p>
+    </div>
+  );
+}
+
+function ExamProgress({
+  label,
+  value,
+  barClassName,
+  valueClassName,
+}: {
+  label: string;
+  value: number;
+  barClassName: string;
+  valueClassName: string;
+}) {
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-bold text-slate-700">{label}</span>
+        <span className={`font-black ${valueClassName}`}>{value}%</span>
+      </div>
+      <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${barClassName}`}
+          style={{ width: `${value}%` }}
+        />
+      </div>
     </div>
   );
 }
