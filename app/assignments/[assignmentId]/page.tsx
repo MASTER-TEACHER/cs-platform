@@ -14,9 +14,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { getLessonAssignmentHref } from "@/services/lessonAssignmentService";
 import {
   completeStudentAssignment,
   getAssignmentById,
@@ -26,10 +32,10 @@ import {
   type StudentAssignmentProgress,
 } from "@/services/resourceAssignmentService";
 
-function formatDate(value: Date | null): string {
-  if (!value) {
-    return "No due date";
-  }
+function formatDate(
+  value: Date | null,
+): string {
+  if (!value) return "No due date";
 
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
@@ -42,11 +48,16 @@ function isOverdue(
   assignment: ResourceAssignment,
   progress: StudentAssignmentProgress,
 ): boolean {
-  if (!assignment.dueDate || progress.status === "completed") {
+  if (
+    !assignment.dueDate ||
+    progress.status === "completed"
+  ) {
     return false;
   }
 
-  const dueDate = new Date(assignment.dueDate);
+  const dueDate = new Date(
+    assignment.dueDate,
+  );
 
   dueDate.setHours(23, 59, 59, 999);
 
@@ -59,83 +70,91 @@ export default function StudentAssignmentDetailPage() {
   }>();
 
   const { user } = useAuth();
+  const assignmentId =
+    params.assignmentId;
 
-  const assignmentId = params.assignmentId;
+  const [assignment, setAssignment] =
+    useState<ResourceAssignment | null>(null);
+  const [progress, setProgress] =
+    useState<StudentAssignmentProgress | null>(
+      null,
+    );
+  const [loading, setLoading] =
+    useState(true);
+  const [actionLoading, setActionLoading] =
+    useState(false);
+  const [error, setError] =
+    useState("");
+  const [successMessage, setSuccessMessage] =
+    useState("");
 
-  const [assignment, setAssignment] = useState<ResourceAssignment | null>(null);
+  const loadAssignment =
+    useCallback(async () => {
+      const studentId =
+        user?.uid;
 
-  const [progress, setProgress] = useState<StudentAssignmentProgress | null>(
-    null,
-  );
-
-  const [loading, setLoading] = useState(true);
-
-  const [actionLoading, setActionLoading] = useState(false);
-
-  const [error, setError] = useState("");
-
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const loadAssignment = useCallback(async () => {
-    const studentId = user?.uid;
-
-    if (!studentId || !assignmentId) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      let assignmentData = null;
-      let progressData = null;
-
-      try {
-        assignmentData = await getAssignmentById(assignmentId);
-        console.log("✅ Assignment loaded", assignmentData);
-      } catch (e) {
-        console.error("❌ getAssignmentById failed", e);
-        throw e;
+      if (!studentId || !assignmentId) {
+        setLoading(false);
+        return;
       }
 
       try {
-        progressData = await getStudentAssignmentProgress(
-          assignmentId,
-          studentId,
+        setLoading(true);
+        setError("");
+
+        const assignmentData =
+          await getAssignmentById(
+            assignmentId,
+          );
+
+        const progressData =
+          await getStudentAssignmentProgress(
+            assignmentId,
+            studentId,
+          );
+
+        if (!assignmentData) {
+          setError(
+            "This assignment could not be found.",
+          );
+          setAssignment(null);
+          return;
+        }
+
+        if (
+          !assignmentData.studentIds.includes(
+            studentId,
+          )
+        ) {
+          setError(
+            "You do not have access to this assignment.",
+          );
+          setAssignment(null);
+          return;
+        }
+
+        setAssignment(
+          assignmentData,
         );
-        console.log("✅ Progress loaded", progressData);
-      } catch (e) {
-        console.error("❌ getStudentAssignmentProgress failed", e);
-        throw e;
+        setProgress(progressData);
+      } catch (loadError) {
+        console.error(
+          "Unable to load assignment:",
+          loadError,
+        );
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "The assignment could not be loaded.",
+        );
+      } finally {
+        setLoading(false);
       }
-
-      if (!assignmentData) {
-        setError("This assignment could not be found.");
-        setAssignment(null);
-        return;
-      }
-
-      if (!assignmentData.studentIds.includes(studentId)) {
-        setError("You do not have access to this assignment.");
-        setAssignment(null);
-        return;
-      }
-
-      setAssignment(assignmentData);
-      setProgress(progressData);
-    } catch (loadError) {
-      console.error("Unable to load assignment:", loadError);
-
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "The assignment could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [assignmentId, user?.uid]);
+    }, [
+      assignmentId,
+      user?.uid,
+    ]);
 
   useEffect(() => {
     void loadAssignment();
@@ -146,13 +165,33 @@ export default function StudentAssignmentDetailPage() {
       return false;
     }
 
-    return isOverdue(assignment, progress);
+    return isOverdue(
+      assignment,
+      progress,
+    );
   }, [assignment, progress]);
 
-  async function handleStartAssignment() {
-    const studentId = user?.uid;
+  const lessonHref = useMemo(
+    () =>
+      assignment?.resourceType ===
+      "lesson"
+        ? getLessonAssignmentHref(
+            assignment.resourceId,
+            assignment.id,
+          )
+        : null,
+    [assignment],
+  );
 
-    if (!studentId || !assignment || !progress) {
+  async function handleStartAssignment() {
+    const studentId =
+      user?.uid;
+
+    if (
+      !studentId ||
+      !assignment ||
+      !progress
+    ) {
       return;
     }
 
@@ -161,24 +200,32 @@ export default function StudentAssignmentDetailPage() {
       setError("");
       setSuccessMessage("");
 
-      await startStudentAssignment(assignment.id, studentId);
+      await startStudentAssignment(
+        assignment.id,
+        studentId,
+      );
 
       setProgress((current) => {
-        if (!current) {
-          return current;
-        }
+        if (!current) return current;
 
         return {
           ...current,
           status: "in_progress",
-          startedAt: current.startedAt ?? new Date(),
+          startedAt:
+            current.startedAt ??
+            new Date(),
           updatedAt: new Date(),
         };
       });
 
-      setSuccessMessage("Assignment started successfully.");
+      setSuccessMessage(
+        "Assignment started successfully.",
+      );
     } catch (startError) {
-      console.error("Unable to start assignment:", startError);
+      console.error(
+        "Unable to start assignment:",
+        startError,
+      );
 
       setError(
         startError instanceof Error
@@ -191,9 +238,14 @@ export default function StudentAssignmentDetailPage() {
   }
 
   async function handleCompleteAssignment() {
-    const studentId = user?.uid;
+    const studentId =
+      user?.uid;
 
-    if (!studentId || !assignment || !progress) {
+    if (
+      !studentId ||
+      !assignment ||
+      !progress
+    ) {
       return;
     }
 
@@ -202,25 +254,34 @@ export default function StudentAssignmentDetailPage() {
       setError("");
       setSuccessMessage("");
 
-      await completeStudentAssignment(assignment.id, studentId);
+      await completeStudentAssignment(
+        assignment.id,
+        studentId,
+      );
 
       setProgress((current) => {
-        if (!current) {
-          return current;
-        }
+        if (!current) return current;
 
         return {
           ...current,
           status: "completed",
-          startedAt: current.startedAt ?? new Date(),
-          completedAt: new Date(),
+          startedAt:
+            current.startedAt ??
+            new Date(),
+          completedAt:
+            new Date(),
           updatedAt: new Date(),
         };
       });
 
-      setSuccessMessage("Assignment marked as completed.");
+      setSuccessMessage(
+        "Assignment marked as completed.",
+      );
     } catch (completeError) {
-      console.error("Unable to complete assignment:", completeError);
+      console.error(
+        "Unable to complete assignment:",
+        completeError,
+      );
 
       setError(
         completeError instanceof Error
@@ -264,7 +325,9 @@ export default function StudentAssignmentDetailPage() {
             Assignment unavailable
           </h1>
 
-          <p className="mt-2 text-red-700">{error}</p>
+          <p className="mt-2 text-red-700">
+            {error}
+          </p>
         </section>
       </main>
     );
@@ -273,6 +336,10 @@ export default function StudentAssignmentDetailPage() {
   if (!assignment || !progress) {
     return null;
   }
+
+  const isLesson =
+    assignment.resourceType ===
+    "lesson";
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
@@ -289,7 +356,9 @@ export default function StudentAssignmentDetailPage() {
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">
-                {assignment.resourceType}
+                {isLesson
+                  ? "Interactive lesson"
+                  : assignment.resourceType}
               </span>
 
               <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">
@@ -322,8 +391,9 @@ export default function StudentAssignmentDetailPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-blue-100">
-              Complete the assigned resource and mark it finished when you are
-              done.
+              {isLesson
+                ? "Complete the exact interactive lesson selected by your teacher."
+                : "Complete the assigned resource and mark it finished when you are done."}
             </p>
           </div>
 
@@ -334,10 +404,14 @@ export default function StudentAssignmentDetailPage() {
 
             <p
               className={`mt-2 text-xl font-black ${
-                overdue ? "text-red-200" : "text-white"
+                overdue
+                  ? "text-red-200"
+                  : "text-white"
               }`}
             >
-              {formatDate(assignment.dueDate)}
+              {formatDate(
+                assignment.dueDate,
+              )}
             </p>
 
             {overdue && (
@@ -352,8 +426,9 @@ export default function StudentAssignmentDetailPage() {
       {error && (
         <section className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-red-800">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-
-          <p className="text-sm font-semibold">{error}</p>
+          <p className="text-sm font-semibold">
+            {error}
+          </p>
         </section>
       )}
 
@@ -361,7 +436,9 @@ export default function StudentAssignmentDetailPage() {
         <section className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-800">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
 
-          <p className="text-sm font-semibold">{successMessage}</p>
+          <p className="text-sm font-semibold">
+            {successMessage}
+          </p>
         </section>
       )}
 
@@ -394,46 +471,84 @@ export default function StudentAssignmentDetailPage() {
 
           <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-black text-slate-900">
-              Assigned resource
+              {isLesson
+                ? "Assigned lesson"
+                : "Assigned resource"}
             </h2>
 
             <p className="mt-2 text-sm text-slate-500">
-              Open the teaching resource and complete the required work.
+              {isLesson
+                ? "Open the exact lesson selected by your teacher. Completion is recorded automatically when you finish the lesson."
+                : "Open the teaching resource and complete the required work."}
             </p>
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href={`/resources/${assignment.resourceId}`}
-                onClick={() => {
-                  if (progress.status === "not_started") {
-                    void handleStartAssignment();
-                  }
-                }}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              >
-                <BookOpen className="h-4 w-4" />
+              {isLesson ? (
+                lessonHref ? (
+                  <Link
+                    href={lessonHref}
+                    onClick={() => {
+                      if (
+                        progress.status ===
+                        "not_started"
+                      ) {
+                        void handleStartAssignment();
+                      }
+                    }}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                  >
+                    <BookOpen className="h-4 w-4" />
 
-                {progress.status === "not_started"
-                  ? "Start resource"
-                  : "Open resource"}
-              </Link>
+                    {progress.status === "completed"
+                      ? "Review lesson"
+                      : progress.status === "in_progress"
+                        ? "Continue lesson"
+                        : "Start lesson"}
+                  </Link>
+                ) : (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                    This lesson assignment uses an unsupported resource reference.
+                  </div>
+                )
+              ) : (
+                <>
+                  <Link
+                    href={`/resources/${assignment.resourceId}`}
+                    onClick={() => {
+                      if (
+                        progress.status ===
+                        "not_started"
+                      ) {
+                        void handleStartAssignment();
+                      }
+                    }}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                  >
+                    <BookOpen className="h-4 w-4" />
 
-              {progress.status === "not_started" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleStartAssignment();
-                  }}
-                  disabled={actionLoading}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-6 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {actionLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4" />
+                    {progress.status === "not_started"
+                      ? "Start resource"
+                      : "Open resource"}
+                  </Link>
+
+                  {progress.status === "not_started" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleStartAssignment();
+                      }}
+                      disabled={actionLoading}
+                      className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-6 py-3 text-sm font-bold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {actionLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                      Mark as started
+                    </button>
                   )}
-                  Mark as started
-                </button>
+                </>
               )}
             </div>
           </article>
@@ -458,25 +573,56 @@ export default function StudentAssignmentDetailPage() {
 
               <p className="flex items-center gap-3">
                 <CalendarDays className="h-5 w-5 text-slate-400" />
-                Assigned {formatDate(assignment.createdAt)}
+                Assigned{" "}
+                {formatDate(
+                  assignment.createdAt,
+                )}
               </p>
 
               <p className="flex items-center gap-3">
                 <Clock3 className="h-5 w-5 text-slate-400" />
-                Due {formatDate(assignment.dueDate)}
+                Due{" "}
+                {formatDate(
+                  assignment.dueDate,
+                )}
               </p>
             </div>
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-black text-slate-900">Completion</h2>
+            <h2 className="text-lg font-black text-slate-900">
+              Completion
+            </h2>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Mark the assignment complete only after you have finished the
-              assigned resource.
-            </p>
+            {isLesson ? (
+              progress.status === "completed" ? (
+                <div className="mt-5 rounded-2xl bg-emerald-50 p-5 text-center">
+                  <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
 
-            {progress.status === "completed" ? (
+                  <p className="mt-3 font-black text-emerald-900">
+                    Lesson assignment completed
+                  </p>
+
+                  <p className="mt-1 text-sm text-emerald-700">
+                    {formatDate(
+                      progress.completedAt,
+                    )}
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                  <p className="font-black text-blue-950">
+                    Complete the lesson
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-blue-800">
+                    There is no manual completion button for lesson assignments.
+                    The assignment completes automatically when you finish the
+                    exact lesson.
+                  </p>
+                </div>
+              )
+            ) : progress.status === "completed" ? (
               <div className="mt-5 rounded-2xl bg-emerald-50 p-5 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
 
@@ -485,25 +631,34 @@ export default function StudentAssignmentDetailPage() {
                 </p>
 
                 <p className="mt-1 text-sm text-emerald-700">
-                  {formatDate(progress.completedAt)}
+                  {formatDate(
+                    progress.completedAt,
+                  )}
                 </p>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  void handleCompleteAssignment();
-                }}
-                disabled={actionLoading}
-                className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {actionLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4" />
-                )}
-                Mark as completed
-              </button>
+              <>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Mark the assignment complete only after you have finished
+                  the assigned resource.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleCompleteAssignment();
+                  }}
+                  disabled={actionLoading}
+                  className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {actionLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  Mark as completed
+                </button>
+              </>
             )}
           </section>
         </aside>

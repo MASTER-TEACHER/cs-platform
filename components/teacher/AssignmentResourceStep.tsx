@@ -8,6 +8,7 @@ import {
   where,
 } from "firebase/firestore";
 
+import LessonAssignmentSelector from "@/components/teacher/lesson/LessonAssignmentSelector";
 import ProgrammingChallengeSelector from "@/components/teacher/programming/ProgrammingChallengeSelector";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,7 +45,7 @@ const resourceOptions: Array<{
     type: "lesson",
     title: "Existing Lesson",
     description:
-      "Assign one of the learning resources already in CS Master.",
+      "Assign an exact interactive lesson already in CS Master.",
     icon: "📚",
   },
   {
@@ -139,8 +140,7 @@ export default function AssignmentResourceStep({
 
             return {
               id: quizDocument.id,
-              title:
-                data.title || "Untitled Quiz",
+              title: data.title || "Untitled Quiz",
               description:
                 data.description ||
                 "Complete the assigned quiz.",
@@ -151,8 +151,7 @@ export default function AssignmentResourceStep({
               difficulty:
                 data.difficulty || "standard",
               questionCount:
-                typeof data.questionCount ===
-                "number"
+                typeof data.questionCount === "number"
                   ? data.questionCount
                   : Array.isArray(data.questions)
                     ? data.questions.length
@@ -192,9 +191,9 @@ export default function AssignmentResourceStep({
     setSelectedType(option.type);
 
     if (
+      option.type === "lesson" ||
       option.type === "ai-quiz" ||
-      option.type ===
-        "programming-challenge"
+      option.type === "programming-challenge"
     ) {
       if (
         selectedResource?.resourceType !==
@@ -203,14 +202,16 @@ export default function AssignmentResourceStep({
         onSelect(
           createPlaceholderResource(
             option.type,
-            option.type ===
-              "programming-challenge"
-              ? "Choose a Programming Challenge"
-              : "Choose an AI Quiz",
-            option.type ===
-              "programming-challenge"
-              ? "Select an exact challenge from the library below."
-              : "Select a saved quiz from the list below.",
+            option.type === "lesson"
+              ? "Choose a Lesson"
+              : option.type === "programming-challenge"
+                ? "Choose a Programming Challenge"
+                : "Choose an AI Quiz",
+            option.type === "lesson"
+              ? "Select an exact curriculum lesson from the library below."
+              : option.type === "programming-challenge"
+                ? "Select an exact challenge from the library below."
+                : "Select a saved quiz from the list below.",
           ),
         );
       }
@@ -244,10 +245,12 @@ export default function AssignmentResourceStep({
   const validResourceSelected =
     selectedResource !== null &&
     !(
-      selectedResource.resourceType ===
-        "ai-quiz" &&
-      selectedResource.resourceId ===
-        "ai-quiz"
+      selectedResource.resourceType === "lesson" &&
+      selectedResource.resourceId === "lesson"
+    ) &&
+    !(
+      selectedResource.resourceType === "ai-quiz" &&
+      selectedResource.resourceId === "ai-quiz"
     ) &&
     !(
       selectedResource.resourceType ===
@@ -267,8 +270,7 @@ export default function AssignmentResourceStep({
       </h2>
 
       <p className="mt-2 text-slate-600">
-        Select the type of resource you want
-        to assign.
+        Select the type of resource you want to assign.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -305,6 +307,16 @@ export default function AssignmentResourceStep({
         })}
       </div>
 
+      {selectedType === "lesson" && (
+        <LessonAssignmentSelector
+          selectedResource={selectedResource}
+          onSelect={(resource) => {
+            setSelectedType("lesson");
+            onSelect(resource);
+          }}
+        />
+      )}
+
       {selectedType === "ai-quiz" && (
         <div className="mt-8 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-6">
           <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
@@ -324,8 +336,7 @@ export default function AssignmentResourceStep({
             <div className="mt-6 rounded-xl bg-red-50 p-4 text-red-700">
               {quizLoadError}
             </div>
-          ) : savedQuizzes.length ===
-            0 ? (
+          ) : savedQuizzes.length === 0 ? (
             <div className="mt-6 rounded-xl bg-white p-6 text-center">
               <div className="text-4xl">
                 🤖
@@ -336,8 +347,7 @@ export default function AssignmentResourceStep({
               </h4>
 
               <p className="mt-2 text-sm text-slate-600">
-                Generate and save a quiz before
-                assigning it.
+                Generate and save a quiz before assigning it.
               </p>
             </div>
           ) : (
@@ -428,6 +438,19 @@ export default function AssignmentResourceStep({
             <p className="mt-1 font-bold text-slate-900">
               {selectedResource.title}
             </p>
+
+            {selectedResource.resourceType ===
+              "lesson" &&
+              selectedResource.topicTitle && (
+                <p className="mt-1 text-sm text-slate-600">
+                  {selectedResource.topicTitle} ·{" "}
+                  {selectedResource.examBoard}{" "}
+                  {selectedResource.qualification ===
+                  "A_LEVEL"
+                    ? "A-Level"
+                    : "GCSE"}
+                </p>
+              )}
           </div>
         )}
 

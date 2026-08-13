@@ -22,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { createAssignment } from "@/services/assignmentService";
 import { createProgrammingAssignment } from "@/services/programmingAssignmentService";
+import { createResourceAssignment } from "@/services/resourceAssignmentService";
 
 import type {
   AssignmentWizardClass,
@@ -38,29 +39,27 @@ const initialWizardData: AssignmentWizardData = {
 };
 
 export default function AssignmentWizardPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } =
+    useAuth();
   const searchParams = useSearchParams();
-
   const quizId = searchParams.get("quizId");
 
   const [step, setStep] =
-    useState<AssignmentWizardStep>("resource");
-
+    useState<AssignmentWizardStep>(
+      "resource",
+    );
   const [wizardData, setWizardData] =
     useState<AssignmentWizardData>(
       initialWizardData,
     );
-
-  const [classes, setClasses] = useState<
-    AssignmentWizardClass[]
-  >([]);
-
+  const [classes, setClasses] =
+    useState<
+      AssignmentWizardClass[]
+    >([]);
   const [loadingClasses, setLoadingClasses] =
     useState(true);
-
   const [loadingResource, setLoadingResource] =
     useState(false);
-
   const [submitting, setSubmitting] =
     useState(false);
 
@@ -73,11 +72,13 @@ export default function AssignmentWizardPage() {
       return;
     }
 
-    const teacherId = user.uid;
-
     const classesQuery = query(
       collection(db, "classes"),
-      where("teacherId", "==", teacherId),
+      where(
+        "teacherId",
+        "==",
+        user.uid,
+      ),
     );
 
     const unsubscribe = onSnapshot(
@@ -102,7 +103,9 @@ export default function AssignmentWizardPage() {
           );
 
         loadedClasses.sort((a, b) =>
-          a.name.localeCompare(b.name),
+          a.name.localeCompare(
+            b.name,
+          ),
         );
 
         setClasses(loadedClasses);
@@ -113,11 +116,9 @@ export default function AssignmentWizardPage() {
           "Failed to load classes:",
           error,
         );
-
         toast.error(
           "Could not load your classes.",
         );
-
         setClasses([]);
         setLoadingClasses(false);
       },
@@ -175,18 +176,22 @@ export default function AssignmentWizardPage() {
             description:
               data.description ||
               "Complete the assigned AI quiz.",
-            resourceType: "ai-quiz",
-            resourceId: quizSnapshot.id,
+            resourceType:
+              "ai-quiz",
+            resourceId:
+              quizSnapshot.id,
           };
 
-        setWizardData((current) => ({
-          ...current,
-          resource,
-          instructions:
-            current.instructions ||
-            data.description ||
-            "Complete the quiz and review your answers.",
-        }));
+        setWizardData(
+          (current) => ({
+            ...current,
+            resource,
+            instructions:
+              current.instructions ||
+              data.description ||
+              "Complete the quiz and review your answers.",
+          }),
+        );
 
         setStep("classes");
 
@@ -228,7 +233,9 @@ export default function AssignmentWizardPage() {
     }));
   }
 
-  function toggleClass(classId: string) {
+  function toggleClass(
+    classId: string,
+  ) {
     setWizardData((current) => {
       const alreadySelected =
         current.selectedClassIds.includes(
@@ -251,12 +258,6 @@ export default function AssignmentWizardPage() {
     });
   }
 
-  function goToStep(
-    nextStep: AssignmentWizardStep,
-  ) {
-    setStep(nextStep);
-  }
-
   async function submitAssignments() {
     if (!user) {
       toast.error(
@@ -273,7 +274,8 @@ export default function AssignmentWizardPage() {
     }
 
     if (
-      wizardData.selectedClassIds.length === 0
+      wizardData.selectedClassIds.length ===
+      0
     ) {
       toast.error(
         "Choose at least one class.",
@@ -301,32 +303,126 @@ export default function AssignmentWizardPage() {
         await Promise.all(
           wizardData.selectedClassIds.map(
             (selectedClassId) =>
-              createProgrammingAssignment({
-                teacherId: user.uid,
-                classId: selectedClassId,
-                challengeId:
-                  wizardData.resource!
-                    .resourceId,
-                dueDate:
-                  wizardData.dueDate,
-                instructions:
-                  wizardData.instructions.trim(),
-              }),
+              createProgrammingAssignment(
+                {
+                  teacherId: user.uid,
+                  classId:
+                    selectedClassId,
+                  challengeId:
+                    wizardData.resource!
+                      .resourceId,
+                  dueDate:
+                    wizardData.dueDate,
+                  instructions:
+                    wizardData.instructions.trim(),
+                },
+              ),
+          ),
+        );
+      } else if (
+        wizardData.resource.resourceType ===
+        "lesson"
+      ) {
+        await Promise.all(
+          wizardData.selectedClassIds.map(
+            async (
+              selectedClassId,
+            ) => {
+              const selectedClass =
+                classes.find(
+                  (item) =>
+                    item.id ===
+                    selectedClassId,
+                );
+
+              if (!selectedClass) {
+                throw new Error(
+                  "A selected class could not be found.",
+                );
+              }
+
+              const classSnapshot =
+                await getDoc(
+                  doc(
+                    db,
+                    "classes",
+                    selectedClassId,
+                  ),
+                );
+
+              if (
+                !classSnapshot.exists()
+              ) {
+                throw new Error(
+                  "A selected class could not be found.",
+                );
+              }
+
+              const classData =
+                classSnapshot.data();
+
+              const studentIds =
+                Array.isArray(
+                  classData.studentIds,
+                )
+                  ? classData.studentIds.filter(
+                      (
+                        value,
+                      ): value is string =>
+                        typeof value ===
+                          "string" &&
+                        Boolean(
+                          value.trim(),
+                        ),
+                    )
+                  : [];
+
+              await createResourceAssignment(
+                {
+                  resourceId:
+                    wizardData.resource!
+                      .resourceId,
+                  resourceTitle:
+                    wizardData.resource!
+                      .title,
+                  resourceTopic:
+                    wizardData.resource!
+                      .topicTitle ||
+                    "Interactive lesson",
+                  resourceType:
+                    "lesson",
+                  teacherId:
+                    user.uid,
+                  teacherName:
+                    user.displayName ||
+                    "Teacher",
+                  classId:
+                    selectedClassId,
+                  className:
+                    selectedClass.name,
+                  instructions:
+                    wizardData.instructions.trim(),
+                  dueDate:
+                    new Date(
+                      `${wizardData.dueDate}T23:59:59`,
+                    ),
+                  studentIds,
+                },
+              );
+            },
           ),
         );
       } else {
-        const assignmentType =
-          wizardData.resource
-            .resourceType === "lesson"
-            ? "lesson"
-            : "quiz";
+  const assignmentType = "quiz";
 
-        await Promise.all(
+  await Promise.all(
           wizardData.selectedClassIds.map(
             (selectedClassId) =>
               createAssignment({
-                teacherId: user.uid,
-                classId: selectedClassId,
+                teacherId:
+                  user.uid,
+                classId:
+                  selectedClassId,
                 title:
                   wizardData.resource!
                     .title,
@@ -345,17 +441,18 @@ export default function AssignmentWizardPage() {
 
       toast.success(
         `${
-          wizardData.resource
-            .resourceType ===
+          wizardData.resource.resourceType ===
           "programming-challenge"
             ? "Programming assignment"
-            : "Assignment"
+            : wizardData.resource.resourceType ===
+                "lesson"
+              ? "Lesson assignment"
+              : "Assignment"
         } created for ${
-          wizardData.selectedClassIds
-            .length
+          wizardData.selectedClassIds.length
         } ${
-          wizardData.selectedClassIds
-            .length === 1
+          wizardData.selectedClassIds.length ===
+          1
             ? "class"
             : "classes"
         }.`,
@@ -391,8 +488,7 @@ export default function AssignmentWizardPage() {
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
 
           <p className="mt-4 font-semibold text-slate-600">
-            Preparing assignment
-            wizard...
+            Preparing assignment wizard...
           </p>
         </div>
       </main>
@@ -413,10 +509,8 @@ export default function AssignmentWizardPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
-              Choose a resource or programming
-              challenge, select classes, add a
-              deadline and create assignments
-              in one guided workflow.
+              Choose a resource or programming challenge, select classes,
+              add a deadline and create assignments in one guided workflow.
             </p>
           </div>
 
@@ -440,7 +534,7 @@ export default function AssignmentWizardPage() {
           }
           onSelect={selectResource}
           onNext={() =>
-            goToStep("classes")
+            setStep("classes")
           }
         />
       )}
@@ -452,21 +546,21 @@ export default function AssignmentWizardPage() {
             wizardData.selectedClassIds
           }
           loading={loadingClasses}
-          onToggleClass={toggleClass}
+          onToggleClass={
+            toggleClass
+          }
           onBack={() =>
-            goToStep("resource")
+            setStep("resource")
           }
           onNext={() =>
-            goToStep("details")
+            setStep("details")
           }
         />
       )}
 
       {step === "details" && (
         <AssignmentDetailsStep
-          dueDate={
-            wizardData.dueDate
-          }
+          dueDate={wizardData.dueDate}
           instructions={
             wizardData.instructions
           }
@@ -478,9 +572,7 @@ export default function AssignmentWizardPage() {
               }),
             )
           }
-          onInstructionsChange={(
-            value,
-          ) =>
+          onInstructionsChange={(value) =>
             setWizardData(
               (current) => ({
                 ...current,
@@ -489,10 +581,10 @@ export default function AssignmentWizardPage() {
             )
           }
           onBack={() =>
-            goToStep("classes")
+            setStep("classes")
           }
           onNext={() =>
-            goToStep("review")
+            setStep("review")
           }
         />
       )}
@@ -503,7 +595,7 @@ export default function AssignmentWizardPage() {
           classes={classes}
           submitting={submitting}
           onBack={() =>
-            goToStep("details")
+            setStep("details")
           }
           onSubmit={
             submitAssignments
@@ -555,7 +647,8 @@ function WizardProgress({
             const complete =
               index < currentIndex;
             const active =
-              item.id === currentStep;
+              item.id ===
+              currentStep;
 
             return (
               <div

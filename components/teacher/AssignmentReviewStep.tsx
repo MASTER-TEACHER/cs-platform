@@ -31,12 +31,21 @@ export default function AssignmentReviewStep({
   onBack,
   onSubmit,
 }: AssignmentReviewStepProps) {
-  const selectedClasses = classes.filter(
-    (classItem) =>
+  const selectedClasses =
+    classes.filter((classItem) =>
       data.selectedClassIds.includes(
         classItem.id,
       ),
-  );
+    );
+
+  const resourceLabel =
+    data.resource?.resourceType ===
+    "programming-challenge"
+      ? "Programming challenge"
+      : data.resource?.resourceType ===
+          "lesson"
+        ? "Assigned lesson"
+        : "Resource";
 
   return (
     <Card>
@@ -49,23 +58,39 @@ export default function AssignmentReviewStep({
       </h2>
 
       <p className="mt-2 text-slate-600">
-        Check the details before assigning this
-        work.
+        Check the details before assigning this work.
       </p>
 
       <div className="mt-6 space-y-5">
         <ReviewSection
-          label={
-            data.resource?.resourceType ===
-            "programming-challenge"
-              ? "Programming challenge"
-              : "Resource"
-          }
+          label={resourceLabel}
           value={
             data.resource?.title ||
             "No resource selected"
           }
         />
+
+        {data.resource?.resourceType ===
+          "lesson" && (
+          <>
+            <ReviewSection
+              label="Topic"
+              value={
+                data.resource.topicTitle ||
+                "Not specified"
+              }
+            />
+
+            <ReviewSection
+              label="Curriculum"
+              value={`${data.resource.examBoard || "Not specified"} ${
+                data.resource.qualification === "A_LEVEL"
+                  ? "A-Level"
+                  : "GCSE"
+              }`}
+            />
+          </>
+        )}
 
         <ReviewSection
           label="Resource type"
@@ -118,6 +143,20 @@ export default function AssignmentReviewStep({
             {data.instructions}
           </p>
         </div>
+
+        {data.resource?.resourceType ===
+          "lesson" && (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+            <p className="font-black text-blue-950">
+              Automatic lesson completion
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-blue-800">
+              The assignment will be completed only when the student
+              completes this exact interactive lesson in CS Master.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
@@ -136,8 +175,7 @@ export default function AssignmentReviewStep({
           disabled={
             submitting ||
             !data.resource ||
-            data.selectedClassIds.length ===
-              0 ||
+            data.selectedClassIds.length === 0 ||
             !data.dueDate ||
             !data.instructions.trim()
           }
@@ -146,8 +184,7 @@ export default function AssignmentReviewStep({
           {submitting
             ? "Creating Assignments..."
             : `Assign to ${data.selectedClassIds.length} ${
-                data.selectedClassIds
-                  .length === 1
+                data.selectedClassIds.length === 1
                   ? "Class"
                   : "Classes"
               }`}
