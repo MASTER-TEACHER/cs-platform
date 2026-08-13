@@ -11,11 +11,16 @@ export type AssignmentWizardResource = {
   description: string;
   resourceType: AssignmentResourceType;
   resourceId: string;
+
   topicId?: string;
   lessonId?: string;
   topicTitle?: string;
   qualification?: "GCSE" | "A_LEVEL";
   examBoard?: string;
+
+  quizTopicId?: string;
+  questionCount?: number;
+  estimatedTime?: string;
 };
 
 export type AssignmentWizardClass = {

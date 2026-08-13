@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertCircle,
   BookOpen,
+  Brain,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -23,6 +24,10 @@ import {
   getTeacherAssignments,
   type ResourceAssignment,
 } from "@/services/resourceAssignmentService";
+import {
+  getTeacherQuizAssignments,
+  type TeacherQuizAssignmentSummary,
+} from "@/services/teacherQuizAssignmentService";
 
 function formatDate(value: Date | null): string {
   if (!value) return "No due date";
@@ -111,6 +116,9 @@ export default function TeacherAssignmentsPage() {
   const [assignments, setAssignments] =
     useState<ResourceAssignment[]>([]);
 
+  const [quizAssignments, setQuizAssignments] =
+    useState<TeacherQuizAssignmentSummary[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -122,9 +130,13 @@ export default function TeacherAssignmentsPage() {
       setLoading(true);
       setError("");
 
-      setAssignments(
-        await getTeacherAssignments(user.uid),
-      );
+      const [loadedResources, loadedQuizzes] = await Promise.all([
+        getTeacherAssignments(user.uid),
+        getTeacherQuizAssignments(user.uid),
+      ]);
+
+      setAssignments(loadedResources);
+      setQuizAssignments(loadedQuizzes);
     } catch (caughtError) {
       console.error(
         "Failed to load teacher assignments:",
@@ -132,6 +144,7 @@ export default function TeacherAssignmentsPage() {
       );
 
       setAssignments([]);
+      setQuizAssignments([]);
 
       setError(
         caughtError instanceof Error
@@ -182,6 +195,20 @@ export default function TeacherAssignmentsPage() {
     (assignment) => assignment.status === "active",
   ).length;
 
+  const quizStudentCount = quizAssignments.reduce(
+    (total, assignment) => total + assignment.studentCount,
+    0,
+  );
+
+  const quizCompletedCount = quizAssignments.reduce(
+    (total, assignment) => total + assignment.completedCount,
+    0,
+  );
+
+  const activeQuizAssignments = quizAssignments.filter(
+    (assignment) => assignment.status === "active",
+  ).length;
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -209,13 +236,21 @@ export default function TeacherAssignmentsPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-100">
-              Review resources and programming
+              Review lessons, quizzes and programming
               assignments, monitor completion and
               identify students who may need support.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/quiz-assignments"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
+            >
+              <Brain className="h-4 w-4" />
+              Quiz results
+            </Link>
+
             <Link
               href="/teacher/programming-assignments"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-cyan-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
@@ -238,15 +273,15 @@ export default function TeacherAssignmentsPage() {
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
           label="Assignments"
-          value={assignments.length}
-          description="All class assignments"
+          value={assignments.length + quizAssignments.length}
+          description="Lessons, quizzes and programming"
           icon={<FileText className="h-6 w-6" />}
           iconClassName="bg-blue-50 text-blue-600"
         />
 
         <SummaryCard
           label="Active"
-          value={activeAssignments}
+          value={activeAssignments + activeQuizAssignments}
           description="Currently available"
           icon={<Clock3 className="h-6 w-6" />}
           iconClassName="bg-amber-50 text-amber-600"
@@ -254,7 +289,7 @@ export default function TeacherAssignmentsPage() {
 
         <SummaryCard
           label="Completed"
-          value={`${totalCompleted}/${totalStudents}`}
+          value={`${totalCompleted + quizCompletedCount}/${totalStudents + quizStudentCount}`}
           description="Student completions"
           icon={<CheckCircle2 className="h-6 w-6" />}
           iconClassName="bg-emerald-50 text-emerald-600"
@@ -457,6 +492,121 @@ export default function TeacherAssignmentsPage() {
                     {programming
                       ? "View programming results"
                       : "View progress"}
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <Card className="rounded-3xl border border-violet-200 p-6 sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-600">
+              Quiz assignments
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Quiz results and completion
+            </h2>
+          </div>
+
+          <Link
+            href="/teacher/quiz-assignments"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
+          >
+            <Brain className="h-4 w-4" />
+            Open quiz markbook
+          </Link>
+        </div>
+
+        {quizAssignments.length === 0 ? (
+          <div className="mt-7 rounded-2xl bg-slate-50 p-8 text-center">
+            <Brain className="mx-auto h-9 w-9 text-slate-400" />
+            <p className="mt-3 font-bold text-slate-800">
+              No quiz assignments yet
+            </p>
+          </div>
+        ) : (
+          <div className="mt-7 grid gap-6 lg:grid-cols-2">
+            {quizAssignments.map((assignment) => {
+              const dueStatus = getDueStatus(assignment.dueDate);
+
+              return (
+                <article
+                  key={assignment.id}
+                  className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-800">
+                          Quiz
+                        </span>
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                          {assignment.className}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-4 text-xl font-black text-slate-950">
+                        {assignment.title}
+                      </h3>
+                    </div>
+
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
+                      <Brain className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Students</p>
+                      <p className="mt-2 font-black text-slate-900">{assignment.studentCount}</p>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Completed</p>
+                      <p className="mt-2 font-black text-slate-900">{assignment.completedCount}</p>
+                    </div>
+
+                    <div className="rounded-2xl bg-violet-50 p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-violet-500">Average</p>
+                      <p className="mt-2 font-black text-violet-900">
+                        {assignment.completedCount > 0
+                          ? `${assignment.averagePercentage}%`
+                          : "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-bold text-slate-700">Completion</span>
+                      <span className="font-black text-violet-700">
+                        {assignment.completionPercentage}%
+                      </span>
+                    </div>
+                    <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600"
+                        style={{ width: `${assignment.completionPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold">
+                    <span className={dueStatus.overdue ? "text-red-600" : "text-slate-500"}>
+                      {formatDate(assignment.dueDate)} · {dueStatus.label}
+                    </span>
+                  </div>
+
+                  <Link
+                    href={`/teacher/quiz-assignments/${assignment.id}`}
+                    className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View quiz results
                   </Link>
                 </article>
               );
