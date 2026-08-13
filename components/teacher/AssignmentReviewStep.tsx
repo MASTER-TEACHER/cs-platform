@@ -14,6 +14,16 @@ type AssignmentReviewStepProps = {
   onSubmit: () => void;
 };
 
+function formatResourceType(
+  value: string,
+): string {
+  return value
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (character) =>
+      character.toUpperCase(),
+    );
+}
+
 export default function AssignmentReviewStep({
   data,
   classes,
@@ -21,8 +31,11 @@ export default function AssignmentReviewStep({
   onBack,
   onSubmit,
 }: AssignmentReviewStepProps) {
-  const selectedClasses = classes.filter((classItem) =>
-    data.selectedClassIds.includes(classItem.id),
+  const selectedClasses = classes.filter(
+    (classItem) =>
+      data.selectedClassIds.includes(
+        classItem.id,
+      ),
   );
 
   return (
@@ -36,18 +49,33 @@ export default function AssignmentReviewStep({
       </h2>
 
       <p className="mt-2 text-slate-600">
-        Check the details before assigning this work.
+        Check the details before assigning this
+        work.
       </p>
 
       <div className="mt-6 space-y-5">
         <ReviewSection
-          label="Resource"
-          value={data.resource?.title || "No resource selected"}
+          label={
+            data.resource?.resourceType ===
+            "programming-challenge"
+              ? "Programming challenge"
+              : "Resource"
+          }
+          value={
+            data.resource?.title ||
+            "No resource selected"
+          }
         />
 
         <ReviewSection
           label="Resource type"
-          value={data.resource?.resourceType || "Not selected"}
+          value={
+            data.resource
+              ? formatResourceType(
+                  data.resource.resourceType,
+                )
+              : "Not selected"
+          }
         />
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -57,28 +85,38 @@ export default function AssignmentReviewStep({
 
           <div className="mt-3 flex flex-wrap gap-2">
             {selectedClasses.length === 0 ? (
-              <p className="text-slate-600">No classes selected.</p>
+              <p className="text-slate-600">
+                No classes selected.
+              </p>
             ) : (
-              selectedClasses.map((classItem) => (
-                <span
-                  key={classItem.id}
-                  className="rounded-full bg-teal-100 px-4 py-2 text-sm font-semibold text-teal-700"
-                >
-                  {classItem.name} · {classItem.yearGroup}
-                </span>
-              ))
+              selectedClasses.map(
+                (classItem) => (
+                  <span
+                    key={classItem.id}
+                    className="rounded-full bg-teal-100 px-4 py-2 text-sm font-semibold text-teal-700"
+                  >
+                    {classItem.name} ·{" "}
+                    {classItem.yearGroup}
+                  </span>
+                ),
+              )
             )}
           </div>
         </div>
 
-        <ReviewSection label="Due date" value={data.dueDate} />
+        <ReviewSection
+          label="Due date"
+          value={data.dueDate}
+        />
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
             Instructions
           </p>
 
-          <p className="mt-3 leading-7 text-slate-700">{data.instructions}</p>
+          <p className="mt-3 leading-7 text-slate-700">
+            {data.instructions}
+          </p>
         </div>
       </div>
 
@@ -98,7 +136,8 @@ export default function AssignmentReviewStep({
           disabled={
             submitting ||
             !data.resource ||
-            data.selectedClassIds.length === 0 ||
+            data.selectedClassIds.length ===
+              0 ||
             !data.dueDate ||
             !data.instructions.trim()
           }
@@ -107,7 +146,10 @@ export default function AssignmentReviewStep({
           {submitting
             ? "Creating Assignments..."
             : `Assign to ${data.selectedClassIds.length} ${
-                data.selectedClassIds.length === 1 ? "Class" : "Classes"
+                data.selectedClassIds
+                  .length === 1
+                  ? "Class"
+                  : "Classes"
               }`}
         </button>
       </div>
@@ -115,14 +157,22 @@ export default function AssignmentReviewStep({
   );
 }
 
-function ReviewSection({ label, value }: { label: string; value: string }) {
+function ReviewSection({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
       <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
 
-      <p className="mt-3 font-bold capitalize text-slate-900">{value}</p>
+      <p className="mt-3 font-bold text-slate-900">
+        {value}
+      </p>
     </div>
   );
 }

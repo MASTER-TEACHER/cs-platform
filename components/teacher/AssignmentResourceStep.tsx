@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import {
+  collection,
+  onSnapshot,
+  query,
+  where,
+} from "firebase/firestore";
 
+import ProgrammingChallengeSelector from "@/components/teacher/programming/ProgrammingChallengeSelector";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -37,26 +43,37 @@ const resourceOptions: Array<{
   {
     type: "lesson",
     title: "Existing Lesson",
-    description: "Assign one of the learning resources already in CS Master.",
+    description:
+      "Assign one of the learning resources already in CS Master.",
     icon: "📚",
   },
   {
     type: "quiz",
     title: "Existing Quiz",
-    description: "Assign one of the standard quizzes already available.",
+    description:
+      "Assign one of the standard quizzes already available.",
     icon: "📝",
   },
   {
     type: "ai-quiz",
     title: "AI Quiz",
-    description: "Choose a saved quiz from your AI quiz library.",
+    description:
+      "Choose a saved quiz from your AI quiz library.",
     icon: "🤖",
   },
   {
     type: "exam-paper",
     title: "Exam Paper",
-    description: "Assign an exam-style assessment or practice paper.",
+    description:
+      "Assign an exam-style assessment or practice paper.",
     icon: "📄",
+  },
+  {
+    type: "programming-challenge",
+    title: "Programming Challenge",
+    description:
+      "Assign an exact Python programming or debugging challenge.",
+    icon: "💻",
   },
 ];
 
@@ -86,18 +103,21 @@ export default function AssignmentResourceStep({
       selectedResource?.resourceType || null,
     );
 
-  const [savedQuizzes, setSavedQuizzes] = useState<SavedQuizOption[]>([]);
-  const [loadingQuizzes, setLoadingQuizzes] = useState(true);
-  const [quizLoadError, setQuizLoadError] = useState("");
+  const [savedQuizzes, setSavedQuizzes] =
+    useState<SavedQuizOption[]>([]);
+  const [loadingQuizzes, setLoadingQuizzes] =
+    useState(true);
+  const [quizLoadError, setQuizLoadError] =
+    useState("");
 
   useEffect(() => {
-    setSelectedType(selectedResource?.resourceType || null);
+    setSelectedType(
+      selectedResource?.resourceType || null,
+    );
   }, [selectedResource]);
 
   useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+    if (authLoading) return;
 
     if (!user) {
       setSavedQuizzes([]);
@@ -113,37 +133,50 @@ export default function AssignmentResourceStep({
     const unsubscribe = onSnapshot(
       quizzesQuery,
       (snapshot) => {
-        const loadedQuizzes: SavedQuizOption[] = snapshot.docs.map(
-          (quizDocument) => {
+        const loadedQuizzes: SavedQuizOption[] =
+          snapshot.docs.map((quizDocument) => {
             const data = quizDocument.data();
 
             return {
               id: quizDocument.id,
-              title: data.title || "Untitled Quiz",
-              description: data.description || "Complete the assigned quiz.",
-              qualification: data.qualification || "GCSE",
-              examBoard: data.examBoard || "AQA",
-              difficulty: data.difficulty || "standard",
+              title:
+                data.title || "Untitled Quiz",
+              description:
+                data.description ||
+                "Complete the assigned quiz.",
+              qualification:
+                data.qualification || "GCSE",
+              examBoard:
+                data.examBoard || "AQA",
+              difficulty:
+                data.difficulty || "standard",
               questionCount:
-                typeof data.questionCount === "number"
+                typeof data.questionCount ===
+                "number"
                   ? data.questionCount
                   : Array.isArray(data.questions)
                     ? data.questions.length
                     : 0,
             };
-          },
-        );
+          });
 
-        loadedQuizzes.sort((a, b) => a.title.localeCompare(b.title));
+        loadedQuizzes.sort((a, b) =>
+          a.title.localeCompare(b.title),
+        );
 
         setSavedQuizzes(loadedQuizzes);
         setQuizLoadError("");
         setLoadingQuizzes(false);
       },
       (error) => {
-        console.error("Failed to load saved quizzes:", error);
+        console.error(
+          "Failed to load saved quizzes:",
+          error,
+        );
         setSavedQuizzes([]);
-        setQuizLoadError("Could not load your saved quizzes.");
+        setQuizLoadError(
+          "Could not load your saved quizzes.",
+        );
         setLoadingQuizzes(false);
       },
     );
@@ -158,13 +191,26 @@ export default function AssignmentResourceStep({
   }) {
     setSelectedType(option.type);
 
-    if (option.type === "ai-quiz") {
-      if (selectedResource?.resourceType !== "ai-quiz") {
+    if (
+      option.type === "ai-quiz" ||
+      option.type ===
+        "programming-challenge"
+    ) {
+      if (
+        selectedResource?.resourceType !==
+        option.type
+      ) {
         onSelect(
           createPlaceholderResource(
-            "ai-quiz",
-            "Choose an AI Quiz",
-            "Select a saved quiz from the list below.",
+            option.type,
+            option.type ===
+              "programming-challenge"
+              ? "Choose a Programming Challenge"
+              : "Choose an AI Quiz",
+            option.type ===
+              "programming-challenge"
+              ? "Select an exact challenge from the library below."
+              : "Select a saved quiz from the list below.",
           ),
         );
       }
@@ -173,11 +219,17 @@ export default function AssignmentResourceStep({
     }
 
     onSelect(
-      createPlaceholderResource(option.type, option.title, option.description),
+      createPlaceholderResource(
+        option.type,
+        option.title,
+        option.description,
+      ),
     );
   }
 
-  function chooseSavedQuiz(quiz: SavedQuizOption) {
+  function chooseSavedQuiz(
+    quiz: SavedQuizOption,
+  ) {
     setSelectedType("ai-quiz");
 
     onSelect({
@@ -192,8 +244,16 @@ export default function AssignmentResourceStep({
   const validResourceSelected =
     selectedResource !== null &&
     !(
-      selectedResource.resourceType === "ai-quiz" &&
-      selectedResource.resourceId === "ai-quiz"
+      selectedResource.resourceType ===
+        "ai-quiz" &&
+      selectedResource.resourceId ===
+        "ai-quiz"
+    ) &&
+    !(
+      selectedResource.resourceType ===
+        "programming-challenge" &&
+      selectedResource.resourceId ===
+        "programming-challenge"
     );
 
   return (
@@ -207,25 +267,31 @@ export default function AssignmentResourceStep({
       </h2>
 
       <p className="mt-2 text-slate-600">
-        Select the type of resource you want to assign.
+        Select the type of resource you want
+        to assign.
       </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {resourceOptions.map((option) => {
-          const selected = selectedType === option.type;
+          const selected =
+            selectedType === option.type;
 
           return (
             <button
               key={option.type}
               type="button"
-              onClick={() => chooseResourceType(option)}
+              onClick={() =>
+                chooseResourceType(option)
+              }
               className={`rounded-2xl border p-5 text-left transition ${
                 selected
                   ? "border-teal-500 bg-teal-50 ring-2 ring-teal-100"
                   : "border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50/50"
               }`}
             >
-              <div className="text-4xl">{option.icon}</div>
+              <div className="text-4xl">
+                {option.icon}
+              </div>
 
               <h3 className="mt-4 text-lg font-bold text-slate-900">
                 {option.title}
@@ -258,30 +324,38 @@ export default function AssignmentResourceStep({
             <div className="mt-6 rounded-xl bg-red-50 p-4 text-red-700">
               {quizLoadError}
             </div>
-          ) : savedQuizzes.length === 0 ? (
+          ) : savedQuizzes.length ===
+            0 ? (
             <div className="mt-6 rounded-xl bg-white p-6 text-center">
-              <div className="text-4xl">🤖</div>
+              <div className="text-4xl">
+                🤖
+              </div>
 
               <h4 className="mt-3 text-lg font-bold text-slate-900">
                 No saved AI quizzes
               </h4>
 
               <p className="mt-2 text-sm text-slate-600">
-                Generate and save a quiz before assigning it.
+                Generate and save a quiz before
+                assigning it.
               </p>
             </div>
           ) : (
             <div className="mt-6 grid grid-cols-1 gap-4">
               {savedQuizzes.map((quiz) => {
                 const selected =
-                  selectedResource?.resourceType === "ai-quiz" &&
-                  selectedResource.resourceId === quiz.id;
+                  selectedResource?.resourceType ===
+                    "ai-quiz" &&
+                  selectedResource.resourceId ===
+                    quiz.id;
 
                 return (
                   <button
                     key={quiz.id}
                     type="button"
-                    onClick={() => chooseSavedQuiz(quiz)}
+                    onClick={() =>
+                      chooseSavedQuiz(quiz)
+                    }
                     className={`rounded-xl border p-5 text-left transition ${
                       selected
                         ? "border-indigo-500 bg-white ring-2 ring-indigo-100"
@@ -309,24 +383,6 @@ export default function AssignmentResourceStep({
                         ✓
                       </div>
                     </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-                      <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">
-                        {quiz.qualification}
-                      </span>
-
-                      <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
-                        {quiz.examBoard}
-                      </span>
-
-                      <span className="rounded-full bg-amber-50 px-3 py-1 capitalize text-amber-700">
-                        {quiz.difficulty}
-                      </span>
-
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                        {quiz.questionCount} questions
-                      </span>
-                    </div>
                   </button>
                 );
               })}
@@ -335,17 +391,45 @@ export default function AssignmentResourceStep({
         </div>
       )}
 
-      {selectedResource && validResourceSelected && (
-        <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
-          <p className="text-sm font-semibold text-green-700">
-            Selected resource
-          </p>
+      {selectedType ===
+        "programming-challenge" && (
+        <ProgrammingChallengeSelector
+          selectedChallengeId={
+            selectedResource?.resourceType ===
+            "programming-challenge"
+              ? selectedResource.resourceId
+              : null
+          }
+          onSelect={(challenge) => {
+            setSelectedType(
+              "programming-challenge",
+            );
 
-          <p className="mt-1 font-bold text-slate-900">
-            {selectedResource.title}
-          </p>
-        </div>
+            onSelect({
+              id: challenge.id,
+              title: challenge.title,
+              description:
+                challenge.description,
+              resourceType:
+                "programming-challenge",
+              resourceId: challenge.id,
+            });
+          }}
+        />
       )}
+
+      {selectedResource &&
+        validResourceSelected && (
+          <div className="mt-6 rounded-xl border border-green-200 bg-green-50 p-4">
+            <p className="text-sm font-semibold text-green-700">
+              Selected resource
+            </p>
+
+            <p className="mt-1 font-bold text-slate-900">
+              {selectedResource.title}
+            </p>
+          </div>
+        )}
 
       <div className="mt-6 flex justify-end">
         <button

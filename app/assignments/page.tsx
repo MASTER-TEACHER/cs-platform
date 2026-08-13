@@ -160,6 +160,10 @@ function getHref(assignment: UnifiedAssignment): string {
     return `/assignments/exam/${assignment.id}`;
   }
 
+  if (assignment.kind === "programming") {
+    return `/assignments/programming/${assignment.id}`;
+  }
+
   return `/assignments/${assignment.id}`;
 }
 
@@ -181,6 +185,18 @@ function getActionLabel(assignment: UnifiedAssignment): string {
         return "Start assessment";
     }
   }
+
+  if (assignment.kind === "programming") {
+  if (assignment.status === "completed") {
+    return "Review challenge";
+  }
+
+  if (assignment.status === "in_progress") {
+    return "Continue challenge";
+  }
+
+  return "Start challenge";
+}
 
   if (assignment.status === "completed") return "Review assignment";
   if (assignment.status === "in_progress") return "Continue assignment";

@@ -8,6 +8,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Code2,
   Eye,
   FileText,
   Loader2,
@@ -20,13 +21,11 @@ import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getTeacherAssignments,
-  ResourceAssignment,
+  type ResourceAssignment,
 } from "@/services/resourceAssignmentService";
 
 function formatDate(value: Date | null): string {
-  if (!value) {
-    return "No due date";
-  }
+  if (!value) return "No due date";
 
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
@@ -38,13 +37,15 @@ function formatDate(value: Date | null): string {
 function formatResourceType(value: string): string {
   return value
     .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
+    .replace(/\b\w/g, (character) =>
+      character.toUpperCase(),
+    );
 }
 
-function getCompletionPercentage(assignment: ResourceAssignment): number {
-  if (assignment.studentCount === 0) {
-    return 0;
-  }
+function getCompletionPercentage(
+  assignment: ResourceAssignment,
+): number {
+  if (assignment.studentCount === 0) return 0;
 
   return Math.round(
     (assignment.completedCount / assignment.studentCount) * 100,
@@ -69,14 +70,17 @@ function getDueStatus(dueDate: Date | null): {
   due.setHours(0, 0, 0, 0);
 
   const differenceInDays = Math.ceil(
-    (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    (due.getTime() - today.getTime()) /
+      (1000 * 60 * 60 * 24),
   );
 
   if (differenceInDays < 0) {
     const overdueDays = Math.abs(differenceInDays);
 
     return {
-      label: `${overdueDays} ${overdueDays === 1 ? "day" : "days"} overdue`,
+      label: `${overdueDays} ${
+        overdueDays === 1 ? "day" : "days"
+      } overdue`,
       overdue: true,
     };
   }
@@ -104,26 +108,28 @@ function getDueStatus(dueDate: Date | null): {
 export default function TeacherAssignmentsPage() {
   const { user } = useAuth();
 
-  const [assignments, setAssignments] = useState<ResourceAssignment[]>([]);
+  const [assignments, setAssignments] =
+    useState<ResourceAssignment[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
   const loadAssignments = useCallback(async () => {
-    if (!user?.uid) {
-      return;
-    }
+    if (!user?.uid) return;
 
     try {
       setLoading(true);
       setError("");
 
-      const loadedAssignments = await getTeacherAssignments(user.uid);
-
-      setAssignments(loadedAssignments);
+      setAssignments(
+        await getTeacherAssignments(user.uid),
+      );
     } catch (caughtError) {
-      console.error("Failed to load teacher assignments:", caughtError);
+      console.error(
+        "Failed to load teacher assignments:",
+        caughtError,
+      );
 
       setAssignments([]);
 
@@ -144,57 +150,46 @@ export default function TeacherAssignmentsPage() {
   const filteredAssignments = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
-    if (!search) {
-      return assignments;
-    }
+    if (!search) return assignments;
 
-    return assignments.filter((assignment) => {
-      return (
-        assignment.resourceTitle.toLowerCase().includes(search) ||
-        assignment.resourceTopic.toLowerCase().includes(search) ||
-        assignment.className.toLowerCase().includes(search)
-      );
-    });
+    return assignments.filter(
+      (assignment) =>
+        assignment.resourceTitle
+          .toLowerCase()
+          .includes(search) ||
+        assignment.resourceTopic
+          .toLowerCase()
+          .includes(search) ||
+        assignment.className
+          .toLowerCase()
+          .includes(search),
+    );
   }, [assignments, searchTerm]);
 
-  const totalStudents = useMemo(
-    () =>
-      assignments.reduce(
-        (total, assignment) => total + assignment.studentCount,
-        0,
-      ),
-    [assignments],
+  const totalStudents = assignments.reduce(
+    (total, assignment) =>
+      total + assignment.studentCount,
+    0,
   );
 
-  const totalCompleted = useMemo(
-    () =>
-      assignments.reduce(
-        (total, assignment) => total + assignment.completedCount,
-        0,
-      ),
-    [assignments],
+  const totalCompleted = assignments.reduce(
+    (total, assignment) =>
+      total + assignment.completedCount,
+    0,
   );
 
-  const activeAssignments = useMemo(
-    () =>
-      assignments.filter((assignment) => assignment.status === "active").length,
-    [assignments],
-  );
+  const activeAssignments = assignments.filter(
+    (assignment) => assignment.status === "active",
+  ).length;
 
   if (loading) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-56 w-full rounded-3xl" />
-
         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
           <Skeleton className="h-28 rounded-3xl" />
           <Skeleton className="h-28 rounded-3xl" />
           <Skeleton className="h-28 rounded-3xl" />
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Skeleton className="h-72 rounded-3xl" />
-          <Skeleton className="h-72 rounded-3xl" />
         </div>
       </div>
     );
@@ -214,18 +209,29 @@ export default function TeacherAssignmentsPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-100">
-              Review resource assignments, monitor completion and identify
-              students who may need support.
+              Review resources and programming
+              assignments, monitor completion and
+              identify students who may need support.
             </p>
           </div>
 
-          <Link
-            href="/teacher/resources"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-700 transition hover:bg-emerald-50"
-          >
-            <BookOpen className="h-4 w-4" />
-            Resource library
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/programming-assignments"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-cyan-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
+            >
+              <Code2 className="h-4 w-4" />
+              Programming results
+            </Link>
+
+            <Link
+              href="/teacher/assignment-wizard"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-700 transition hover:bg-emerald-50"
+            >
+              <BookOpen className="h-4 w-4" />
+              Assignment Wizard
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -233,7 +239,7 @@ export default function TeacherAssignmentsPage() {
         <SummaryCard
           label="Assignments"
           value={assignments.length}
-          description="All resource assignments"
+          description="All class assignments"
           icon={<FileText className="h-6 w-6" />}
           iconClassName="bg-blue-50 text-blue-600"
         />
@@ -259,7 +265,7 @@ export default function TeacherAssignmentsPage() {
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-600">
-              Resource assignments
+              Class assignments
             </p>
 
             <h2 className="mt-2 text-2xl font-black text-slate-950">
@@ -273,7 +279,9 @@ export default function TeacherAssignmentsPage() {
             <input
               type="search"
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) =>
+                setSearchTerm(event.target.value)
+              }
               placeholder="Search assignments..."
               className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 sm:w-72"
             />
@@ -290,13 +298,13 @@ export default function TeacherAssignmentsPage() {
                   Assignments unavailable
                 </p>
 
-                <p className="mt-1 text-sm text-red-700">{error}</p>
+                <p className="mt-1 text-sm text-red-700">
+                  {error}
+                </p>
 
                 <button
                   type="button"
-                  onClick={() => {
-                    void loadAssignments();
-                  }}
+                  onClick={() => void loadAssignments()}
                   className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
                 >
                   <Loader2 className="h-4 w-4" />
@@ -314,23 +322,22 @@ export default function TeacherAssignmentsPage() {
             </h3>
 
             <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
-              Create and assign a published teaching resource to begin tracking
+              Create an assignment to begin tracking
               student completion.
             </p>
-
-            <Link
-              href="/teacher/resources"
-              className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700"
-            >
-              Open resource library
-            </Link>
           </div>
         ) : (
           <div className="mt-7 grid gap-6 lg:grid-cols-2">
             {filteredAssignments.map((assignment) => {
-              const completionPercentage = getCompletionPercentage(assignment);
+              const completionPercentage =
+                getCompletionPercentage(assignment);
 
-              const dueStatus = getDueStatus(assignment.dueDate);
+              const dueStatus =
+                getDueStatus(assignment.dueDate);
+
+              const programming =
+                assignment.resourceType ===
+                "programming-challenge";
 
               return (
                 <article
@@ -340,16 +347,22 @@ export default function TeacherAssignmentsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
                       <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-700">
-                          {formatResourceType(assignment.resourceType)}
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-bold ${
+                            programming
+                              ? "bg-cyan-100 text-cyan-800"
+                              : "bg-teal-50 text-teal-700"
+                          }`}
+                        >
+                          {programming
+                            ? "Programming"
+                            : formatResourceType(
+                                assignment.resourceType,
+                              )}
                         </span>
 
                         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
                           {assignment.className}
-                        </span>
-
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold capitalize text-slate-600">
-                          {assignment.status}
                         </span>
                       </div>
 
@@ -362,23 +375,26 @@ export default function TeacherAssignmentsPage() {
                       </p>
                     </div>
 
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
-                      <BookOpen className="h-5 w-5" />
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+                        programming
+                          ? "bg-cyan-50 text-cyan-700"
+                          : "bg-teal-50 text-teal-600"
+                      }`}
+                    >
+                      {programming ? (
+                        <Code2 className="h-5 w-5" />
+                      ) : (
+                        <BookOpen className="h-5 w-5" />
+                      )}
                     </div>
                   </div>
-
-                  {assignment.instructions && (
-                    <p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">
-                      {assignment.instructions}
-                    </p>
-                  )}
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-slate-50 p-4">
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                         Students
                       </p>
-
                       <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
                         <Users className="h-4 w-4 text-blue-600" />
                         {assignment.studentCount}
@@ -389,15 +405,15 @@ export default function TeacherAssignmentsPage() {
                       <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
                         Due date
                       </p>
-
                       <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
                         <CalendarDays className="h-4 w-4 text-teal-600" />
                         {formatDate(assignment.dueDate)}
                       </p>
-
                       <p
                         className={`mt-1 text-xs font-semibold ${
-                          dueStatus.overdue ? "text-red-600" : "text-slate-500"
+                          dueStatus.overdue
+                            ? "text-red-600"
+                            : "text-slate-500"
                         }`}
                       >
                         {dueStatus.label}
@@ -410,7 +426,6 @@ export default function TeacherAssignmentsPage() {
                       <span className="font-bold text-slate-700">
                         Completion
                       </span>
-
                       <span className="font-black text-teal-700">
                         {completionPercentage}%
                       </span>
@@ -424,22 +439,25 @@ export default function TeacherAssignmentsPage() {
                         }}
                       />
                     </div>
-
-                    <p className="mt-2 text-xs font-semibold text-slate-500">
-                      {assignment.completedCount} of {assignment.studentCount}{" "}
-                      completed
-                    </p>
                   </div>
 
-                  <div className="mt-6">
-                    <Link
-                      href={`/teacher/assignments/${assignment.id}`}
-                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-teal-700"
-                    >
-                      <Eye className="h-4 w-4" />
-                      View progress
-                    </Link>
-                  </div>
+                  <Link
+                    href={
+                      programming
+                        ? `/teacher/programming-assignments/${assignment.id}`
+                        : `/teacher/assignments/${assignment.id}`
+                    }
+                    className={`mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition ${
+                      programming
+                        ? "bg-cyan-700 hover:bg-cyan-800"
+                        : "bg-teal-600 hover:bg-teal-700"
+                    }`}
+                  >
+                    <Eye className="h-4 w-4" />
+                    {programming
+                      ? "View programming results"
+                      : "View progress"}
+                  </Link>
                 </article>
               );
             })}
@@ -467,11 +485,15 @@ function SummaryCard({
     <Card className="rounded-3xl border border-slate-200 p-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-bold text-slate-500">{label}</p>
-
-          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="text-sm font-bold text-slate-500">
+            {label}
+          </p>
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            {value}
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            {description}
+          </p>
         </div>
 
         <div

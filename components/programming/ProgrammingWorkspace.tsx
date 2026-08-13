@@ -9,13 +9,16 @@ import ProgrammingModeTabs from "@/components/programming/ProgrammingModeTabs";
 import ProgrammingStats from "@/components/programming/ProgrammingStats";
 import SimulatorDifficulty from "@/components/Simulators/common/SimulatorDifficulty";
 import { useAuth } from "@/contexts/AuthContext";
+import { getProgrammingChallengeById } from "@/data/programming/challenges";
 import { useProgrammingProgress } from "@/hooks/useProgrammingProgress";
 import { evaluateProgrammingChallenge } from "@/lib/programming/evaluator";
+import { recordProgrammingAssignmentAttempt } from "@/services/programmingAssignmentService";
 import {
   chooseNextProgrammingChallenge,
   getProgrammingChallenges,
 } from "@/services/programmingChallengeService";
 import { runPython } from "@/services/pythonRunnerService";
+
 import type {
   ProgrammingChallenge,
   ProgrammingDifficulty,
@@ -25,6 +28,12 @@ import type {
   ProgrammingQualification,
   PythonRunResult,
 } from "@/types/programming";
+
+type ProgrammingWorkspaceProps = {
+  assignedChallengeId?: string | null;
+  assignmentId?: string | null;
+  assignmentTitle?: string;
+};
 
 const exploreStarter = `name = input()
 print(f"Hello, {name}!")
@@ -44,7 +53,9 @@ const emptyRun: PythonRunResult = {
 function toQualification(
   value: string | null | undefined,
 ): ProgrammingQualification {
-  return value === "A_LEVEL" ? "A_LEVEL" : "GCSE";
+  return value === "A_LEVEL"
+    ? "A_LEVEL"
+    : "GCSE";
 }
 
 function toExamBoard(
@@ -61,69 +72,151 @@ function toExamBoard(
   return null;
 }
 
-export default function ProgrammingWorkspace() {
-  const { profile } = useAuth();
+export default function ProgrammingWorkspace({
+  assignedChallengeId = null,
+  assignmentId = null,
+  assignmentTitle = "",
+}: ProgrammingWorkspaceProps = {}) {
+  const { user, profile } = useAuth();
 
-  const qualification = toQualification(profile?.qualification);
-  const examBoard = toExamBoard(profile?.examBoard);
+  const qualification =
+    toQualification(
+      profile?.qualification,
+    );
+
+  const examBoard =
+    toExamBoard(profile?.examBoard);
+
+  const assignedChallenge =
+    useMemo(
+      () =>
+        assignedChallengeId
+          ? getProgrammingChallengeById(
+              assignedChallengeId,
+            )
+          : null,
+      [assignedChallengeId],
+    );
+
+  const assignedMode =
+    Boolean(
+      assignmentId &&
+        assignedChallengeId,
+    );
 
   const [mode, setMode] =
-    useState<ProgrammingMode>("practice");
+    useState<ProgrammingMode>(
+      assignedChallenge?.mode ??
+        "practice",
+    );
 
   const [difficulty, setDifficulty] =
-    useState<ProgrammingDifficulty>("foundation");
+    useState<ProgrammingDifficulty>(
+      assignedChallenge?.difficulty ??
+        "foundation",
+    );
 
-  const [currentChallengeId, setCurrentChallengeId] =
-    useState<string | null>(null);
-
-  const progress = useProgrammingProgress();
-
-  const availableChallenges = useMemo(() => {
-    if (mode === "explore") return [];
-
-    return getProgrammingChallenges({
-      qualification,
-      examBoard,
-      difficulty,
-      mode,
-    });
-  }, [difficulty, examBoard, mode, qualification]);
-
-  const challenge = useMemo<ProgrammingChallenge | null>(() => {
-    if (mode === "explore") return null;
-
-    const existing =
-      availableChallenges.find(
-        (item) => item.id === currentChallengeId,
-      ) ?? null;
-
-    if (existing) return existing;
-
-    return chooseNextProgrammingChallenge({
-      qualification,
-      examBoard,
-      difficulty,
-      mode,
-      completedChallengeIds:
-        progress.completedChallengeIds,
-      recentChallengeIds:
-        progress.history
-          .slice(0, 5)
-          .map((item) => item.challengeId),
-      preferredWeakSkills:
-        progress.weakSkills,
-    });
-  }, [
-    availableChallenges,
+  const [
     currentChallengeId,
-    difficulty,
-    examBoard,
-    mode,
-    progress.completedChallengeIds,
-    progress.history,
-    progress.weakSkills,
-    qualification,
-  ]);
+    setCurrentChallengeId,
+  ] = useState<string | null>(
+    assignedChallenge?.id ?? null,
+  );
+
+  const progress =
+    useProgrammingProgress();
+
+  useEffect(() => {
+    if (!assignedChallenge) return;
+
+    setMode(assignedChallenge.mode);
+    setDifficulty(
+      assignedChallenge.difficulty,
+    );
+    setCurrentChallengeId(
+      assignedChallenge.id,
+    );
+  }, [assignedChallenge]);
+
+  const availableChallenges =
+    useMemo(() => {
+      if (assignedMode) {
+        return assignedChallenge
+          ? [assignedChallenge]
+          : [];
+      }
+
+      if (mode === "explore") {
+        return [];
+      }
+
+      return getProgrammingChallenges({
+        qualification,
+        examBoard,
+        difficulty,
+        mode,
+      });
+    }, [
+      assignedChallenge,
+      assignedMode,
+      difficulty,
+      examBoard,
+      mode,
+      qualification,
+    ]);
+
+  const challenge =
+    useMemo<ProgrammingChallenge | null>(
+      () => {
+        if (assignedMode) {
+          return assignedChallenge;
+        }
+
+        if (mode === "explore") {
+          return null;
+        }
+
+        const existing =
+          availableChallenges.find(
+            (item) =>
+              item.id ===
+              currentChallengeId,
+          ) ?? null;
+
+        if (existing) return existing;
+
+        return chooseNextProgrammingChallenge({
+          qualification,
+          examBoard,
+          difficulty,
+          mode,
+          completedChallengeIds:
+            progress.completedChallengeIds,
+          recentChallengeIds:
+            progress.history
+              .slice(0, 5)
+              .map(
+                (item) =>
+                  item.challengeId,
+              ),
+          preferredWeakSkills:
+            progress.weakSkills,
+        });
+      },
+      [
+        assignedChallenge,
+        assignedMode,
+        availableChallenges,
+        currentChallengeId,
+        difficulty,
+        examBoard,
+        mode,
+        progress.completedChallengeIds,
+        progress.history,
+        progress.weakSkills,
+        qualification,
+      ],
+    );
 
   const [code, setCode] =
     useState(exploreStarter);
@@ -132,10 +225,17 @@ export default function ProgrammingWorkspace() {
     useState("Ada");
 
   const [runResult, setRunResult] =
-    useState<PythonRunResult>(emptyRun);
+    useState<PythonRunResult>(
+      emptyRun,
+    );
 
-  const [evaluation, setEvaluation] =
-    useState<ProgrammingEvaluation | null>(null);
+  const [
+    evaluation,
+    setEvaluation,
+  ] =
+    useState<ProgrammingEvaluation | null>(
+      null,
+    );
 
   const [running, setRunning] =
     useState(false);
@@ -146,17 +246,26 @@ export default function ProgrammingWorkspace() {
   const [hintLevel, setHintLevel] =
     useState<0 | 1 | 2>(0);
 
-  const [showExplanation, setShowExplanation] =
-    useState(false);
+  const [
+    showExplanation,
+    setShowExplanation,
+  ] = useState(false);
 
-  const [statusMessage, setStatusMessage] =
-    useState(
-      "The first Python run may take longer while the browser loads the runtime.",
-    );
+  const [
+    statusMessage,
+    setStatusMessage,
+  ] = useState(
+    assignedMode
+      ? "Complete the assigned challenge and use Check solution when you are ready."
+      : "The first Python run may take longer while the browser loads the runtime.",
+  );
 
   useEffect(() => {
+    if (assignedMode) return;
+
     setCurrentChallengeId(null);
   }, [
+    assignedMode,
     difficulty,
     examBoard,
     mode,
@@ -164,19 +273,31 @@ export default function ProgrammingWorkspace() {
   ]);
 
   useEffect(() => {
-    if (mode === "explore") {
+    if (
+      mode === "explore" &&
+      !assignedMode
+    ) {
       setCode(exploreStarter);
       setStdin("Ada");
     } else if (challenge) {
-      setCode(challenge.starterCode);
+      setCode(
+        challenge.starterCode,
+      );
+
       setStdin(
         challenge.stdin ??
-          challenge.visibleTests[0]?.input ??
+          challenge.visibleTests[0]
+            ?.input ??
           "",
       );
 
-      if (challenge.id !== currentChallengeId) {
-        setCurrentChallengeId(challenge.id);
+      if (
+        challenge.id !==
+        currentChallengeId
+      ) {
+        setCurrentChallengeId(
+          challenge.id,
+        );
       }
     }
 
@@ -184,23 +305,30 @@ export default function ProgrammingWorkspace() {
     setEvaluation(null);
     setHintLevel(0);
     setShowExplanation(false);
-  }, [challenge, currentChallengeId, mode]);
+  }, [
+    assignedMode,
+    challenge,
+    currentChallengeId,
+    mode,
+  ]);
 
   async function handleRun() {
     if (!code.trim()) return;
 
     setRunning(true);
     setRunResult(emptyRun);
+
     setStatusMessage(
       "Running Python in the browser...",
     );
 
     try {
-      const result = await runPython({
-        code,
-        stdin,
-        timeoutMs: 3000,
-      });
+      const result =
+        await runPython({
+          code,
+          stdin,
+          timeoutMs: 3000,
+        });
 
       setRunResult(result);
 
@@ -216,7 +344,9 @@ export default function ProgrammingWorkspace() {
           "Python returned an error. Use the console to debug it.",
         );
       } else {
-        setStatusMessage("Run complete.");
+        setStatusMessage(
+          "Run complete.",
+        );
       }
     } catch (error) {
       setRunResult({
@@ -236,11 +366,17 @@ export default function ProgrammingWorkspace() {
   }
 
   async function handleCheck() {
-    if (!challenge || !code.trim()) return;
+    if (
+      !challenge ||
+      !code.trim()
+    ) {
+      return;
+    }
 
     setChecking(true);
     setEvaluation(null);
     setShowExplanation(false);
+
     setStatusMessage(
       "Checking visible and hidden tests...",
     );
@@ -260,14 +396,55 @@ export default function ProgrammingWorkspace() {
           result.passed,
         );
 
+      if (
+        assignedMode &&
+        assignmentId &&
+        user?.uid
+      ) {
+        await recordProgrammingAssignmentAttempt(
+          {
+            assignmentId,
+            studentId: user.uid,
+            code,
+            passed: result.passed,
+            passedCount:
+              result.passedCount,
+            totalTests:
+              result.totalCount,
+            error:
+              result.results
+                .filter(
+                  (item) =>
+                    !item.passed &&
+                    item.error,
+                )
+                .map(
+                  (item) =>
+                    item.error,
+                )
+                .filter(Boolean)
+                .join("\n")
+                .slice(0, 2000),
+          },
+        );
+      }
+
       if (result.passed) {
         setShowExplanation(true);
 
-        setStatusMessage(
-          awarded > 0
-            ? `All tests passed. +${awarded} XP awarded.`
-            : "All tests passed. This challenge was already completed for XP.",
-        );
+        if (assignedMode) {
+          setStatusMessage(
+            awarded > 0
+              ? `Assignment completed. All tests passed and +${awarded} XP was awarded.`
+              : "Assignment completed. All tests passed.",
+          );
+        } else {
+          setStatusMessage(
+            awarded > 0
+              ? `All tests passed. +${awarded} XP awarded.`
+              : "All tests passed. This challenge was already completed for XP.",
+          );
+        }
       } else {
         setStatusMessage(
           `${result.passedCount}/${result.totalCount} tests passed. Review the feedback and try again.`,
@@ -285,14 +462,21 @@ export default function ProgrammingWorkspace() {
   }
 
   function resetCurrent() {
-    if (mode === "explore") {
+    if (
+      mode === "explore" &&
+      !assignedMode
+    ) {
       setCode(exploreStarter);
       setStdin("Ada");
     } else if (challenge) {
-      setCode(challenge.starterCode);
+      setCode(
+        challenge.starterCode,
+      );
+
       setStdin(
         challenge.stdin ??
-          challenge.visibleTests[0]?.input ??
+          challenge.visibleTests[0]
+            ?.input ??
           "",
       );
     }
@@ -301,11 +485,17 @@ export default function ProgrammingWorkspace() {
     setEvaluation(null);
     setHintLevel(0);
     setShowExplanation(false);
-    setStatusMessage("Challenge reset.");
+
+    setStatusMessage(
+      assignedMode
+        ? "Assigned challenge reset."
+        : "Challenge reset.",
+    );
   }
 
   function nextChallenge() {
     if (
+      assignedMode ||
       mode === "explore" ||
       availableChallenges.length === 0
     ) {
@@ -324,7 +514,10 @@ export default function ProgrammingWorkspace() {
           challenge?.id ?? "",
           ...progress.history
             .slice(0, 5)
-            .map((item) => item.challengeId),
+            .map(
+              (item) =>
+                item.challengeId,
+            ),
         ].filter(Boolean),
         preferredWeakSkills:
           progress.weakSkills,
@@ -337,7 +530,10 @@ export default function ProgrammingWorkspace() {
       return;
     }
 
-    setCurrentChallengeId(next.id);
+    setCurrentChallengeId(
+      next.id,
+    );
+
     setStatusMessage(
       "New curriculum-matched challenge loaded.",
     );
@@ -360,6 +556,28 @@ export default function ProgrammingWorkspace() {
 
   return (
     <div className="space-y-7">
+      {assignedMode && (
+        <section className="rounded-3xl border border-cyan-200 bg-cyan-50 p-6">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-700">
+            Teacher-assigned programming
+          </p>
+
+          <h2 className="mt-2 text-2xl font-black text-cyan-950">
+            {assignmentTitle ||
+              challenge?.title ||
+              "Programming assignment"}
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-cyan-900">
+            This workspace is locked to the
+            exact challenge selected by your
+            teacher. Adaptive challenge
+            switching is disabled until you
+            leave this assignment.
+          </p>
+        </section>
+      )}
+
       <section className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
@@ -372,9 +590,8 @@ export default function ProgrammingWorkspace() {
             </h1>
 
             <p className="mt-3 max-w-3xl leading-7 text-slate-600">
-              Write, run, debug and test Python directly in your browser.
-              Practice adapts to qualification, exam board, difficulty and
-              programming performance.
+              Write, run, debug and test Python
+              directly in your browser.
             </p>
           </div>
 
@@ -385,7 +602,8 @@ export default function ProgrammingWorkspace() {
 
             <p className="mt-1 font-black">
               {examBoard ?? "General"}{" "}
-              {qualification === "A_LEVEL"
+              {qualification ===
+              "A_LEVEL"
                 ? "A-Level"
                 : "GCSE"}
             </p>
@@ -393,17 +611,22 @@ export default function ProgrammingWorkspace() {
         </div>
       </section>
 
-      <ProgrammingModeTabs
-        value={mode}
-        onChange={setMode}
-      />
-
-      {mode !== "explore" && (
-        <SimulatorDifficulty
-          value={difficulty}
-          onChange={setDifficulty}
+      {!assignedMode && (
+        <ProgrammingModeTabs
+          value={mode}
+          onChange={setMode}
         />
       )}
+
+      {!assignedMode &&
+        mode !== "explore" && (
+          <SimulatorDifficulty
+            value={difficulty}
+            onChange={
+              setDifficulty
+            }
+          />
+        )}
 
       <ProgrammingStats
         attempts={progress.attempts}
@@ -411,21 +634,29 @@ export default function ProgrammingWorkspace() {
         accuracy={progress.accuracy}
         xp={progress.xp}
         streak={progress.streak}
-        bestStreak={progress.bestStreak}
+        bestStreak={
+          progress.bestStreak
+        }
       />
 
-      {progress.weakSkills.length > 0 && (
-        <section className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4">
-          <p className="font-black text-violet-950">
-            Adaptive focus
-          </p>
+      {!assignedMode &&
+        progress.weakSkills.length >
+          0 && (
+          <section className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4">
+            <p className="font-black text-violet-950">
+              Adaptive focus
+            </p>
 
-          <p className="mt-1 text-sm text-violet-800">
-            CS Master is prioritising:{" "}
-            {progress.weakSkills.join(", ")}.
-          </p>
-        </section>
-      )}
+            <p className="mt-1 text-sm text-violet-800">
+              CS Master is
+              prioritising:{" "}
+              {progress.weakSkills.join(
+                ", ",
+              )}
+              .
+            </p>
+          </section>
+        )}
 
       <section className="rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
         <p className="font-bold text-blue-950">
@@ -438,32 +669,37 @@ export default function ProgrammingWorkspace() {
           challenge={challenge}
           evaluation={evaluation}
           hintLevel={hintLevel}
-          showExplanation={showExplanation}
+          showExplanation={
+            showExplanation
+          }
         />
       )}
 
-      {mode === "explore" && (
-        <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
-          <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
-            Explore mode
-          </p>
+      {!assignedMode &&
+        mode === "explore" && (
+          <section className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
+            <p className="text-xs font-black uppercase tracking-widest text-emerald-700">
+              Explore mode
+            </p>
 
-          <h2 className="mt-2 text-2xl font-black text-emerald-950">
-            Your own Python
-          </h2>
+            <h2 className="mt-2 text-2xl font-black text-emerald-950">
+              Your own Python
+            </h2>
 
-          <p className="mt-3 leading-7 text-emerald-900">
-            Change the program and standard input freely. Code runs inside
-            the browser worker and is stopped if it runs for too long.
-          </p>
-        </section>
-      )}
+            <p className="mt-3 leading-7 text-emerald-900">
+              Change the program and standard
+              input freely.
+            </p>
+          </section>
+        )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)]">
         <ProgrammingEditor
           code={code}
           onChange={setCode}
-          disabled={running || checking}
+          disabled={
+            running || checking
+          }
         />
 
         <div className="space-y-5">
@@ -476,28 +712,39 @@ export default function ProgrammingWorkspace() {
             </label>
 
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Put each input() value on a new line.
+              Put each input() value on a new
+              line.
             </p>
 
             <textarea
               id="programming-stdin"
               value={stdin}
               onChange={(event) =>
-                setStdin(event.target.value)
+                setStdin(
+                  event.target.value,
+                )
               }
-              disabled={running || checking}
+              disabled={
+                running ||
+                checking
+              }
               spellCheck={false}
               className="mt-3 min-h-28 w-full rounded-2xl border border-slate-300 px-4 py-3 font-mono text-sm outline-none focus:border-blue-500"
             />
           </section>
 
           <ProgrammingConsole
-            stdout={runResult.stdout}
-            stderr={runResult.stderr}
+            stdout={
+              runResult.stdout
+            }
+            stderr={
+              runResult.stderr
+            }
             error={runResult.error}
             running={running}
             durationMs={
-              runResult.durationMs > 0
+              runResult.durationMs >
+              0
                 ? runResult.durationMs
                 : undefined
             }
@@ -524,7 +771,9 @@ export default function ProgrammingWorkspace() {
         {mode !== "explore" && (
           <button
             type="button"
-            onClick={handleCheck}
+            onClick={
+              handleCheck
+            }
             disabled={
               running ||
               checking ||
@@ -535,61 +784,78 @@ export default function ProgrammingWorkspace() {
           >
             {checking
               ? "Checking..."
-              : "Check solution"}
+              : assignedMode
+                ? "Check assignment"
+                : "Check solution"}
           </button>
         )}
 
-        {mode !== "explore" && challenge && (
-          <>
-            <button
-              type="button"
-              onClick={requestHint}
-              disabled={
-                hintLevel === 2 ||
-                (hintLevel === 1 &&
-                  !challenge.secondHint)
-              }
-              className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-40"
-            >
-              {hintLevel === 0
-                ? "Hint 1"
-                : hintLevel === 1 &&
-                    challenge.secondHint
-                  ? "Hint 2"
-                  : "Hints shown"}
-            </button>
+        {mode !== "explore" &&
+          challenge && (
+            <>
+              <button
+                type="button"
+                onClick={
+                  requestHint
+                }
+                disabled={
+                  hintLevel === 2 ||
+                  (hintLevel ===
+                    1 &&
+                    !challenge.secondHint)
+                }
+                className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 font-black text-amber-800 transition hover:bg-amber-100 disabled:opacity-40"
+              >
+                {hintLevel === 0
+                  ? "Hint 1"
+                  : hintLevel ===
+                        1 &&
+                      challenge.secondHint
+                    ? "Hint 2"
+                    : "Hints shown"}
+              </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                setShowExplanation(
-                  (current) => !current,
-                )
-              }
-              className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 font-black text-violet-800 transition hover:bg-violet-100"
-            >
-              {showExplanation
-                ? "Hide explanation"
-                : "Show explanation"}
-            </button>
-          </>
-        )}
+              <button
+                type="button"
+                onClick={() =>
+                  setShowExplanation(
+                    (current) =>
+                      !current,
+                  )
+                }
+                className="rounded-xl border border-violet-300 bg-violet-50 px-5 py-3 font-black text-violet-800 transition hover:bg-violet-100"
+              >
+                {showExplanation
+                  ? "Hide explanation"
+                  : "Show explanation"}
+              </button>
+            </>
+          )}
 
         <button
           type="button"
           onClick={resetCurrent}
-          disabled={running || checking}
+          disabled={
+            running || checking
+          }
           className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
         >
           Reset
         </button>
 
-        {mode !== "explore" &&
-          availableChallenges.length > 1 && (
+        {!assignedMode &&
+          mode !== "explore" &&
+          availableChallenges.length >
+            1 && (
             <button
               type="button"
-              onClick={nextChallenge}
-              disabled={running || checking}
+              onClick={
+                nextChallenge
+              }
+              disabled={
+                running ||
+                checking
+              }
               className="rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-40"
             >
               New challenge
@@ -599,7 +865,9 @@ export default function ProgrammingWorkspace() {
         <button
           type="button"
           onClick={() =>
-            setRunResult(emptyRun)
+            setRunResult(
+              emptyRun,
+            )
           }
           disabled={running}
           className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-black text-slate-700 transition hover:bg-slate-50 disabled:opacity-40"
@@ -614,14 +882,18 @@ export default function ProgrammingWorkspace() {
         </h2>
 
         <p className="mt-3 leading-7 text-amber-900">
-          Python runs on the student's device rather than on the CS Master
-          server. Browser, network and process-control modules are blocked
-          and long-running code is terminated. This is educational
-          isolation, not a hostile-code security sandbox.
+          Python runs on the student's device
+          rather than on the CS Master server.
+          Browser, network and process-control
+          modules are blocked and long-running
+          code is terminated. This is
+          educational isolation, not a
+          hostile-code security sandbox.
         </p>
       </section>
 
-      {progress.history.length > 0 && (
+      {progress.history.length >
+        0 && (
         <section className="rounded-3xl border border-slate-200 bg-white p-6">
           <h2 className="text-xl font-black text-slate-950">
             Recent programming attempts
@@ -637,13 +909,20 @@ export default function ProgrammingWorkspace() {
                 >
                   <div>
                     <p className="font-black text-slate-800">
-                      {item.challengeTitle}
+                      {
+                        item.challengeTitle
+                      }
                     </p>
 
                     <p className="text-sm text-slate-500">
                       {item.mode} ·{" "}
-                      {item.difficulty} ·{" "}
-                      {item.skills.join(", ")}
+                      {
+                        item.difficulty
+                      }{" "}
+                      ·{" "}
+                      {item.skills.join(
+                        ", ",
+                      )}
                     </p>
                   </div>
 
@@ -660,9 +939,14 @@ export default function ProgrammingWorkspace() {
                         : "Not passed"}
                     </span>
 
-                    {item.xpAwarded > 0 && (
+                    {item.xpAwarded >
+                      0 && (
                       <span className="ml-3 text-blue-700">
-                        +{item.xpAwarded} XP
+                        +
+                        {
+                          item.xpAwarded
+                        }{" "}
+                        XP
                       </span>
                     )}
                   </div>
