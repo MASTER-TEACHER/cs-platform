@@ -1,104 +1,44 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertCircle,
   BookOpen,
-  Brain,
-  CalendarDays,
   CheckCircle2,
+  ChevronRight,
   Clock3,
   Code2,
-  Eye,
   FileText,
-  Loader2,
   Search,
-  Users,
+  Sparkles,
 } from "lucide-react";
 
-import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  getTeacherAssignments,
-  type ResourceAssignment,
-} from "@/services/resourceAssignmentService";
-import {
-  getTeacherQuizAssignments,
-  type TeacherQuizAssignmentSummary,
-} from "@/services/teacherQuizAssignmentService";
-import { getTeacherExamAssignments } from "@/services/examAssignmentService";
-import { getAssignmentSubmissions } from "@/services/examSubmissionService";
-import type {
-  ExamAssignment,
-  ExamSubmission,
-} from "@/types/examAssignment";
+  getUnifiedStudentAssignments,
+  isUnifiedAssignmentComplete,
+  isUnifiedAssignmentOverdue,
+  type UnifiedAssignment,
+} from "@/services/unifiedAssignmentService";
 
-
-type TeacherExamAssignmentSummary = {
-  assignment: ExamAssignment;
-  submittedCount: number;
-  awaitingMarkingCount: number;
-  markedCount: number;
-  averagePercentage: number | null;
-  submissionPercentage: number;
-  markingPercentage: number;
-};
-
-function summariseExamAssignment(
-  assignment: ExamAssignment,
-  submissions: ExamSubmission[],
-): TeacherExamAssignmentSummary {
-  const submittedCount = submissions.filter((submission) =>
-    ["submitted", "marking", "marked"].includes(submission.status),
-  ).length;
-
-  const awaitingMarkingCount = submissions.filter((submission) =>
-    ["submitted", "marking"].includes(submission.status),
-  ).length;
-
-  const markedSubmissions = submissions.filter(
-    (submission) => submission.status === "marked",
-  );
-
-  const markedCount = markedSubmissions.length;
-
-  const averagePercentage =
-    markedCount > 0
-      ? Math.round(
-          markedSubmissions.reduce(
-            (total, submission) => total + submission.percentage,
-            0,
-          ) / markedCount,
-        )
-      : null;
-
-  const studentCount = assignment.studentIds.length;
-
-  return {
-    assignment,
-    submittedCount,
-    awaitingMarkingCount,
-    markedCount,
-    averagePercentage,
-    submissionPercentage:
-      studentCount > 0
-        ? Math.round((submittedCount / studentCount) * 100)
-        : 0,
-    markingPercentage:
-      studentCount > 0
-        ? Math.round((markedCount / studentCount) * 100)
-        : 0,
-  };
-}
+type AssignmentFilter =
+  | "all"
+  | "resources"
+  | "quizzes"
+  | "exams"
+  | "not_started"
+  | "in_progress"
+  | "submitted"
+  | "completed"
+  | "overdue";
 
 function formatDate(value: Date | null): string {
   if (!value) return "No due date";
 
   return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "long",
+    day: "numeric",
+    month: "short",
     year: "numeric",
   }).format(value);
 }
@@ -106,902 +46,534 @@ function formatDate(value: Date | null): string {
 function formatResourceType(value: string): string {
   return value
     .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (character) =>
-      character.toUpperCase(),
-    );
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function getCompletionPercentage(
-  assignment: ResourceAssignment,
-): number {
-  if (assignment.studentCount === 0) return 0;
+function getStatusLabel(assignment: UnifiedAssignment): string {
+  if (assignment.kind === "exam") {
+    switch (assignment.status) {
+      case "in_progress":
+        return "In progress";
+      case "submitted":
+        return "Submitted";
+      case "marking":
+        return "Marking";
+      case "marked":
+        return "Marked";
+      default:
+        return "Not started";
+    }
+  }
 
-  return Math.round(
-    (assignment.completedCount / assignment.studentCount) * 100,
-  );
+  if (assignment.status === "completed") return "Completed";
+  if (assignment.status === "in_progress") return "In progress";
+
+  return "Not started";
 }
 
-function getDueStatus(dueDate: Date | null): {
-  label: string;
+function KindIcon({ kind }: { kind: UnifiedAssignment["kind"] }) {
+  if (kind === "quiz") return <Sparkles className="h-3.5 w-3.5" />;
+  if (kind === "exam") return <FileText className="h-3.5 w-3.5" />;
+  if (kind === "programming") return <Code2 className="h-3.5 w-3.5" />;
+
+  return <BookOpen className="h-3.5 w-3.5" />;
+}
+
+function StatusBadge({
+  assignment,
+  overdue,
+}: {
+  assignment: UnifiedAssignment;
   overdue: boolean;
-} {
-  if (!dueDate) {
-    return {
-      label: "No due date",
-      overdue: false,
-    };
+}) {
+  if (isUnifiedAssignmentComplete(assignment)) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        {assignment.kind === "exam" ? "Marked" : "Completed"}
+      </span>
+    );
   }
 
-  const today = new Date();
-  const due = new Date(dueDate);
+  if (overdue) {
+    return (
+      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
+        Overdue
+      </span>
+    );
+  }
 
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
+  if (assignment.status === "submitted" || assignment.status === "marking") {
+    return (
+      <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-bold text-cyan-700">
+        {assignment.status === "marking" ? "Marking" : "Submitted"}
+      </span>
+    );
+  }
 
-  const differenceInDays = Math.ceil(
-    (due.getTime() - today.getTime()) /
-      (1000 * 60 * 60 * 24),
+  if (assignment.status === "in_progress") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+        <Clock3 className="h-3.5 w-3.5" />
+        In progress
+      </span>
+    );
+  }
+
+  return (
+    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+      Not started
+    </span>
   );
+}
 
-  if (differenceInDays < 0) {
-    const overdueDays = Math.abs(differenceInDays);
+function matchesFilter(
+  assignment: UnifiedAssignment,
+  filter: AssignmentFilter,
+): boolean {
+  if (filter === "all") return true;
+  if (filter === "overdue") return isUnifiedAssignmentOverdue(assignment);
 
+  if (filter === "resources") {
+    return assignment.kind === "resource" || assignment.kind === "programming";
+  }
+
+  if (filter === "quizzes") return assignment.kind === "quiz";
+  if (filter === "exams") return assignment.kind === "exam";
+
+  if (filter === "completed") {
+    return isUnifiedAssignmentComplete(assignment);
+  }
+
+  if (filter === "submitted") {
+    return (
+      assignment.kind === "exam" &&
+      (assignment.status === "submitted" || assignment.status === "marking")
+    );
+  }
+
+  return assignment.status === filter;
+}
+
+function getHref(assignment: UnifiedAssignment): string {
+  if (assignment.kind === "quiz") {
+    return `/quiz?topic=${encodeURIComponent(
+      assignment.resourceId,
+    )}&assignment=${encodeURIComponent(assignment.id)}`;
+  }
+
+  if (assignment.kind === "exam") {
+    return `/assignments/exam/${assignment.id}`;
+  }
+
+  if (assignment.kind === "programming") {
+    return `/assignments/programming/${assignment.id}`;
+  }
+
+  return `/assignments/${assignment.id}`;
+}
+
+function getActionLabel(assignment: UnifiedAssignment): string {
+  if (assignment.kind === "quiz") {
+    return assignment.status === "completed" ? "Review quiz" : "Start quiz";
+  }
+
+  if (assignment.kind === "exam") {
+    switch (assignment.status) {
+      case "marked":
+        return "Review feedback";
+      case "submitted":
+      case "marking":
+        return "View submission";
+      case "in_progress":
+        return "Continue assessment";
+      default:
+        return "Start assessment";
+    }
+  }
+
+  if (assignment.kind === "programming") {
+    return assignment.status === "completed"
+      ? "Review challenge"
+      : assignment.status === "in_progress"
+        ? "Continue challenge"
+        : "Start challenge";
+  }
+
+  return assignment.status === "completed"
+    ? "Review assignment"
+    : assignment.status === "in_progress"
+      ? "Continue assignment"
+      : "Open assignment";
+}
+
+function getTone(kind: UnifiedAssignment["kind"]) {
+  if (kind === "quiz") {
     return {
-      label: `${overdueDays} ${
-        overdueDays === 1 ? "day" : "days"
-      } overdue`,
-      overdue: true,
+      badge: "bg-violet-100 text-violet-800",
+      button: "bg-violet-600 hover:bg-violet-700 focus:ring-violet-500",
     };
   }
 
-  if (differenceInDays === 0) {
+  if (kind === "exam") {
     return {
-      label: "Due today",
-      overdue: false,
+      badge: "bg-amber-100 text-amber-800",
+      button: "bg-amber-600 hover:bg-amber-700 focus:ring-amber-500",
     };
   }
 
-  if (differenceInDays === 1) {
+  if (kind === "programming") {
     return {
-      label: "Due tomorrow",
-      overdue: false,
+      badge: "bg-blue-100 text-blue-800",
+      button: "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500",
     };
   }
 
   return {
-    label: `${differenceInDays} days remaining`,
-    overdue: false,
+    badge: "bg-emerald-100 text-emerald-800",
+    button: "bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500",
   };
 }
 
-export default function TeacherAssignmentsPage() {
-  const { user } = useAuth();
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-black text-slate-900">{value}</p>
+    </div>
+  );
+}
 
-  const [assignments, setAssignments] =
-    useState<ResourceAssignment[]>([]);
+export default function StudentAssignmentsPage() {
+  const { user, loading: authLoading } = useAuth();
 
-  const [quizAssignments, setQuizAssignments] =
-    useState<TeacherQuizAssignmentSummary[]>([]);
-
-  const [examAssignments, setExamAssignments] =
-    useState<TeacherExamAssignmentSummary[]>([]);
-
+  const [assignments, setAssignments] = useState<UnifiedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-
-  const loadAssignments = useCallback(async () => {
-    if (!user?.uid) return;
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const [loadedResources, loadedQuizzes, loadedExams] =
-        await Promise.all([
-          getTeacherAssignments(user.uid),
-          getTeacherQuizAssignments(user.uid),
-          getTeacherExamAssignments(user.uid),
-        ]);
-
-      const loadedExamSummaries = await Promise.all(
-        loadedExams.map(async (assignment) => {
-          const submissions = await getAssignmentSubmissions(
-            assignment.id,
-            user.uid,
-          );
-
-          return summariseExamAssignment(assignment, submissions);
-        }),
-      );
-
-      setAssignments(loadedResources);
-      setQuizAssignments(loadedQuizzes);
-      setExamAssignments(loadedExamSummaries);
-    } catch (caughtError) {
-      console.error(
-        "Failed to load teacher assignments:",
-        caughtError,
-      );
-
-      setAssignments([]);
-      setQuizAssignments([]);
-      setExamAssignments([]);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Your assignments could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
+  const [filter, setFilter] = useState<AssignmentFilter>("all");
 
   useEffect(() => {
-    void loadAssignments();
-  }, [loadAssignments]);
+    let cancelled = false;
+
+    async function load() {
+      if (authLoading) return;
+
+      if (!user?.uid) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setError("");
+
+        const loadedAssignments = await getUnifiedStudentAssignments(user.uid);
+
+        if (!cancelled) {
+          setAssignments(loadedAssignments);
+        }
+      } catch (caughtError) {
+        console.error("Failed to load student assignments:", caughtError);
+
+        if (!cancelled) {
+          setAssignments([]);
+          setError("Your assignments could not be loaded.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user?.uid]);
+
+  const counts = useMemo(
+    () => ({
+      all: assignments.length,
+      resources: assignments.filter(
+        (assignment) =>
+          assignment.kind === "resource" || assignment.kind === "programming",
+      ).length,
+      quizzes: assignments.filter((assignment) => assignment.kind === "quiz")
+        .length,
+      exams: assignments.filter((assignment) => assignment.kind === "exam")
+        .length,
+      completed: assignments.filter(isUnifiedAssignmentComplete).length,
+      not_started: assignments.filter(
+        (assignment) => assignment.status === "not_started",
+      ).length,
+      in_progress: assignments.filter(
+        (assignment) => assignment.status === "in_progress",
+      ).length,
+      submitted: assignments.filter(
+        (assignment) =>
+          assignment.kind === "exam" &&
+          (assignment.status === "submitted" || assignment.status === "marking"),
+      ).length,
+      overdue: assignments.filter(isUnifiedAssignmentOverdue).length,
+    }),
+    [assignments],
+  );
 
   const filteredAssignments = useMemo(() => {
-    const search = searchTerm.trim().toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
 
-    if (!search) return assignments;
+    return assignments.filter((assignment) => {
+      if (!matchesFilter(assignment, filter)) return false;
+      if (!term) return true;
 
-    return assignments.filter(
-      (assignment) =>
-        assignment.resourceTitle
-          .toLowerCase()
-          .includes(search) ||
-        assignment.resourceTopic
-          .toLowerCase()
-          .includes(search) ||
-        assignment.className
-          .toLowerCase()
-          .includes(search),
-    );
-  }, [assignments, searchTerm]);
+      return [
+        assignment.title,
+        assignment.topic,
+        assignment.resourceType,
+        assignment.className,
+      ].some((value) => value.toLowerCase().includes(term));
+    });
+  }, [assignments, filter, searchTerm]);
 
-  const totalStudents = assignments.reduce(
-    (total, assignment) =>
-      total + assignment.studentCount,
-    0,
-  );
-
-  const totalCompleted = assignments.reduce(
-    (total, assignment) =>
-      total + assignment.completedCount,
-    0,
-  );
-
-  const activeAssignments = assignments.filter(
-    (assignment) => assignment.status === "active",
-  ).length;
-
-  const quizStudentCount = quizAssignments.reduce(
-    (total, assignment) => total + assignment.studentCount,
-    0,
-  );
-
-  const quizCompletedCount = quizAssignments.reduce(
-    (total, assignment) => total + assignment.completedCount,
-    0,
-  );
-
-  const activeQuizAssignments = quizAssignments.filter(
-    (assignment) => assignment.status === "active",
-  ).length;
-
-
-  const examStudentCount = examAssignments.reduce(
-    (total, item) => total + item.assignment.studentIds.length,
-    0,
-  );
-
-  const examMarkedCount = examAssignments.reduce(
-    (total, item) => total + item.markedCount,
-    0,
-  );
-
-  const activeExamAssignments = examAssignments.filter(
-    (item) => item.assignment.status === "active",
-  ).length;
-
-  if (loading) {
+  if (authLoading || loading) {
     return (
-      <div className="space-y-8">
-        <Skeleton className="h-56 w-full rounded-3xl" />
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          <Skeleton className="h-28 rounded-3xl" />
-          <Skeleton className="h-28 rounded-3xl" />
-          <Skeleton className="h-28 rounded-3xl" />
+      <div className="space-y-6">
+        <Skeleton className="h-40 rounded-3xl" />
+        <div className="grid gap-4 md:grid-cols-4">
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
         </div>
+        <Skeleton className="h-96 rounded-3xl" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-700 p-7 text-white shadow-xl sm:p-9">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-emerald-100">
-              Teacher assignments
-            </p>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <section className="rounded-3xl bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-7 text-white shadow-lg">
+        <p className="text-sm font-black uppercase tracking-[0.18em] text-white/80">
+          Student workspace
+        </p>
 
-            <h1 className="mt-3 text-3xl font-black sm:text-4xl">
-              Assignment tracking
-            </h1>
+        <h1 className="mt-2 text-3xl font-black">My Assignments</h1>
 
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-emerald-100">
-              Review lessons, quizzes, programming challenges and written
-              exams, monitor completion and identify students who may need
-              support.
-            </p>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-white/85">
+          Complete resources, quizzes and written assessments, monitor due dates
+          and review your results and feedback.
+        </p>
+      </section>
+
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label="All assignments" value={String(counts.all)} />
+        <Metric label="Resources" value={String(counts.resources)} />
+        <Metric label="Quizzes" value={String(counts.quizzes)} />
+        <Metric label="Written exams" value={String(counts.exams)} />
+        <Metric label="Completed" value={String(counts.completed)} />
+        <Metric label="Not started" value={String(counts.not_started)} />
+        <Metric label="In progress" value={String(counts.in_progress)} />
+        <Metric label="Submitted" value={String(counts.submitted)} />
+        <Metric label="Overdue" value={String(counts.overdue)} />
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full lg:max-w-md">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search assignments..."
+              className="w-full rounded-xl border border-slate-200 py-3 pl-11 pr-4 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Link
-              href="/teacher/exam-assignments"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-indigo-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
-            >
-              <FileText className="h-4 w-4" />
-              Exam markbooks
-            </Link>
-
-            <Link
-              href="/teacher/quiz-assignments"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-violet-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
-            >
-              <Brain className="h-4 w-4" />
-              Quiz results
-            </Link>
-
-            <Link
-              href="/teacher/programming-assignments"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-cyan-950/30 px-5 py-3 text-sm font-bold text-white ring-1 ring-white/25"
-            >
-              <Code2 className="h-4 w-4" />
-              Programming results
-            </Link>
-
-            <Link
-              href="/teacher/assignment-wizard"
-              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-700 transition hover:bg-emerald-50"
-            >
-              <BookOpen className="h-4 w-4" />
-              Assignment Wizard
-            </Link>
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["all", "All"],
+                ["resources", "Resources"],
+                ["quizzes", "Quizzes"],
+                ["exams", "Exams"],
+                ["not_started", "Not started"],
+                ["in_progress", "In progress"],
+                ["submitted", "Submitted"],
+                ["completed", "Completed"],
+                ["overdue", "Overdue"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setFilter(value)}
+                className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+                  filter === value
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-        <SummaryCard
-          label="Assignments"
-          value={
-            assignments.length +
-            quizAssignments.length +
-            examAssignments.length
-          }
-          description="Lessons, quizzes, programming and exams"
-          icon={<FileText className="h-6 w-6" />}
-          iconClassName="bg-blue-50 text-blue-600"
-        />
+      {filteredAssignments.length === 0 ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+          <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
+          <h2 className="mt-4 text-xl font-black text-slate-900">
+            No assignments found
+          </h2>
+          <p className="mt-2 text-slate-500">
+            There are no assignments matching the current filters.
+          </p>
+        </section>
+      ) : (
+        <section className="grid gap-6 xl:grid-cols-2">
+          {filteredAssignments.map((assignment) => {
+            const overdue = isUnifiedAssignmentOverdue(assignment);
+            const tone = getTone(assignment.kind);
 
-        <SummaryCard
-          label="Active"
-          value={
-            activeAssignments +
-            activeQuizAssignments +
-            activeExamAssignments
-          }
-          description="Currently available"
-          icon={<Clock3 className="h-6 w-6" />}
-          iconClassName="bg-amber-50 text-amber-600"
-        />
-
-        <SummaryCard
-          label="Completed"
-          value={`${
-            totalCompleted +
-            quizCompletedCount +
-            examMarkedCount
-          }/${
-            totalStudents +
-            quizStudentCount +
-            examStudentCount
-          }`}
-          description="Student completions"
-          icon={<CheckCircle2 className="h-6 w-6" />}
-          iconClassName="bg-emerald-50 text-emerald-600"
-        />
-      </div>
-
-      <Card className="rounded-3xl border border-slate-200 p-6 sm:p-7">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-600">
-              Class assignments
-            </p>
-
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              Your assignments
-            </h2>
-          </div>
-
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) =>
-                setSearchTerm(event.target.value)
-              }
-              placeholder="Search assignments..."
-              className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-100 sm:w-72"
-            />
-          </label>
-        </div>
-
-        {error ? (
-          <div className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-
-              <div>
-                <p className="font-bold text-red-950">
-                  Assignments unavailable
-                </p>
-
-                <p className="mt-1 text-sm text-red-700">
-                  {error}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={() => void loadAssignments()}
-                  className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white"
-                >
-                  <Loader2 className="h-4 w-4" />
-                  Try again
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : filteredAssignments.length === 0 ? (
-          <div className="mt-8 rounded-3xl bg-slate-50 p-10 text-center">
-            <BookOpen className="mx-auto h-10 w-10 text-slate-400" />
-
-            <h3 className="mt-4 text-xl font-black text-slate-950">
-              No assignments found
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-lg text-sm text-slate-500">
-              Create an assignment to begin tracking
-              student completion.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-7 grid gap-6 lg:grid-cols-2">
-            {filteredAssignments.map((assignment) => {
-              const completionPercentage =
-                getCompletionPercentage(assignment);
-
-              const dueStatus =
-                getDueStatus(assignment.dueDate);
-
-              const programming =
-                assignment.resourceType ===
-                "programming-challenge";
-
-              return (
-                <article
-                  key={assignment.id}
-                  className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-bold ${
-                            programming
-                              ? "bg-cyan-100 text-cyan-800"
-                              : "bg-teal-50 text-teal-700"
-                          }`}
-                        >
-                          {programming
-                            ? "Programming"
-                            : formatResourceType(
-                                assignment.resourceType,
-                              )}
-                        </span>
-
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                          {assignment.className}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-4 text-xl font-black text-slate-950">
-                        {assignment.resourceTitle}
-                      </h3>
-
-                      <p className="mt-2 text-sm font-semibold text-teal-700">
-                        {assignment.resourceTopic}
-                      </p>
-                    </div>
-
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-                        programming
-                          ? "bg-cyan-50 text-cyan-700"
-                          : "bg-teal-50 text-teal-600"
-                      }`}
-                    >
-                      {programming ? (
-                        <Code2 className="h-5 w-5" />
-                      ) : (
-                        <BookOpen className="h-5 w-5" />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Students
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
-                        <Users className="h-4 w-4 text-blue-600" />
-                        {assignment.studentCount}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
-                        Due date
-                      </p>
-                      <p className="mt-2 flex items-center gap-2 font-bold text-slate-800">
-                        <CalendarDays className="h-4 w-4 text-teal-600" />
-                        {formatDate(assignment.dueDate)}
-                      </p>
-                      <p
-                        className={`mt-1 text-xs font-semibold ${
-                          dueStatus.overdue
-                            ? "text-red-600"
-                            : "text-slate-500"
-                        }`}
+            return (
+              <article
+                key={`${assignment.kind}-${assignment.id}`}
+                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+              >
+                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${tone.badge}`}
                       >
-                        {dueStatus.label}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-bold text-slate-700">
-                        Completion
+                        <KindIcon kind={assignment.kind} />
+                        {formatResourceType(assignment.resourceType)}
                       </span>
-                      <span className="font-black text-teal-700">
-                        {completionPercentage}%
-                      </span>
+
+                      <StatusBadge assignment={assignment} overdue={overdue} />
                     </div>
 
-                    <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 transition-all"
-                        style={{
-                          width: `${completionPercentage}%`,
-                        }}
-                      />
-                    </div>
+                    <h2 className="mt-4 text-xl font-black text-slate-950">
+                      {assignment.title}
+                    </h2>
+
+                    <p className="mt-2 text-sm font-semibold text-slate-500">
+                      {assignment.topic}
+                    </p>
                   </div>
 
-                  <Link
-                    href={
-                      programming
-                        ? `/teacher/programming-assignments/${assignment.id}`
-                        : `/teacher/assignments/${assignment.id}`
-                    }
-                    className={`mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold text-white transition ${
-                      programming
-                        ? "bg-cyan-700 hover:bg-cyan-800"
-                        : "bg-teal-600 hover:bg-teal-700"
-                    }`}
-                  >
-                    <Eye className="h-4 w-4" />
-                    {programming
-                      ? "View programming results"
-                      : "View progress"}
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Due
+                    </p>
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {formatDate(assignment.dueDate)}
+                    </p>
+                  </div>
+                </div>
 
-      <Card className="rounded-3xl border border-violet-200 p-6 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-violet-600">
-              Quiz and AI quiz assignments
-            </p>
-
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              Quiz results and completion
-            </h2>
-          </div>
-
-          <Link
-            href="/teacher/quiz-assignments"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
-          >
-            <Brain className="h-4 w-4" />
-            Open quiz markbook
-          </Link>
-        </div>
-
-        {quizAssignments.length === 0 ? (
-          <div className="mt-7 rounded-2xl bg-slate-50 p-8 text-center">
-            <Brain className="mx-auto h-9 w-9 text-slate-400" />
-            <p className="mt-3 font-bold text-slate-800">
-              No quiz assignments yet
-            </p>
-          </div>
-        ) : (
-          <div className="mt-7 grid gap-6 lg:grid-cols-2">
-            {quizAssignments.map((assignment) => {
-              const dueStatus = getDueStatus(assignment.dueDate);
-              const isAIQuiz =
-                assignment.quizSource === "ai-generated";
-
-              return (
-                <article
-                  key={assignment.id}
-                  className="rounded-3xl border border-violet-100 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="flex flex-wrap gap-2">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-bold ${
-                            isAIQuiz
-                              ? "bg-fuchsia-100 text-fuchsia-800"
-                              : "bg-violet-100 text-violet-800"
-                          }`}
-                        >
-                          {isAIQuiz ? "AI Quiz" : "Quiz"}
-                        </span>
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                          {assignment.className}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-4 text-xl font-black text-slate-950">
-                        {assignment.title}
-                      </h3>
-
-                      <p
-                        className={`mt-2 text-sm font-semibold ${
-                          isAIQuiz
-                            ? "text-fuchsia-700"
-                            : "text-violet-700"
-                        }`}
-                      >
-                        {isAIQuiz
-                          ? "Saved AI Quiz Library"
-                          : "Built-in quiz library"}
-                      </p>
-                    </div>
-
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-50 text-violet-700">
-                      <Brain className="h-5 w-5" />
-                    </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                    <p className="font-bold text-slate-900">
+                      {assignment.className}
+                    </p>
+                    <p className="mt-1">{assignment.teacherName}</p>
                   </div>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Students</p>
-                      <p className="mt-2 font-black text-slate-900">{assignment.studentCount}</p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Completed</p>
-                      <p className="mt-2 font-black text-slate-900">{assignment.completedCount}</p>
-                    </div>
-
-                    <div className="rounded-2xl bg-violet-50 p-4">
-                      <p className="text-xs font-bold uppercase tracking-wide text-violet-500">Average</p>
-                      <p className="mt-2 font-black text-violet-900">
-                        {assignment.completedCount > 0
-                          ? `${assignment.averagePercentage}%`
-                          : "—"}
-                      </p>
-                    </div>
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                    <p className="font-bold text-slate-900">Status</p>
+                    <p className="mt-1">{getStatusLabel(assignment)}</p>
                   </div>
+                </div>
 
-                  <div className="mt-5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-bold text-slate-700">Completion</span>
-                      <span className="font-black text-violet-700">
-                        {assignment.completionPercentage}%
-                      </span>
-                    </div>
-                    <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-600"
-                        style={{ width: `${assignment.completionPercentage}%` }}
-                      />
-                    </div>
+                {assignment.description && (
+                  <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                      Teacher instructions
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {assignment.description}
+                    </p>
                   </div>
+                )}
 
-                  <div className="mt-4 flex items-center justify-between gap-3 text-xs font-semibold">
-                    <span className={dueStatus.overdue ? "text-red-600" : "text-slate-500"}>
-                      {formatDate(assignment.dueDate)} · {dueStatus.label}
-                    </span>
-                  </div>
-
-                  <Link
-                    href={`/teacher/quiz-assignments/${assignment.id}`}
-                    className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-violet-700"
-                  >
-                    <Eye className="h-4 w-4" />
-                    {isAIQuiz ? "View AI quiz results" : "View quiz results"}
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </Card>
-
-      <Card className="rounded-3xl border border-indigo-200 p-6 sm:p-7">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-600">
-              Written exam assignments
-            </p>
-
-            <h2 className="mt-2 text-2xl font-black text-slate-950">
-              Submissions and marking
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Track submitted papers, assessments awaiting marking and
-              finalised results.
-            </p>
-          </div>
-
-          <Link
-            href="/teacher/exam-assignments"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
-          >
-            <FileText className="h-4 w-4" />
-            Open exam markbooks
-          </Link>
-        </div>
-
-        {examAssignments.length === 0 ? (
-          <div className="mt-7 rounded-2xl bg-slate-50 p-8 text-center">
-            <FileText className="mx-auto h-9 w-9 text-slate-400" />
-            <p className="mt-3 font-bold text-slate-800">
-              No written exam assignments yet
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              Assign a saved exam paper from the Assignment Wizard and it will
-              appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-7 grid gap-6 lg:grid-cols-2">
-            {examAssignments.map((item) => {
-              const assignment = item.assignment;
-              const dueStatus = getDueStatus(assignment.dueDate);
-              const studentCount = assignment.studentIds.length;
-
-              return (
-                <article
-                  key={assignment.id}
-                  className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
-                          Written Exam
-                        </span>
-                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                          {assignment.className}
-                        </span>
-                      </div>
-
-                      <h3 className="mt-4 text-xl font-black text-slate-950">
-                        {assignment.title}
-                      </h3>
-
-                      <p className="mt-2 text-sm font-semibold text-indigo-700">
-                        {assignment.questionSetSnapshot.topic ||
-                          assignment.questionSetTitle}
-                      </p>
-                    </div>
-
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <ExamMetric label="Students" value={studentCount} />
-                    <ExamMetric label="Submitted" value={item.submittedCount} />
-                    <ExamMetric
-                      label="Awaiting marking"
-                      value={item.awaitingMarkingCount}
-                      tone="amber"
-                    />
-                    <ExamMetric
-                      label="Marked"
-                      value={item.markedCount}
-                      tone="green"
-                    />
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <ExamMetric
+                {assignment.kind === "exam" && (
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <Metric
                       label="Questions"
-                      value={assignment.questionCount}
+                      value={String(assignment.questionCount || 0)}
                     />
-                    <ExamMetric
+                    <Metric
                       label="Total marks"
-                      value={assignment.totalMarks}
-                    />
-                    <ExamMetric
-                      label="Class average"
-                      value={
-                        item.averagePercentage !== null
-                          ? `${item.averagePercentage}%`
-                          : "Awaiting marks"
-                      }
-                      tone="indigo"
+                      value={String(assignment.totalMarks || 0)}
                     />
                   </div>
+                )}
 
-                  <ExamProgress
-                    label="Submitted"
-                    value={item.submissionPercentage}
-                    barClassName="bg-gradient-to-r from-cyan-500 to-blue-600"
-                    valueClassName="text-cyan-700"
-                  />
+                {assignment.kind === "quiz" &&
+                  assignment.status === "completed" && (
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <Metric
+                        label="Score"
+                        value={`${assignment.score || 0}/${assignment.totalQuestions || 0}`}
+                      />
+                      <Metric
+                        label="Percentage"
+                        value={`${assignment.percentage || 0}%`}
+                      />
+                      <Metric
+                        label="XP"
+                        value={String(assignment.earnedXP || 0)}
+                      />
+                      <Metric
+                        label="Completed"
+                        value={formatDate(assignment.completedAt)}
+                      />
+                    </div>
+                  )}
 
-                  <ExamProgress
-                    label="Marked / completed"
-                    value={item.markingPercentage}
-                    barClassName="bg-gradient-to-r from-emerald-500 to-teal-600"
-                    valueClassName="text-emerald-700"
-                  />
+                {assignment.kind === "exam" &&
+                  assignment.status === "marked" && (
+                    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      <Metric
+                        label="Score"
+                        value={`${assignment.score || 0}/${assignment.totalMarks || 0}`}
+                      />
+                      <Metric
+                        label="Percentage"
+                        value={`${assignment.percentage || 0}%`}
+                      />
+                      <Metric
+                        label="Marked"
+                        value={formatDate(assignment.markedAt)}
+                      />
+                    </div>
+                  )}
 
-                  <div className="mt-4 flex flex-col gap-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between">
-                    <span
-                      className={
-                        dueStatus.overdue ? "text-red-600" : "text-slate-500"
-                      }
-                    >
-                      {formatDate(assignment.dueDate)} · {dueStatus.label}
-                    </span>
-
-                    {item.awaitingMarkingCount > 0 && (
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-800">
-                        {item.awaitingMarkingCount} awaiting marking
-                      </span>
-                    )}
-                  </div>
-
+                <div className="mt-6 flex justify-end">
                   <Link
-                    href={`/teacher/exam-assignments/${assignment.id}`}
-                    className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+                    href={getHref(assignment)}
+                    className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition focus:ring-2 focus:ring-offset-2 ${tone.button}`}
                   >
-                    <Eye className="h-4 w-4" />
-                    {item.awaitingMarkingCount > 0
-                      ? "View submissions / Mark exam"
-                      : "Open exam markbook"}
+                    {getActionLabel(assignment)}
+                    <ChevronRight className="h-4 w-4" />
                   </Link>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+      )}
     </div>
-  );
-}
-
-function ExamMetric({
-  label,
-  value,
-  tone = "slate",
-}: {
-  label: string;
-  value: number | string;
-  tone?: "slate" | "amber" | "green" | "indigo";
-}) {
-  const toneClasses = {
-    slate: "bg-slate-50 text-slate-900",
-    amber: "bg-amber-50 text-amber-900",
-    green: "bg-emerald-50 text-emerald-900",
-    indigo: "bg-indigo-50 text-indigo-900",
-  };
-
-  return (
-    <div className={`rounded-2xl p-4 ${toneClasses[tone]}`}>
-      <p className="text-xs font-bold uppercase tracking-wide opacity-60">
-        {label}
-      </p>
-      <p className="mt-2 font-black">{value}</p>
-    </div>
-  );
-}
-
-function ExamProgress({
-  label,
-  value,
-  barClassName,
-  valueClassName,
-}: {
-  label: string;
-  value: number;
-  barClassName: string;
-  valueClassName: string;
-}) {
-  return (
-    <div className="mt-5">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-bold text-slate-700">{label}</span>
-        <span className={`font-black ${valueClassName}`}>{value}%</span>
-      </div>
-      <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-100">
-        <div
-          className={`h-full rounded-full ${barClassName}`}
-          style={{ width: `${value}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  description,
-  icon,
-  iconClassName,
-}: {
-  label: string;
-  value: number | string;
-  description: string;
-  icon: React.ReactNode;
-  iconClassName: string;
-}) {
-  return (
-    <Card className="rounded-3xl border border-slate-200 p-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold text-slate-500">
-            {label}
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-950">
-            {value}
-          </p>
-          <p className="mt-1 text-sm text-slate-500">
-            {description}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}
-        >
-          {icon}
-        </div>
-      </div>
-    </Card>
   );
 }

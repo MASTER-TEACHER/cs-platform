@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import StudentsIntelligencePanel from "@/components/teacher/intelligence/StudentsIntelligencePanel";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
@@ -276,7 +277,7 @@ export default function TeacherStudentsPage() {
           icon="⭐"
         />
       </div>
-
+<StudentsIntelligencePanel />
       <Card>
         <div className="flex flex-col gap-5">
           <div>

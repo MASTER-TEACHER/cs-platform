@@ -1,13 +1,17 @@
-import { collection, getDocs, query, where } from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
 import { curriculumRegistry } from "@/data/curriculum/curriculumRegistry";
-import { getAdaptiveLearningPlan } from "@/services/adaptiveLearningService";
+import { getTeacherAnalyticsPortfolio } from "@/services/analytics/teacherAnalyticsService";
 import { normaliseTopic } from "@/services/topicNormalisationService";
+
 import type {
   ClassKnowledgeMap,
   ClassKnowledgeMapTopic,
 } from "@/types/knowledgeMap";
+
+type TopicAccumulator = {
+  percentages: number[];
+  evidenceCount: number;
+  studentCount: number;
+};
 
 function average(values: number[]): number {
   return values.length
@@ -15,6 +19,22 @@ function average(values: number[]): number {
     : 0;
 }
 
+/*
+ * IMPORTANT:
+ *
+ * The old Class Knowledge Map service loaded every student profile and then
+ * called getAdaptiveLearningPlan(studentId) while a TEACHER was signed in.
+ *
+ * That adaptive-learning pipeline contains student-context Firestore reads,
+ * which is why /teacher/knowledge-map could fail with:
+ *
+ * FirebaseError: Missing or insufficient permissions.
+ *
+ * The Teacher Analytics pipeline is already tested and working with the
+ * teacher's existing Firestore permissions. This service therefore consumes
+ * the same teacher analytics portfolio rather than opening a second,
+ * permission-sensitive student analytics path.
+ */
 export async function getClassKnowledgeMap(
   teacherId: string,
 ): Promise<ClassKnowledgeMap> {
@@ -29,70 +49,126 @@ export async function getClassKnowledgeMap(
     };
   }
 
-  const classesSnapshot = await getDocs(
-    query(collection(db, "classes"), where("teacherId", "==", id)),
-  );
+  const portfolio = await getTeacherAnalyticsPortfolio(id);
 
-  const classIds = classesSnapshot.docs.map((document) => document.id);
-
-  if (!classIds.length) {
+  if (portfolio.classes.length === 0) {
     return {
       teacherId: id,
       generatedAt: new Date(),
       studentCount: 0,
-      topics: [],
+      topics: curriculumRegistry.map((definition) => ({
+        topicId: definition.id,
+        topicTitle: definition.title,
+        unitId: definition.unitId,
+        unitTitle: definition.unitTitle,
+        classAverage: 0,
+        averageConfidence: 0,
+        assessedStudents: 0,
+        priorityStudents: 0,
+        secureStudents: 0,
+      })),
     };
   }
 
-  const studentsSnapshot = await getDocs(
-    query(collection(db, "users"), where("role", "==", "student")),
-  );
+  const accumulators = new Map<string, TopicAccumulator>();
 
-  const studentIds = studentsSnapshot.docs
-    .filter((document) => {
-      const value = document.data().classIds;
+  for (const classItem of portfolio.classes) {
+    for (const student of classItem.students) {
+      for (const topic of student.analytics.topics) {
+        const normalised = normaliseTopic(topic.topic);
+        const topicId = normalised.topicId;
 
-      return (
-        Array.isArray(value) &&
-        value.some(
-          (classId) =>
-            typeof classId === "string" && classIds.includes(classId),
-        )
-      );
-    })
-    .map((document) => document.id);
+        if (!topicId) {
+          continue;
+        }
 
-  const plans = await Promise.all(
-    studentIds.map((studentId) => getAdaptiveLearningPlan(studentId)),
-  );
+        const current = accumulators.get(topicId) || {
+          percentages: [],
+          evidenceCount: 0,
+          studentCount: 0,
+        };
+
+        current.percentages.push(topic.weightedPercentage);
+        current.evidenceCount += topic.evidenceCount;
+        current.studentCount += 1;
+
+        accumulators.set(topicId, current);
+      }
+    }
+  }
 
   const topics: ClassKnowledgeMapTopic[] = curriculumRegistry.map(
     (definition) => {
-      const evidence = plans
-        .map((plan) =>
-          plan.topics.find(
-            (topic) => normaliseTopic(topic.topic).topicId === definition.id,
-          ),
-        )
-        .filter((topic): topic is NonNullable<typeof topic> => Boolean(topic));
+      const evidence = accumulators.get(definition.id);
+
+      const classAverage = evidence
+        ? average(evidence.percentages)
+        : 0;
+
+      const assessedStudents = evidence?.studentCount ?? 0;
+
+      /*
+       * Confidence here is intentionally derived from the quantity of
+       * assessment evidence backing the topic rather than from the old
+       * adaptive-learning confidence service.
+       *
+       * 1 evidence item  -> 40
+       * 2 evidence items -> 55
+       * 3 evidence items -> 70
+       * 4+               -> 85-100
+       */
+      const evidenceCount = evidence?.evidenceCount ?? 0;
+
+      const averageConfidence =
+        evidenceCount === 0
+          ? 0
+          : Math.min(100, 25 + evidenceCount * 15);
+
+      /*
+       * The current ClassKnowledgeMap type stores class-level counts.
+       * We derive the counts consistently from the same thresholds used
+       * throughout CS Master's teacher analytics:
+       *
+       * priority   < 50%
+       * developing 50-69%
+       * secure     >= 70%
+       *
+       * With multiple students, each student's topic mastery is counted.
+       */
+      let priorityStudents = 0;
+      let secureStudents = 0;
+
+      for (const classItem of portfolio.classes) {
+        for (const student of classItem.students) {
+          const studentTopic = student.analytics.topics.find(
+            (topic) =>
+              normaliseTopic(topic.topic).topicId === definition.id,
+          );
+
+          if (!studentTopic) {
+            continue;
+          }
+
+          if (studentTopic.weightedPercentage < 50) {
+            priorityStudents += 1;
+          }
+
+          if (studentTopic.weightedPercentage >= 70) {
+            secureStudents += 1;
+          }
+        }
+      }
 
       return {
         topicId: definition.id,
         topicTitle: definition.title,
         unitId: definition.unitId,
         unitTitle: definition.unitTitle,
-        classAverage: average(evidence.map((topic) => topic.masteryScore)),
-        averageConfidence: average(
-          evidence.map((topic) => topic.confidenceScore),
-        ),
-        assessedStudents: evidence.length,
-        priorityStudents: evidence.filter(
-          (topic) =>
-            topic.state === "priority" || topic.state === "forgetting-risk",
-        ).length,
-        secureStudents: evidence.filter(
-          (topic) => topic.state === "secure" || topic.state === "mastered",
-        ).length,
+        classAverage,
+        averageConfidence,
+        assessedStudents,
+        priorityStudents,
+        secureStudents,
       };
     },
   );
@@ -100,7 +176,7 @@ export async function getClassKnowledgeMap(
   return {
     teacherId: id,
     generatedAt: new Date(),
-    studentCount: studentIds.length,
+    studentCount: portfolio.uniqueStudentCount,
     topics,
   };
 }

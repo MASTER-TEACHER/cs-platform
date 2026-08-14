@@ -14,6 +14,8 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import TopicAnalytics from "@/components/teacher/dashboard/TopicAnalytics";
 import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
 import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
+import TeacherAnalyticsSnapshot from "@/components/teacher/dashboard/TeacherAnalyticsSnapshot";
+import TeacherPrioritySnapshot from "@/components/teacher/intelligence/TeacherPrioritySnapshot";
 import {
   getCompletionMessage,
   getPerformanceMessage,
@@ -212,7 +214,8 @@ export default function TeacherPage() {
           />
         </div>
       </section>
-
+<TeacherAnalyticsSnapshot />
+<TeacherPrioritySnapshot />
       <TeacherQuickActions />
 
       <section>

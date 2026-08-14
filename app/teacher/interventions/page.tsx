@@ -8,6 +8,7 @@ import InterventionFilters from "@/components/teacher/interventions/Intervention
 import InterventionStudentRow from "@/components/teacher/interventions/InterventionStudentRow";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import InterventionIntelligencePanel from "@/components/teacher/intelligence/InterventionIntelligencePanel";
 import {
   getInterventionCandidates,
   type InterventionCandidate,
@@ -124,6 +125,7 @@ export default function TeacherInterventionsPage() {
           </table>
         </div>
       </Card>
+      <InterventionIntelligencePanel /> 
       <Card>
         <h2 className="text-2xl font-black">Existing interventions</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

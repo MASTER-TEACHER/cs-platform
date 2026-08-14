@@ -11,6 +11,7 @@ import DashboardQuiz from "@/components/dashboard/DashboardQuiz";
 import DashboardActivity from "@/components/dashboard/DashboardActivity";
 import AssessmentInsights from "@/components/dashboard/AssessmentInsights";
 import AdaptiveLearningCard from "@/components/dashboard/AdaptiveLearningCard";
+import StudentAnalyticsSnapshot from "@/components/dashboard/StudentAnalyticsSnapshot";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRecentQuiz } from "@/hooks/useRecentQuiz";
@@ -23,9 +24,18 @@ import { getTotalLessonCount } from "@/lib/curriculumProgress";
 export default function DashboardPage() {
   const router = useRouter();
 
-  const { user, profile, loading, profileReady, profileError } = useAuth();
+  const {
+    user,
+    profile,
+    loading,
+    profileReady,
+    profileError,
+  } = useAuth();
 
-  const { quiz: recentQuiz, loading: recentQuizLoading } = useRecentQuiz();
+  const {
+    quiz: recentQuiz,
+    loading: recentQuizLoading,
+  } = useRecentQuiz();
 
   const {
     analytics,
@@ -33,8 +43,10 @@ export default function DashboardPage() {
     error: analyticsError,
   } = useStudentAdaptiveAnalytics();
 
-  const { plan: adaptivePlan, loading: adaptiveLoading } =
-    useAdaptiveLearning();
+  const {
+    plan: adaptivePlan,
+    loading: adaptiveLoading,
+  } = useAdaptiveLearning();
 
   useEffect(() => {
     if (loading) {
@@ -50,7 +62,10 @@ export default function DashboardPage() {
       return;
     }
 
-    if (profile.role === "teacher" || profile.role === "admin") {
+    if (
+      profile.role === "teacher" ||
+      profile.role === "admin"
+    ) {
       router.replace("/teacher");
       return;
     }
@@ -63,9 +78,20 @@ export default function DashboardPage() {
     if (!curriculumComplete) {
       router.replace("/onboarding");
     }
-  }, [loading, user, profileReady, profile, router]);
+  }, [
+    loading,
+    user,
+    profileReady,
+    profile,
+    router,
+  ]);
 
-  if (loading || (user && !profileReady && !profileError)) {
+  if (
+    loading ||
+    (user &&
+      !profileReady &&
+      !profileError)
+  ) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-72 w-full" />
@@ -77,6 +103,7 @@ export default function DashboardPage() {
           <Skeleton className="h-32" />
         </div>
 
+        <Skeleton className="h-64 w-full" />
         <Skeleton className="h-72 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -90,7 +117,9 @@ export default function DashboardPage() {
           Your dashboard could not be loaded
         </h1>
 
-        <p className="mt-3 text-red-800">{profileError}</p>
+        <p className="mt-3 text-red-800">
+          {profileError}
+        </p>
       </section>
     );
   }
@@ -115,15 +144,28 @@ export default function DashboardPage() {
     );
   }
 
-  const name = profile.name || "Student";
-  const xp = profile.xp || 0;
-  const streak = profile.streak || 0;
-  const badges = profile.badges || [];
-  const completedLessons = profile.completedLessons || [];
+  const name =
+    profile.name || "Student";
 
-  const totalLessons = getTotalLessonCount();
+  const xp =
+    profile.xp || 0;
 
-  const mission = getDailyMission(completedLessons);
+  const streak =
+    profile.streak || 0;
+
+  const badges =
+    profile.badges || [];
+
+  const completedLessons =
+    profile.completedLessons || [];
+
+  const totalLessons =
+    getTotalLessonCount();
+
+  const mission =
+    getDailyMission(
+      completedLessons,
+    );
 
   return (
     <div className="space-y-8">
@@ -136,12 +178,20 @@ export default function DashboardPage() {
 
       <DashboardStats
         xp={xp}
-        completedLessons={completedLessons.length}
+        completedLessons={
+          completedLessons.length
+        }
         streak={streak}
         badges={badges.length}
       />
 
-      <AdaptiveLearningCard plan={adaptivePlan} loading={adaptiveLoading} />
+      {/* NEW RICH ATTAINMENT ANALYTICS */}
+      <StudentAnalyticsSnapshot />
+
+      <AdaptiveLearningCard
+        plan={adaptivePlan}
+        loading={adaptiveLoading}
+      />
 
       <AssessmentInsights
         analytics={analytics}
@@ -151,22 +201,30 @@ export default function DashboardPage() {
 
       <DashboardLearning
         mission={mission}
-        completedLessons={completedLessons}
+        completedLessons={
+          completedLessons
+        }
         totalLessons={totalLessons}
       />
 
       <DashboardQuiz
         recentQuiz={recentQuiz}
-        recentQuizLoading={recentQuizLoading}
+        recentQuizLoading={
+          recentQuizLoading
+        }
         unlockedBadges={badges}
         xp={xp}
-        completedLessons={completedLessons}
+        completedLessons={
+          completedLessons
+        }
       />
 
       <DashboardActivity
         unlockedBadges={badges}
         xp={xp}
-        completedLessons={completedLessons}
+        completedLessons={
+          completedLessons
+        }
       />
     </div>
   );

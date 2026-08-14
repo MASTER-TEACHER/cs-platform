@@ -4,6 +4,7 @@ import Link from "next/link";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
+import ReportsIntelligencePanel from "@/components/teacher/intelligence/ReportsIntelligencePanel";
 
 export default function TeacherReportsPage() {
   const {
@@ -102,7 +103,7 @@ export default function TeacherReportsPage() {
           icon="📚"
         />
       </div>
-
+<ReportsIntelligencePanel />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <p className="text-sm font-semibold uppercase tracking-wide text-red-600">

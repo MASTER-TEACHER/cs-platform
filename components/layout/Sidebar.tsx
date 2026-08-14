@@ -3,89 +3,45 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { ReactNode } from "react";
 
 import LogoutButton from "@/components/layout/LogoutButton";
 import { useAuth } from "@/contexts/AuthContext";
+import { BarChart3 } from "lucide-react";
 
 type SidebarLink = {
   href: string;
   label: string;
-  icon: string;
+  icon: ReactNode;
 };
 
 const studentLinks: SidebarLink[] = [
+  { href: "/dashboard", label: "Dashboard", icon: "🏠" },
+  { href: "/adaptive-learning", label: "Adaptive Learning", icon: "🧬" },
+  { href: "/knowledge-map", label: "Knowledge Map", icon: "🗺️" },
   {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: "🏠",
+    href: "/analytics",
+    label: "Analytics",
+    icon: <BarChart3 className="h-4 w-4" />,
   },
-  {
-    href: "/adaptive-learning",
-    label: "Adaptive Learning",
-    icon: "🧬",
-  },
-  {
-    href: "/knowledge-map",
-    label: "Knowledge Map",
-    icon: "🗺️",
-  },
-  {
-    href: "/tutor",
-    label: "AI Tutor",
-    icon: "🤖",
-  },
-  {
-    href: "/revision-plan",
-    label: "Revision Plan",
-    icon: "🧭",
-  },
-  {
-    href: "/assignments",
-    label: "Assignments",
-    icon: "📋",
-  },
-  {
-    href: "/learn",
-    label: "Learn",
-    icon: "📚",
-  },
-  {
-    href: "/quiz",
-    label: "Quiz",
-    icon: "📝",
-  },
-  {
-    href: "/programming",
-    label: "Programming",
-    icon: "💻",
-  },
-  {
-    href: "/visualisers",
-    label: "Visualisers",
-    icon: "🧠",
-  },
-  {
-    href: "/exam",
-    label: "Exam Mode",
-    icon: "🎯",
-  },
-  {
-    href: "/exam-trainer",
-    label: "Exam Trainer",
-    icon: "🧪",
-  },
-  {
-    href: "/profile",
-    label: "Profile",
-    icon: "👤",
-  },
+  { href: "/tutor", label: "AI Tutor", icon: "🤖" },
+  { href: "/revision-plan", label: "Revision Plan", icon: "🧭" },
+  { href: "/assignments", label: "Assignments", icon: "📋" },
+  { href: "/learn", label: "Learn", icon: "📚" },
+  { href: "/quiz", label: "Quiz", icon: "📝" },
+  { href: "/programming", label: "Programming", icon: "💻" },
+  { href: "/visualisers", label: "Visualisers", icon: "🧠" },
+  { href: "/exam", label: "Exam Mode", icon: "🎯" },
+  { href: "/exam-trainer", label: "Exam Trainer", icon: "🧪" },
+  { href: "/profile", label: "Profile", icon: "👤" },
 ];
 
 const teacherLinks: SidebarLink[] = [
+  { href: "/teacher", label: "Dashboard", icon: "📊" },
   {
-    href: "/teacher",
-    label: "Dashboard",
-    icon: "📊",
+    href: "/teacher/analytics",
+    label: "Analytics",
+    icon: <BarChart3 className="h-4 w-4" />,
   },
   {
     href: "/teacher/knowledge-map",
@@ -97,21 +53,9 @@ const teacherLinks: SidebarLink[] = [
     label: "Interventions",
     icon: "🧭",
   },
-  {
-    href: "/teacher/students",
-    label: "Students",
-    icon: "👨‍🎓",
-  },
-  {
-    href: "/teacher/classes",
-    label: "Classes",
-    icon: "🏫",
-  },
-  {
-    href: "/teacher/assignments",
-    label: "Assignments",
-    icon: "📋",
-  },
+  { href: "/teacher/students", label: "Students", icon: "👨‍🎓" },
+  { href: "/teacher/classes", label: "Classes", icon: "🏫" },
+  { href: "/teacher/assignments", label: "Assignments", icon: "📋" },
   {
     href: "/teacher/assignment-wizard",
     label: "Assignment Wizard",
@@ -137,39 +81,18 @@ const teacherLinks: SidebarLink[] = [
     label: "Resource Library",
     icon: "📚",
   },
-  {
-    href: "/teacher/reports",
-    label: "Reports",
-    icon: "📈",
-  },
+  { href: "/teacher/reports", label: "Reports", icon: "📈" },
 ];
 
 const adminLinks: SidebarLink[] = [
-  {
-    href: "/admin",
-    label: "Admin Dashboard",
-    icon: "🛡️",
-  },
-  {
-    href: "/admin/teachers",
-    label: "Teachers",
-    icon: "👩‍🏫",
-  },
-  {
-    href: "/admin/users",
-    label: "Users",
-    icon: "👥",
-  },
-  {
-    href: "/admin/schools",
-    label: "Schools",
-    icon: "🏫",
-  },
+  { href: "/admin", label: "Admin Dashboard", icon: "🛡️" },
+  { href: "/admin/teachers", label: "Teachers", icon: "👩‍🏫" },
+  { href: "/admin/users", label: "Users", icon: "👥" },
+  { href: "/admin/schools", label: "Schools", icon: "🏫" },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-
   const { profile, loading } = useAuth();
 
   const isAdmin = profile?.role === "admin";
@@ -218,7 +141,6 @@ export default function Sidebar() {
 
           <div>
             <h1 className="text-lg font-extrabold">CS MASTER</h1>
-
             <p className="text-xs text-slate-400">{portalLabel}</p>
           </div>
         </Link>
@@ -230,7 +152,6 @@ export default function Sidebar() {
         ) : (
           <>
             <p className="font-bold">{accountName}</p>
-
             <p className="mt-1 text-sm text-slate-400">{accountLabel}</p>
           </>
         )}
@@ -255,7 +176,6 @@ export default function Sidebar() {
               }`}
             >
               <span aria-hidden="true">{link.icon}</span>
-
               <span>{link.label}</span>
             </Link>
           );
