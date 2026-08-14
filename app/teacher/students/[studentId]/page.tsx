@@ -26,7 +26,7 @@ import {
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
+import StudentIntelligenceRecord from "@/components/teacher/student/StudentIntelligenceRecord";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
@@ -577,7 +577,7 @@ export default function TeacherStudentAnalyticsPage() {
             />
           </div>
         </Card>
-
+<StudentIntelligenceRecord studentId={studentId} />
         <Card className="rounded-3xl border border-slate-200 p-6">
           <SectionHeading
             eyebrow="Progress"

@@ -16,6 +16,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTeacherStudentAnalytics } from "@/services/analytics/teacherAnalyticsService";
 import type { TeacherStudentAnalyticsRow } from "@/types/teacherAnalytics";
+import StudentIntelligenceRecord from "@/components/teacher/student/StudentIntelligenceRecord";
 
 export default function TeacherStudentAnalyticsPage() {
   const params = useParams<{ studentId: string }>();
@@ -140,7 +141,7 @@ export default function TeacherStudentAnalyticsPage() {
               {row.className} · {row.studentEmail}
             </p>
           </div>
-
+<StudentIntelligenceRecord studentId={studentId} />
           <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
             <div className="mb-2 flex items-center gap-2 text-sm font-black">
               <Target className="h-4 w-4" />

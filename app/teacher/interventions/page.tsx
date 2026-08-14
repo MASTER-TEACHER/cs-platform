@@ -15,6 +15,8 @@ import {
 } from "@/services/interventionAnalyticsService";
 import { getTeacherInterventions } from "@/services/interventionService";
 import type { Intervention } from "@/types/intervention";
+import InterventionActionContext from "@/components/teacher/interventions/InterventionActionContext";
+
 
 export default function TeacherInterventionsPage() {
   const { user } = useAuth();
@@ -99,6 +101,8 @@ export default function TeacherInterventionsPage() {
         priority={priority}
         onPriorityChange={setPriority}
       />
+      <InterventionActionContext />
+      
       <Card>
         <h2 className="text-2xl font-black">Recommended interventions</h2>
         <div className="mt-6 overflow-x-auto">

@@ -25,6 +25,7 @@ import { createProgrammingAssignment } from "@/services/programmingAssignmentSer
 import { createExamAssignment } from "@/services/examAssignmentService";
 import { getExamQuestionSetById } from "@/services/examQuestionService";
 import { createResourceAssignment } from "@/services/resourceAssignmentService";
+import InterventionAssignmentContext from "@/components/teacher/assignment/InterventionAssignmentContext";
 
 import type {
   AssignmentWizardClass,
@@ -659,6 +660,8 @@ export default function AssignmentWizardPage() {
         </div>
       </Card>
 
+      <InterventionAssignmentContext />
+
       <WizardProgress
         currentStep={step}
       />
@@ -741,7 +744,6 @@ export default function AssignmentWizardPage() {
     </div>
   );
 }
-
 function WizardProgress({
   currentStep,
 }: {
