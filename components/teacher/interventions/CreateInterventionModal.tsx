@@ -1,6 +1,9 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+
+import { captureInterventionBaseline } from "@/services/analytics/interventionImpactService";
 import { createIntervention } from "@/services/interventionService";
 import type { InterventionCandidate } from "@/services/interventionAnalyticsService";
 import type { InterventionPriority } from "@/types/intervention";
@@ -21,7 +24,8 @@ export default function CreateInterventionModal({
   const [title, setTitle] = useState("");
   const [topic, setTopic] = useState("");
   const [reason, setReason] = useState("");
-  const [priority, setPriority] = useState<InterventionPriority>("high");
+  const [priority, setPriority] =
+    useState<InterventionPriority>("high");
   const [pathway, setPathway] = useState<
     "lesson" | "quiz" | "exam" | "complete"
   >("complete");
@@ -30,43 +34,101 @@ export default function CreateInterventionModal({
   const [quizId, setQuizId] = useState("");
   const [examId, setExamId] = useState("");
   const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     if (!candidate) return;
+
     const date = new Date();
     date.setDate(date.getDate() + 7);
+
     setDueDate(date.toISOString().slice(0, 10));
     setTitle(`${candidate.priorityTopic} intervention`);
     setTopic(candidate.priorityTopic);
     setReason(candidate.recommendation);
-    setPriority(candidate.priority === "low" ? "medium" : candidate.priority);
+    setPriority(
+      candidate.priority === "low"
+        ? "medium"
+        : candidate.priority,
+    );
     setLessonHref(
       `/learn?search=${encodeURIComponent(candidate.priorityTopic)}`,
     );
   }, [candidate]);
+
   if (!candidate) return null;
+
   async function submit() {
+    if (!candidate) return;
+
+    if (!teacherId.trim()) {
+      toast.error("A teacher account is required.");
+      return;
+    }
+
+    if (!title.trim() || !topic.trim() || !reason.trim()) {
+      toast.error("Add a title, topic and reason.");
+      return;
+    }
+
+    if (!dueDate) {
+      toast.error("Choose a due date.");
+      return;
+    }
+
     setSaving(true);
+
     try {
-      await createIntervention({
+      const createdResult = (await createIntervention({
         teacherId,
         teacherName,
-        studentId: candidate!.student.uid,
-        studentName: candidate!.student.name,
-        studentEmail: candidate!.student.email,
-        classId: candidate!.classId,
-        className: candidate!.className,
-        title,
-        topic,
-        reason,
+        studentId: candidate.student.uid,
+        studentName: candidate.student.name,
+        studentEmail: candidate.student.email,
+        classId: candidate.classId,
+        className: candidate.className,
+        title: title.trim(),
+        topic: topic.trim(),
+        reason: reason.trim(),
         priority,
-        baselineScore: candidate!.combinedAverage,
+        baselineScore: candidate.combinedAverage,
         dueDate: new Date(`${dueDate}T23:59:59`),
         pathway,
-        lessonHref,
-        quizAssignmentId: quizId,
-        examAssignmentId: examId,
+        lessonHref: lessonHref.trim(),
+        quizAssignmentId: quizId.trim(),
+        examAssignmentId: examId.trim(),
         xpPerStep: 25,
-      });
+      })) as unknown;
+
+      if (
+        typeof createdResult === "string" &&
+        createdResult.trim()
+      ) {
+        try {
+          await captureInterventionBaseline({
+            interventionId: createdResult,
+            teacherId,
+            studentId: candidate.student.uid,
+            topic: topic.trim(),
+          });
+        } catch (baselineError) {
+          console.error(
+            "Intervention created but baseline capture failed:",
+            baselineError,
+          );
+
+          toast.error(
+            "Intervention created, but the analytics baseline could not be captured automatically. You can capture it from Review impact.",
+          );
+
+          onCreated();
+          return;
+        }
+      } else {
+        console.warn(
+          "createIntervention did not return an intervention ID. Automatic baseline capture was skipped.",
+        );
+      }
+
       toast.success("Intervention created.");
       onCreated();
     } catch (error) {
@@ -79,51 +141,61 @@ export default function CreateInterventionModal({
       setSaving(false);
     }
   }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
       <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6">
-        <div className="flex justify-between">
+        <div className="flex justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase text-teal-600">
               Create intervention
             </p>
+
             <h2 className="mt-2 text-2xl font-black">
               {candidate.student.name}
             </h2>
+
             <p className="text-sm text-slate-500">
               Baseline {candidate.combinedAverage}% · {candidate.className}
             </p>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
             className="rounded-xl border px-4 py-2 font-bold"
           >
             Close
           </button>
         </div>
+
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <label className="md:col-span-2">
             <span className="text-sm font-bold">Title</span>
             <input
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(event) => setTitle(event.target.value)}
               className="mt-2 w-full rounded-xl border px-4 py-3"
             />
           </label>
+
           <label>
             <span className="text-sm font-bold">Topic</span>
             <input
               value={topic}
-              onChange={(e) => setTopic(e.target.value)}
+              onChange={(event) => setTopic(event.target.value)}
               className="mt-2 w-full rounded-xl border px-4 py-3"
             />
           </label>
+
           <label>
             <span className="text-sm font-bold">Priority</span>
             <select
               value={priority}
-              onChange={(e) =>
-                setPriority(e.target.value as InterventionPriority)
+              onChange={(event) =>
+                setPriority(
+                  event.target.value as InterventionPriority,
+                )
               }
               className="mt-2 w-full rounded-xl border px-4 py-3"
             >
@@ -132,11 +204,14 @@ export default function CreateInterventionModal({
               <option value="low">Low</option>
             </select>
           </label>
+
           <label>
             <span className="text-sm font-bold">Pathway</span>
             <select
               value={pathway}
-              onChange={(e) => setPathway(e.target.value as typeof pathway)}
+              onChange={(event) =>
+                setPathway(event.target.value as typeof pathway)
+              }
               className="mt-2 w-full rounded-xl border px-4 py-3"
             >
               <option value="complete">Complete pathway</option>
@@ -145,34 +220,38 @@ export default function CreateInterventionModal({
               <option value="exam">Exam only</option>
             </select>
           </label>
+
           <label>
             <span className="text-sm font-bold">Due date</span>
             <input
               type="date"
               value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
+              onChange={(event) => setDueDate(event.target.value)}
               className="mt-2 w-full rounded-xl border px-4 py-3"
             />
           </label>
+
           <label className="md:col-span-2">
             <span className="text-sm font-bold">Reason</span>
             <textarea
               rows={4}
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(event) => setReason(event.target.value)}
               className="mt-2 w-full rounded-xl border px-4 py-3"
             />
           </label>
+
           {(pathway === "lesson" || pathway === "complete") && (
             <label className="md:col-span-2">
               <span className="text-sm font-bold">Lesson link</span>
               <input
                 value={lessonHref}
-                onChange={(e) => setLessonHref(e.target.value)}
+                onChange={(event) => setLessonHref(event.target.value)}
                 className="mt-2 w-full rounded-xl border px-4 py-3"
               />
             </label>
           )}
+
           {(pathway === "quiz" || pathway === "complete") && (
             <label>
               <span className="text-sm font-bold">
@@ -180,11 +259,12 @@ export default function CreateInterventionModal({
               </span>
               <input
                 value={quizId}
-                onChange={(e) => setQuizId(e.target.value)}
+                onChange={(event) => setQuizId(event.target.value)}
                 className="mt-2 w-full rounded-xl border px-4 py-3"
               />
             </label>
           )}
+
           {(pathway === "exam" || pathway === "complete") && (
             <label>
               <span className="text-sm font-bold">
@@ -192,23 +272,27 @@ export default function CreateInterventionModal({
               </span>
               <input
                 value={examId}
-                onChange={(e) => setExamId(e.target.value)}
+                onChange={(event) => setExamId(event.target.value)}
                 className="mt-2 w-full rounded-xl border px-4 py-3"
               />
             </label>
           )}
         </div>
+
         <div className="mt-6 flex justify-end gap-3">
           <button
+            type="button"
             onClick={onClose}
             className="rounded-xl border px-5 py-3 font-bold"
           >
             Cancel
           </button>
+
           <button
+            type="button"
             onClick={() => void submit()}
             disabled={saving}
-            className="rounded-xl bg-teal-600 px-5 py-3 font-bold text-white disabled:bg-slate-300"
+            className="rounded-xl bg-teal-600 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {saving ? "Creating..." : "Create Intervention"}
           </button>

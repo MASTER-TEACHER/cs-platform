@@ -11,22 +11,25 @@ import {
 
 import RichAnalyticsOverview from "@/components/analytics/RichAnalyticsOverview";
 import TargetGradeControl from "@/components/teacher/analytics/TargetGradeControl";
+import StudentIntelligenceRecord from "@/components/teacher/student/StudentIntelligenceRecord";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { getTeacherStudentAnalytics } from "@/services/analytics/teacherAnalyticsService";
 import type { TeacherStudentAnalyticsRow } from "@/types/teacherAnalytics";
-import StudentIntelligenceRecord from "@/components/teacher/student/StudentIntelligenceRecord";
 
 export default function TeacherStudentAnalyticsPage() {
   const params = useParams<{ studentId: string }>();
   const studentId = params.studentId;
 
-  const { user, profile, loading: authLoading } = useAuth();
+  const {
+    user,
+    profile,
+    loading: authLoading,
+  } = useAuth();
 
   const [row, setRow] =
     useState<TeacherStudentAnalyticsRow | null>(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -64,7 +67,10 @@ export default function TeacherStudentAnalyticsPage() {
           }
         }
       } catch (caughtError) {
-        console.error("Unable to load student analytics:", caughtError);
+        console.error(
+          "Unable to load student analytics:",
+          caughtError,
+        );
 
         if (!cancelled) {
           setError(
@@ -74,7 +80,9 @@ export default function TeacherStudentAnalyticsPage() {
           );
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }
 
@@ -106,7 +114,11 @@ export default function TeacherStudentAnalyticsPage() {
         <h1 className="text-2xl font-black text-red-950">
           Student analytics unavailable
         </h1>
-        <p className="mt-3 text-red-700">{error}</p>
+
+        <p className="mt-3 text-red-700">
+          {error}
+        </p>
+
         <Link
           href="/teacher/analytics"
           className="mt-5 inline-flex items-center gap-2 font-black text-red-800"
@@ -134,14 +146,16 @@ export default function TeacherStudentAnalyticsPage() {
             <p className="text-sm font-black uppercase tracking-[0.16em] text-violet-200">
               Student analytics
             </p>
+
             <h1 className="mt-2 text-3xl font-black">
               {row.studentName}
             </h1>
+
             <p className="mt-2 text-sm text-white/70">
               {row.className} · {row.studentEmail}
             </p>
           </div>
-<StudentIntelligenceRecord studentId={studentId} />
+
           <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
             <div className="mb-2 flex items-center gap-2 text-sm font-black">
               <Target className="h-4 w-4" />
@@ -154,7 +168,9 @@ export default function TeacherStudentAnalyticsPage() {
               teacherId={user?.uid || ""}
               qualification={row.qualification}
               value={row.targetGrade}
-              onSaved={() => setRefreshKey((value) => value + 1)}
+              onSaved={() =>
+                setRefreshKey((value) => value + 1)
+              }
             />
           </div>
         </div>
@@ -164,6 +180,7 @@ export default function TeacherStudentAnalyticsPage() {
         <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
+
             <div>
               <h2 className="font-black capitalize text-amber-950">
                 {row.interventionPriority} intervention priority
@@ -176,7 +193,9 @@ export default function TeacherStudentAnalyticsPage() {
               </ul>
 
               <Link
-                href="/teacher/interventions"
+                href={`/teacher/interventions?studentId=${encodeURIComponent(
+                  row.studentId,
+                )}&classId=${encodeURIComponent(row.classId)}`}
                 className="mt-4 inline-flex font-black text-amber-900 underline"
               >
                 Open Interventions
@@ -187,6 +206,8 @@ export default function TeacherStudentAnalyticsPage() {
       )}
 
       <RichAnalyticsOverview analytics={row.analytics} />
+
+      <StudentIntelligenceRecord studentId={studentId} />
     </div>
   );
 }
