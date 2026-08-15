@@ -8,6 +8,7 @@ import { doc, getDoc } from "firebase/firestore";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import ExamIntegrityPolicyCard from "@/components/teacher/exam-assignments/ExamIntegrityPolicyCard";
+import ExamAssignmentIntelligencePanel from "@/components/teacher/exam-assignments/ExamAssignmentIntelligencePanel";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
@@ -363,6 +364,11 @@ export default function ExamAssignmentMarkbookPage() {
           }
         />
       )}
+
+      <ExamAssignmentIntelligencePanel
+        assignment={assignment}
+        submissions={submissions}
+      />
 
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

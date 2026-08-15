@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import ExamIntegrityReportCard from "@/components/teacher/exam-assignments/ExamIntegrityReportCard";
+import { AlertTriangle, BarChart3, ClipboardList } from "lucide-react";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
 import {
   finaliseExamMarking,
@@ -389,6 +390,58 @@ export default function MarkExamSubmissionPage() {
       </Card>
 
       <ExamIntegrityReportCard submission={submission} />
+
+      <Card className="rounded-3xl border border-slate-200">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">
+              Intelligence handoff
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Connect this exam to the learner record
+            </h2>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Review this written paper alongside the student's wider analytics before deciding whether to reteach, assign targeted work or create an intervention.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href={`/teacher/analytics/${submission.studentId}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-black text-white"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Student analytics
+            </Link>
+
+            <Link
+              href={`/teacher/interventions?studentId=${encodeURIComponent(
+                submission.studentId,
+              )}&classId=${encodeURIComponent(
+                submission.classId,
+              )}&topic=${encodeURIComponent(
+                assignment.questionSetSnapshot.topic ||
+                  assignment.questionSetTitle,
+              )}&reason=${encodeURIComponent(
+                "Review written-exam performance and identify targeted support from the marked paper.",
+              )}`}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700"
+            >
+              <ClipboardList className="h-4 w-4" />
+              Intervention Centre
+            </Link>
+          </div>
+        </div>
+
+        {submission.integrityIncidents.length > 0 && (
+          <div className="mt-5 flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            Integrity-monitoring events are contextual evidence for teacher review. They should not be treated as automatic proof of misconduct.
+          </div>
+        )}
+      </Card>
 
       <Card className="border border-violet-200 bg-violet-50">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
