@@ -41,6 +41,15 @@ export type ExamStudentPriority = {
   integrityTerminated: boolean;
   priority: "high" | "medium" | "monitor" | "none";
   reasons: string[];
+
+  /*
+   * Exam-specific learning handoff.
+   * These fields allow the teacher to move directly from a marked written
+   * paper into targeted intervention / analytics without guessing the focus.
+   */
+  weakestExamTopic: string | null;
+  weakestQuestionNumber: number | null;
+  weakestQuestionSuccessPercentage: number | null;
 };
 
 export type ExamIntegritySummary = {
@@ -58,13 +67,16 @@ export type ExamClassIntelligence = {
   markedCount: number;
   submissionPercentage: number;
   markingPercentage: number;
+
   classAverage: number | null;
   highestPercentage: number | null;
   lowestPercentage: number | null;
+
   questionIntelligence: ExamQuestionIntelligence[];
   topicIntelligence: ExamTopicIntelligence[];
   studentPriorities: ExamStudentPriority[];
   integrity: ExamIntegritySummary;
+
   hardestQuestion: ExamQuestionIntelligence | null;
   easiestQuestion: ExamQuestionIntelligence | null;
   weakestTopic: ExamTopicIntelligence | null;

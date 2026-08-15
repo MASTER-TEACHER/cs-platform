@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Download,
+  FileBarChart2,
   ShieldAlert,
   Target,
   TrendingDown,
@@ -21,12 +22,20 @@ import type {
   ExamSubmission,
 } from "@/types/examAssignment";
 
-function percentage(value: number | null): string {
-  return value === null ? "—" : `${value}%`;
+function percentage(
+  value: number | null,
+): string {
+  return value === null
+    ? "—"
+    : `${value}%`;
 }
 
 function priorityClass(
-  value: "high" | "medium" | "monitor" | "none",
+  value:
+    | "high"
+    | "medium"
+    | "monitor"
+    | "none",
 ): string {
   if (value === "high") {
     return "bg-red-100 text-red-700";
@@ -61,6 +70,22 @@ export default function ExamAssignmentIntelligencePanel({
       (student) =>
         student.priority !== "none",
     );
+
+  const weakestTopic =
+    intelligence.weakestTopic?.topic ||
+    assignment.questionSetSnapshot.topic ||
+    assignment.questionSetTitle;
+
+  const classKnowledgeMapHref =
+    `/teacher/knowledge-map?source=exam` +
+    `&assignmentId=${encodeURIComponent(assignment.id)}` +
+    `&classId=${encodeURIComponent(assignment.classId)}` +
+    `&topic=${encodeURIComponent(weakestTopic)}`;
+
+  const followUpHref =
+    `/teacher/assignment-wizard?source=exam` +
+    `&classId=${encodeURIComponent(assignment.classId)}` +
+    `&topic=${encodeURIComponent(weakestTopic)}`;
 
   return (
     <div className="space-y-6">
@@ -120,8 +145,7 @@ export default function ExamAssignmentIntelligencePanel({
           <Metric
             label="Integrity events"
             value={String(
-              intelligence.integrity
-                .totalIncidents,
+              intelligence.integrity.totalIncidents,
             )}
           />
         </div>
@@ -148,10 +172,7 @@ export default function ExamAssignmentIntelligencePanel({
           {intelligence.weakestTopic ? (
             <div className="mt-5 rounded-2xl bg-red-50 p-5">
               <p className="text-lg font-black text-red-950">
-                {
-                  intelligence.weakestTopic
-                    .topic
-                }
+                {intelligence.weakestTopic.topic}
               </p>
 
               <p className="mt-2 text-sm text-red-800">
@@ -163,21 +184,9 @@ export default function ExamAssignmentIntelligencePanel({
               </p>
 
               <p className="mt-1 text-sm text-red-800">
-                {
-                  intelligence.weakestTopic
-                    .questionCount
-                }{" "}
-                question
-                {intelligence.weakestTopic
-                  .questionCount === 1
-                  ? ""
-                  : "s"}{" "}
-                ·{" "}
-                {
-                  intelligence.weakestTopic
-                    .availableMarks
-                }{" "}
-                available marks
+                {intelligence.weakestTopic.questionCount} question
+                {intelligence.weakestTopic.questionCount === 1 ? "" : "s"} ·{" "}
+                {intelligence.weakestTopic.availableMarks} available marks
               </p>
             </div>
           ) : (
@@ -188,15 +197,16 @@ export default function ExamAssignmentIntelligencePanel({
 
           <div className="mt-4 flex flex-wrap gap-3">
             <Link
-              href="/teacher/knowledge-map"
+              href={classKnowledgeMapHref}
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-black text-white"
             >
-              Class Knowledge Map
+              <FileBarChart2 className="h-4 w-4" />
+              Open in Knowledge Map
               <ChevronRight className="h-4 w-4" />
             </Link>
 
             <Link
-              href="/teacher/assignment-wizard"
+              href={followUpHref}
               className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-black text-slate-700"
             >
               Assign follow-up work
@@ -224,10 +234,7 @@ export default function ExamAssignmentIntelligencePanel({
           {intelligence.strongestTopic ? (
             <div className="mt-5 rounded-2xl bg-emerald-50 p-5">
               <p className="text-lg font-black text-emerald-950">
-                {
-                  intelligence.strongestTopic
-                    .topic
-                }
+                {intelligence.strongestTopic.topic}
               </p>
 
               <p className="mt-2 text-sm text-emerald-800">
@@ -260,11 +267,7 @@ export default function ExamAssignmentIntelligencePanel({
             {intelligence.hardestQuestion && (
               <p className="mt-2 text-sm font-bold text-slate-500">
                 Hardest: Q
-                {
-                  intelligence.hardestQuestion
-                    .questionNumber
-                }{" "}
-                ·{" "}
+                {intelligence.hardestQuestion.questionNumber} ·{" "}
                 {percentage(
                   intelligence.hardestQuestion
                     .successPercentage,
@@ -292,13 +295,33 @@ export default function ExamAssignmentIntelligencePanel({
           <table className="w-full min-w-[980px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left">
-                <th className="p-4">Question</th>
-                <th className="p-4">Topic</th>
-                <th className="p-4">Avg marks</th>
-                <th className="p-4">Success</th>
-                <th className="p-4">Attempted</th>
-                <th className="p-4">Zero marks</th>
-                <th className="p-4">Interpretation</th>
+                <th className="p-4">
+                  Question
+                </th>
+
+                <th className="p-4">
+                  Topic
+                </th>
+
+                <th className="p-4">
+                  Avg marks
+                </th>
+
+                <th className="p-4">
+                  Success
+                </th>
+
+                <th className="p-4">
+                  Attempted
+                </th>
+
+                <th className="p-4">
+                  Zero marks
+                </th>
+
+                <th className="p-4">
+                  Interpretation
+                </th>
               </tr>
             </thead>
 
@@ -321,8 +344,7 @@ export default function ExamAssignmentIntelligencePanel({
                     </td>
 
                     <td className="p-4 text-sm font-bold text-slate-700">
-                      {question.averageAwardedMarks ===
-                      null
+                      {question.averageAwardedMarks === null
                         ? "—"
                         : `${question.averageAwardedMarks}/${question.availableMarks}`}
                     </td>
@@ -345,14 +367,11 @@ export default function ExamAssignmentIntelligencePanel({
                     <td className="p-4">
                       <span
                         className={`rounded-full px-3 py-1 text-xs font-black capitalize ${
-                          question.difficulty ===
-                          "priority"
+                          question.difficulty === "priority"
                             ? "bg-red-100 text-red-700"
-                            : question.difficulty ===
-                                "developing"
+                            : question.difficulty === "developing"
                               ? "bg-amber-100 text-amber-700"
-                              : question.difficulty ===
-                                  "secure"
+                              : question.difficulty === "secure"
                                 ? "bg-emerald-100 text-emerald-700"
                                 : "bg-slate-100 text-slate-600"
                         }`}
@@ -389,34 +408,22 @@ export default function ExamAssignmentIntelligencePanel({
           <div className="mt-5 grid grid-cols-2 gap-3">
             <MiniMetric
               label="Clean submissions"
-              value={
-                intelligence.integrity
-                  .cleanSubmissionCount
-              }
+              value={intelligence.integrity.cleanSubmissionCount}
             />
 
             <MiniMetric
               label="With incidents"
-              value={
-                intelligence.integrity
-                  .submissionsWithIncidents
-              }
+              value={intelligence.integrity.submissionsWithIncidents}
             />
 
             <MiniMetric
               label="Auto-terminated"
-              value={
-                intelligence.integrity
-                  .integrityTerminatedCount
-              }
+              value={intelligence.integrity.integrityTerminatedCount}
             />
 
             <MiniMetric
               label="Total incidents"
-              value={
-                intelligence.integrity
-                  .totalIncidents
-              }
+              value={intelligence.integrity.totalIncidents}
             />
           </div>
 
@@ -456,80 +463,108 @@ export default function ExamAssignmentIntelligencePanel({
             <div className="mt-5 space-y-3">
               {priorityStudents
                 .slice(0, 8)
-                .map((student) => (
-                  <div
-                    key={student.studentId}
-                    className="rounded-2xl border border-slate-200 p-4"
-                  >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-black text-slate-950">
-                            {student.studentName}
+                .map((student) => {
+                  const focusTopic =
+                    student.weakestExamTopic ||
+                    weakestTopic;
+
+                  const reason =
+                    student.reasons[0] ||
+                    `Written exam evidence indicates that ${focusTopic} should be reviewed.`;
+
+                  const interventionHref =
+                    `/teacher/interventions?studentId=${encodeURIComponent(student.studentId)}` +
+                    `&classId=${encodeURIComponent(assignment.classId)}` +
+                    `&topic=${encodeURIComponent(focusTopic)}` +
+                    `&reason=${encodeURIComponent(reason)}` +
+                    `&source=exam` +
+                    `&assignmentId=${encodeURIComponent(assignment.id)}`;
+
+                  return (
+                    <div
+                      key={student.studentId}
+                      className="rounded-2xl border border-slate-200 p-4"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-black text-slate-950">
+                              {student.studentName}
+                            </p>
+
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-black capitalize ${priorityClass(
+                                student.priority,
+                              )}`}
+                            >
+                              {student.priority}
+                            </span>
+                          </div>
+
+                          <p className="mt-2 text-sm text-slate-500">
+                            {student.percentage === null
+                              ? "Result not yet marked"
+                              : `${student.percentage}%`}
+                            {" · "}
+                            {student.integrityIncidentCount} integrity event
+                            {student.integrityIncidentCount === 1 ? "" : "s"}
                           </p>
 
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-black capitalize ${priorityClass(
-                              student.priority,
-                            )}`}
-                          >
-                            {student.priority}
-                          </span>
+                          {student.weakestExamTopic && (
+                            <p className="mt-2 text-xs font-black text-indigo-700">
+                              Exam focus: {student.weakestExamTopic}
+                              {student.weakestQuestionNumber
+                                ? ` · Q${student.weakestQuestionNumber}`
+                                : ""}
+                              {student.weakestQuestionSuccessPercentage !== null
+                                ? ` · ${student.weakestQuestionSuccessPercentage}%`
+                                : ""}
+                            </p>
+                          )}
                         </div>
 
-                        <p className="mt-2 text-sm text-slate-500">
-                          {student.percentage ===
-                          null
-                            ? "Result not yet marked"
-                            : `${student.percentage}%`}
-                          {" · "}
-                          {
-                            student.integrityIncidentCount
-                          }{" "}
-                          integrity event
-                          {student.integrityIncidentCount ===
-                          1
-                            ? ""
-                            : "s"}
-                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.studentId}`}
+                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+                          >
+                            Submission
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+
+                          <Link
+                            href={`/teacher/analytics/${student.studentId}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700"
+                          >
+                            Analytics
+                          </Link>
+
+                          <Link
+                            href={interventionHref}
+                            className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-black text-white"
+                          >
+                            Intervention
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.studentId}`}
-                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white"
-                        >
-                          Submission
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </Link>
-
-                        <Link
-                          href={`/teacher/analytics/${student.studentId}`}
-                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700"
-                        >
-                          Analytics
-                        </Link>
-                      </div>
-                    </div>
-
-                    {student.reasons.length >
-                      0 && (
-                      <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
-                        {student.reasons.map(
-                          (reason) => (
+                      {student.reasons.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
+                          {student.reasons.map((reasonItem) => (
                             <li
-                              key={reason}
+                              key={reasonItem}
                               className="flex items-start gap-2"
                             >
                               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                              {reason}
+                              {reasonItem}
                             </li>
-                          ),
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                ))}
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           )}
         </Card>
