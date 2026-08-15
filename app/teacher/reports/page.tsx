@@ -1,12 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
-import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
 import ReportsIntelligencePanel from "@/components/teacher/intelligence/ReportsIntelligencePanel";
+import ClassProgressReportPanel from "@/components/teacher/reports/ClassProgressReportPanel";
+
+import { useAuth } from "@/contexts/AuthContext";
+import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
+import { useTeacherIntelligence } from "@/hooks/useTeacherIntelligence";
 
 export default function TeacherReportsPage() {
+  const { user } = useAuth();
+
   const {
     studentCount,
     classCount,
@@ -22,7 +30,28 @@ export default function TeacherReportsPage() {
     loading,
   } = useTeacherDashboard();
 
-  if (loading) {
+  const {
+    portfolio,
+    loading: intelligenceLoading,
+  } = useTeacherIntelligence();
+
+  const [selectedClassId, setSelectedClassId] =
+    useState("");
+
+  useEffect(() => {
+    if (
+      selectedClassId ||
+      !portfolio?.classes.length
+    ) {
+      return;
+    }
+
+    setSelectedClassId(
+      portfolio.classes[0].classId,
+    );
+  }, [portfolio, selectedClassId]);
+
+  if (loading || intelligenceLoading) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-52 w-full" />
@@ -39,6 +68,8 @@ export default function TeacherReportsPage() {
     );
   }
 
+  const reportClasses = portfolio?.classes ?? [];
+
   return (
     <div className="space-y-8">
       <Card className="border-0 bg-gradient-to-r from-emerald-700 via-teal-700 to-cyan-700 text-white">
@@ -48,7 +79,9 @@ export default function TeacherReportsPage() {
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">Reports</h1>
+            <h1 className="mt-3 text-4xl font-extrabold">
+              Reports
+            </h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
               Review whole-platform performance, completion and student support
@@ -71,39 +104,109 @@ export default function TeacherReportsPage() {
           value={studentCount.toString()}
           icon="👨‍🎓"
         />
-        <SummaryCard label="Classes" value={classCount.toString()} icon="🏫" />
+
+        <SummaryCard
+          label="Classes"
+          value={classCount.toString()}
+          icon="🏫"
+        />
+
         <SummaryCard
           label="Assignments"
           value={assignmentCount.toString()}
           icon="📋"
         />
+
         <SummaryCard
           label="Active Assignments"
           value={activeAssignmentCount.toString()}
           icon="✅"
         />
+
         <SummaryCard
           label="Average Score"
           value={`${averageScore}%`}
           icon="📊"
         />
+
         <SummaryCard
           label="Completion Rate"
           value={`${completionRate}%`}
           icon="📈"
         />
+
         <SummaryCard
           label="Completed Today"
           value={completedToday.toString()}
           icon="🕒"
         />
+
         <SummaryCard
           label="Lessons Completed"
           value={lessonsCompleted.toString()}
           icon="📚"
         />
       </div>
-<ReportsIntelligencePanel />
+
+      <ReportsIntelligencePanel />
+
+      <Card className="rounded-3xl border border-slate-200">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wide text-teal-600">
+              Progress reporting
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Class Progress Report
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Select a class to review analytics-backed attainment, target,
+              completion and curriculum priorities.
+            </p>
+          </div>
+
+          {reportClasses.length > 0 && (
+            <label className="w-full md:w-80">
+              <span className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Select class
+              </span>
+
+              <select
+                value={selectedClassId}
+                onChange={(event) =>
+                  setSelectedClassId(
+                    event.target.value,
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-bold text-slate-900"
+              >
+                {reportClasses.map((classItem) => (
+                  <option
+                    key={classItem.classId}
+                    value={classItem.classId}
+                  >
+                    {classItem.className}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+      </Card>
+
+      {user?.uid && selectedClassId ? (
+        <ClassProgressReportPanel
+          teacherId={user.uid}
+          classId={selectedClassId}
+        />
+      ) : (
+        <Card className="rounded-3xl border border-slate-200 p-8 text-center text-slate-500">
+          No class is currently available for progress reporting.
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <p className="text-sm font-semibold uppercase tracking-wide text-red-600">
@@ -125,11 +228,15 @@ export default function TeacherReportsPage() {
                   key={student.id}
                   className="rounded-2xl border border-red-200 bg-red-50 p-5"
                 >
-                  <p className="font-bold text-slate-900">{student.name}</p>
+                  <p className="font-bold text-slate-900">
+                    {student.name}
+                  </p>
 
                   <p className="mt-2 text-sm text-slate-700">
                     Average score:{" "}
-                    <span className="font-bold">{student.averageScore}%</span>
+                    <span className="font-bold">
+                      {student.averageScore}%
+                    </span>
                   </p>
 
                   <p className="mt-2 text-sm text-slate-600">
@@ -171,7 +278,9 @@ export default function TeacherReportsPage() {
                     </p>
                   </div>
 
-                  <p className="font-bold text-amber-700">⭐ {student.xp} XP</p>
+                  <p className="font-bold text-amber-700">
+                    ⭐ {student.xp} XP
+                  </p>
                 </div>
               ))}
             </div>
@@ -200,7 +309,9 @@ export default function TeacherReportsPage() {
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
               >
                 <div className="flex items-center justify-between gap-4">
-                  <p className="font-bold text-slate-900">{topic.topic}</p>
+                  <p className="font-bold text-slate-900">
+                    {topic.topic}
+                  </p>
 
                   <p className="font-bold text-blue-700">
                     {topic.averageScore}%
@@ -213,7 +324,10 @@ export default function TeacherReportsPage() {
                     style={{
                       width: `${Math.min(
                         100,
-                        Math.max(0, topic.averageScore),
+                        Math.max(
+                          0,
+                          topic.averageScore,
+                        ),
                       )}%`,
                     }}
                   />
@@ -240,11 +354,18 @@ function SummaryCard({
     <Card>
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
+          <p className="text-sm font-semibold text-slate-500">
+            {label}
+          </p>
+
+          <p className="mt-2 text-3xl font-bold text-slate-900">
+            {value}
+          </p>
         </div>
 
-        <div className="text-3xl">{icon}</div>
+        <div className="text-3xl">
+          {icon}
+        </div>
       </div>
     </Card>
   );

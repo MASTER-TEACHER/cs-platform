@@ -181,14 +181,14 @@ function getActionLabel(assignment: UnifiedAssignment): string {
   if (assignment.kind === "exam") {
     switch (assignment.status) {
       case "marked":
-        return "Review feedback";
+        return "Review result";
       case "submitted":
       case "marking":
-        return "View submission";
+        return "Review submission";
       case "in_progress":
-        return "Continue assessment";
+        return "Resume Exam Mode";
       default:
-        return "Start assessment";
+        return "Enter Exam Mode";
     }
   }
 
@@ -366,6 +366,31 @@ export default function StudentAssignmentsPage() {
           Complete resources, quizzes and written assessments, monitor due dates
           and review your results and feedback.
         </p>
+      </section>
+
+      <section className="rounded-3xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-700">
+              Written assessments
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              Use Exam Mode for all written exams
+            </h2>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Teacher-assigned written papers use the monitored Exam Mode workflow. Open the dedicated hub to see every written exam in one place.
+            </p>
+          </div>
+
+          <Link
+            href="/exam"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-indigo-700 px-5 py-3 font-black text-white transition hover:bg-indigo-800"
+          >
+            Open Exam Mode
+          </Link>
+        </div>
       </section>
 
       {error && (

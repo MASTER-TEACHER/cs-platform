@@ -27,11 +27,15 @@ const studentLinks: SidebarLink[] = [
   { href: "/tutor", label: "AI Tutor", icon: "🤖" },
   { href: "/revision-plan", label: "Revision Plan", icon: "🧭" },
   { href: "/assignments", label: "Assignments", icon: "📋" },
+  {
+    href: "/exam",
+    label: "Exam Mode",
+    icon: "🎯",
+  },
   { href: "/learn", label: "Learn", icon: "📚" },
   { href: "/quiz", label: "Quiz", icon: "📝" },
   { href: "/programming", label: "Programming", icon: "💻" },
   { href: "/visualisers", label: "Visualisers", icon: "🧠" },
-  { href: "/exam", label: "Exam Mode", icon: "🎯" },
   { href: "/exam-trainer", label: "Exam Trainer", icon: "🧪" },
   { href: "/profile", label: "Profile", icon: "👤" },
 ];
@@ -56,6 +60,11 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher/students", label: "Students", icon: "👨‍🎓" },
   { href: "/teacher/classes", label: "Classes", icon: "🏫" },
   { href: "/teacher/assignments", label: "Assignments", icon: "📋" },
+  {
+    href: "/teacher/exam-assignments",
+    label: "Exam Assignments",
+    icon: "📝",
+  },
   {
     href: "/teacher/assignment-wizard",
     label: "Assignment Wizard",
@@ -98,9 +107,17 @@ export default function Sidebar() {
   const isAdmin = profile?.role === "admin";
   const isTeacher = profile?.role === "teacher";
 
-  const links = isAdmin ? adminLinks : isTeacher ? teacherLinks : studentLinks;
+  const links = isAdmin
+    ? adminLinks
+    : isTeacher
+      ? teacherLinks
+      : studentLinks;
 
-  const homeHref = isAdmin ? "/admin" : isTeacher ? "/teacher" : "/dashboard";
+  const homeHref = isAdmin
+    ? "/admin"
+    : isTeacher
+      ? "/teacher"
+      : "/dashboard";
 
   const portalLabel = isAdmin
     ? "Administration"
@@ -110,7 +127,11 @@ export default function Sidebar() {
 
   const accountName =
     profile?.name ||
-    (isAdmin ? "Administrator" : isTeacher ? "Teacher" : "Student");
+    (isAdmin
+      ? "Administrator"
+      : isTeacher
+        ? "Teacher"
+        : "Student");
 
   const accountLabel = isAdmin
     ? "Administrator account"
@@ -123,7 +144,8 @@ export default function Sidebar() {
       return pathname === href;
     }
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+    return pathname === href ||
+      pathname.startsWith(`${href}/`);
   }
 
   return (

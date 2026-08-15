@@ -1026,54 +1026,220 @@ const TOPIC_PROFILES: TopicProfile[] = [
     keywords: ["table", "record", "field", "primary key", "foreign key", "SQL"],
   },
   {
-    id: "data-representation",
+    id: "image-representation",
     patterns: [
-      /\bdata representation\b/i,
+      /\bimage representation\b/i,
+      /\bbitmap\b/i,
       /\bimage\b/i,
       /\bpixel\b/i,
+      /\bresolution\b/i,
       /\bcolour depth\b/i,
-      /\bsampling\b/i,
-      /\bsample rate\b/i,
-      /\bbit depth\b/i,
-      /\bcompression\b/i,
-      /\blossy\b/i,
-      /\blossless\b/i,
-      /\bcharacter set\b/i,
-      /\bascii\b/i,
-      /\bunicode\b/i,
+      /\bcolor depth\b/i,
     ],
-    displayName: "data representation",
+    displayName: "bitmap image representation",
     definition:
-      "Data representation is the use of binary patterns to encode information such as numbers, text, images and sound.",
+      "A bitmap image is represented as a grid of pixels. Its resolution is the number of pixels in the image and its colour depth is the number of bits used to represent the colour of each pixel.",
     explanation:
-      "Images use pixels, resolution and colour depth. Sound is sampled at regular intervals, with sample rate and bit depth affecting quality and file size. Character sets map characters to numeric codes. Compression reduces file size, either without losing data or by discarding some detail.",
+      "Increasing image resolution increases the number of pixels and can improve detail, while increasing colour depth increases the number of colours that can be represented. Both normally increase the uncompressed file size. An uncompressed bitmap file size can be estimated as width × height × colour depth, with the result first calculated in bits.",
     examples: [
-      "Higher image resolution uses more pixels",
-      "A higher sound sample rate records more samples per second",
-      "Unicode can represent a much wider range of characters than ASCII",
+      "An 800 × 600 image contains 480,000 pixels",
+      "8-bit colour depth can represent up to 256 different colour values",
+      "Uncompressed bitmap size in bits = width × height × colour depth",
     ],
     benefits: [
-      "allows different forms of information to be stored and processed digitally",
-      "quality can be adjusted for a particular purpose",
-      "compression can reduce storage and transmission requirements",
+      "higher resolution can preserve more spatial detail",
+      "higher colour depth can represent a wider range of colours",
+      "bitmap images allow direct control of individual pixels",
     ],
     limitations: [
-      "higher quality normally increases file size",
-      "lossy compression permanently removes some data",
-      "incorrect metadata can cause data to be interpreted wrongly",
+      "higher resolution normally increases file size",
+      "higher colour depth normally increases file size",
+      "large uncompressed images require more storage and bandwidth",
     ],
     misconceptions: [
-      "assuming resolution and colour depth mean the same thing",
-      "believing lossless compression reduces quality",
-      "confusing sample rate with bit depth",
+      "confusing resolution with colour depth",
+      "forgetting to convert bits to bytes when calculating file size",
+      "assuming increasing resolution always improves a poor-quality source image",
     ],
     keywords: [
       "pixel",
       "resolution",
       "colour depth",
+      "bitmap",
+      "file size",
+      "bits",
+    ],
+  },
+  {
+    id: "sound-representation",
+    patterns: [
+      /\bsound representation\b/i,
+      /\baudio\b/i,
+      /\bsound\b/i,
+      /\bsampling\b/i,
+      /\bsample rate\b/i,
+      /\bsampling rate\b/i,
+      /\bbit depth\b/i,
+      /\bsample resolution\b/i,
+    ],
+    displayName: "digital sound representation",
+    definition:
+      "Digital sound is created by sampling an analogue sound wave at regular intervals and storing each sample as a binary value.",
+    explanation:
+      "Sample rate is the number of samples recorded each second. Bit depth is the number of bits used to store each sample. Increasing either value can improve the accuracy of the digital representation, but also increases file size. For uncompressed mono audio, file size in bits can be estimated as sample rate × bit depth × duration in seconds.",
+    examples: [
+      "A sample rate of 44,100 Hz records 44,100 samples each second",
+      "A larger bit depth allows more possible amplitude values",
+      "Uncompressed mono audio size in bits = sample rate × bit depth × duration",
+    ],
+    benefits: [
+      "a higher sample rate can represent changes in the waveform more frequently",
+      "a higher bit depth can represent amplitude more precisely",
+      "digital audio can be stored, copied and processed by computer systems",
+    ],
+    limitations: [
+      "higher sample rates increase file size",
+      "higher bit depths increase file size",
+      "low sampling settings can reduce the accuracy of the representation",
+    ],
+    misconceptions: [
+      "confusing sample rate with bit depth",
+      "assuming a higher sample rate changes the number of amplitude levels",
+      "forgetting duration when calculating uncompressed audio file size",
+    ],
+    keywords: [
+      "sample",
       "sample rate",
       "bit depth",
-      "compression",
+      "amplitude",
+      "analogue",
+      "file size",
+    ],
+  },
+  {
+    id: "character-representation",
+    patterns: [
+      /\bcharacter representation\b/i,
+      /\bcharacter set\b/i,
+      /\bascii\b/i,
+      /\bunicode\b/i,
+      /\btext representation\b/i,
+    ],
+    displayName: "character representation and character sets",
+    definition:
+      "A character set assigns a numeric code to each character so that text can be represented and stored in binary.",
+    explanation:
+      "ASCII provides codes for a limited set of characters, while Unicode supports a much larger range of characters and writing systems. The numeric code assigned to a character is ultimately stored as binary.",
+    examples: [
+      "The letter A has a numeric character code that can be stored in binary",
+      "Unicode can represent characters from many languages",
+      "ASCII contains a much smaller character repertoire than Unicode",
+    ],
+    benefits: [
+      "standard character codes allow text to be exchanged consistently",
+      "Unicode supports a very large range of languages and symbols",
+      "numeric codes allow characters to be stored and processed in binary",
+    ],
+    limitations: [
+      "different encodings can use different numbers of bytes",
+      "ASCII cannot represent the full range of world writing systems",
+      "using the wrong encoding can display incorrect characters",
+    ],
+    misconceptions: [
+      "assuming ASCII and Unicode contain exactly the same character range",
+      "confusing the displayed character with the numeric code used to represent it",
+      "assuming all Unicode characters always require the same number of bytes",
+    ],
+    keywords: [
+      "character set",
+      "code point",
+      "ASCII",
+      "Unicode",
+      "encoding",
+      "binary",
+    ],
+  },
+  {
+    id: "compression",
+    patterns: [
+      /\bcompression\b/i,
+      /\blossy\b/i,
+      /\blossless\b/i,
+      /\bcompressed\b/i,
+    ],
+    displayName: "data compression",
+    definition:
+      "Compression reduces the number of bits required to store or transmit data. Lossless compression preserves all original data, while lossy compression permanently removes some data.",
+    explanation:
+      "Lossless compression is suitable when the original data must be reconstructed exactly. Lossy compression can achieve greater reductions for media such as images, audio or video by discarding detail judged less important, but the discarded data cannot be restored.",
+    examples: [
+      "Lossless compression can reduce a text file while preserving every character",
+      "Lossy image compression may remove visual detail to reduce file size",
+      "Compressed files can require less storage space and transmission time",
+    ],
+    benefits: [
+      "reduces storage requirements",
+      "reduces the amount of data that must be transmitted",
+      "can reduce download or upload times",
+    ],
+    limitations: [
+      "lossy compression permanently removes some data",
+      "compressed data may require processing to encode and decode",
+      "excessive lossy compression can noticeably reduce quality",
+    ],
+    misconceptions: [
+      "believing lossless compression reduces quality",
+      "assuming deleted lossy data can later be restored",
+      "assuming every data type should use lossy compression",
+    ],
+    keywords: [
+      "lossy",
+      "lossless",
+      "file size",
+      "quality",
+      "storage",
+      "transmission",
+    ],
+  },
+  {
+    id: "data-representation",
+    patterns: [
+      /\bdata representation\b/i,
+      /\bdata encoding\b/i,
+      /\brepresenting data\b/i,
+    ],
+    displayName: "data representation",
+    definition:
+      "Data representation is the use of binary patterns to encode information so that it can be stored and processed by computer systems.",
+    explanation:
+      "Different kinds of data use agreed representations and metadata. Numbers, text, images and sound are all ultimately represented using binary patterns, with choices about precision or quality often affecting storage requirements.",
+    examples: [
+      "binary patterns can represent numbers",
+      "character sets map characters to numeric codes",
+      "images and sound use metadata to describe how their binary data should be interpreted",
+    ],
+    benefits: [
+      "provides consistent machine-readable representations",
+      "allows many data types to be stored and processed digitally",
+      "supports transmission between compatible systems",
+    ],
+    limitations: [
+      "higher precision or quality often requires more storage",
+      "metadata is needed to interpret some binary data correctly",
+      "different formats and encodings can create compatibility issues",
+    ],
+    misconceptions: [
+      "assuming all data uses the same representation rules",
+      "ignoring metadata when interpreting a binary file",
+      "treating representation and compression as the same concept",
+    ],
+    keywords: [
+      "binary",
+      "encoding",
+      "metadata",
+      "representation",
+      "storage",
+      "format",
     ],
   },
   {
@@ -1296,6 +1462,503 @@ function explanationForTopic(topic: string): string {
   return specificExplanation(topic);
 }
 
+
+type DemoQuestionContent = {
+  question: string;
+  context: string;
+  markPoints: string[];
+  modelAnswer: string;
+  examinerGuidance: string[];
+  misconceptions: string[];
+};
+
+function createDataRepresentationDemoContent(
+  item: AssessmentBlueprintItem,
+  index: number,
+): DemoQuestionContent | null {
+  const profile = resolveTopicProfile(item.topicFocus);
+  const variant = index + 1;
+
+  if (profile.id === "image-representation") {
+    const width = 480 + variant * 160;
+    const height = 320 + variant * 80;
+    const colourDepth = variant % 2 === 0 ? 24 : 8;
+    const pixels = width * height;
+    const bits = pixels * colourDepth;
+    const bytes = bits / 8;
+
+    if (
+      item.questionType === "calculation" ||
+      item.questionType === "worked-calculation" ||
+      item.questionType === "conversion"
+    ) {
+      return {
+        question: `A bitmap image is ${width} pixels wide and ${height} pixels high. It uses a colour depth of ${colourDepth} bits. Calculate the uncompressed file size in bytes. Show your working.`,
+        context:
+          "Ignore file headers, metadata and compression. Use 8 bits = 1 byte.",
+        markPoints: [
+          `Calculates the number of pixels as ${width} × ${height} = ${pixels}.`,
+          `Multiplies by the colour depth: ${pixels} × ${colourDepth} = ${bits} bits.`,
+          `Divides by 8 to convert bits to bytes.`,
+          `Gives the final answer as ${bytes} bytes.`,
+          "Shows a correct file-size method.",
+          "Uses the correct unit.",
+        ],
+        modelAnswer: `${width} × ${height} = ${pixels} pixels.\n${pixels} × ${colourDepth} = ${bits} bits.\n${bits} ÷ 8 = ${bytes} bytes.\n\nThe uncompressed file size is ${bytes} bytes.`,
+        examinerGuidance: [
+          "Award method marks when the candidate uses width × height × colour depth even if a later arithmetic error occurs.",
+          "Do not award the final conversion mark if a value in bits is labelled as bytes.",
+        ],
+        misconceptions: [
+          "Adding width and height instead of multiplying them to find the number of pixels.",
+          "Forgetting to divide by 8 when converting the file size from bits to bytes.",
+        ],
+      };
+    }
+
+    if (item.questionType === "multiple-choice") {
+      return {
+        question:
+          "Which statement about bitmap image representation is correct?\n\nA. Resolution is the number of bits used for each pixel.\nB. Colour depth is the total number of pixels in the image.\nC. Increasing resolution usually increases the number of pixels stored.\nD. Increasing colour depth always reduces the file size.",
+        context: "Select one answer.",
+        markPoints: [
+          "Award 1 mark for option C: increasing resolution usually increases the number of pixels stored.",
+        ],
+        modelAnswer: "C",
+        examinerGuidance: [
+          "Award the mark only for option C.",
+          "Do not award a mark for multiple selected options unless C is clearly identified as the final answer.",
+        ],
+        misconceptions: [
+          "Confusing resolution with colour depth.",
+          "Assuming that increasing image quality settings reduces storage requirements.",
+        ],
+      };
+    }
+
+    if (
+      item.questionType === "extended-response" ||
+      item.questionType === "discuss" ||
+      item.questionType === "evaluate" ||
+      item.questionType === "scenario-application"
+    ) {
+      return {
+        question:
+          "A school is preparing photographs for its website. Evaluate how resolution, colour depth and compression should be chosen to balance image quality, file size and download speed. Reach a justified recommendation.",
+        context:
+          "The website will be viewed on phones and laptops, and some users have slow internet connections.",
+        markPoints: [
+          "Explains that increasing resolution can increase detail but normally increases file size.",
+          "Explains that increasing colour depth can represent more colours but normally increases file size.",
+          "Explains that compression reduces storage and transmission requirements.",
+          "Distinguishes an appropriate use of lossy or lossless compression.",
+          "Applies the discussion to website download speed or bandwidth.",
+          "Recognises that unnecessarily high settings provide limited benefit for the intended display size.",
+          "Uses accurate terminology including pixels, resolution and colour depth.",
+          "Develops a balanced recommendation.",
+          "Links the recommendation to the needs of phone and laptop users.",
+          "Reaches a justified conclusion.",
+          "Considers image quality as well as storage/transmission.",
+          "Maintains a clear line of reasoning.",
+        ],
+        modelAnswer:
+          "The school should use a resolution high enough for the largest display size required, but it should avoid storing far more pixels than the website can use because this increases file size without a visible benefit for most users. A suitable colour depth should preserve realistic colours, but increasing colour depth also increases the number of bits needed for every pixel. For photographic website images, moderate lossy compression is usually appropriate because it can substantially reduce file size and download time while keeping visible quality acceptable. This is particularly important for users on slower connections. The school should therefore resize photographs to their intended display dimensions, use sufficient colour depth for the content and apply controlled compression after checking the visual result.",
+        examinerGuidance: [
+          "Highest-level responses must connect technical choices directly to both image quality and transmission/storage constraints.",
+          "A response that simply states that higher resolution and colour depth are 'better' without considering file size cannot access the highest level.",
+        ],
+        misconceptions: [
+          "Treating resolution and colour depth as the same property.",
+          "Assuming that lossy compression can always reconstruct every discarded detail.",
+        ],
+      };
+    }
+
+    if (item.questionType === "compare") {
+      return {
+        question:
+          "Compare resolution and colour depth as properties of a bitmap image.",
+        context:
+          "Your answer should explain what each property controls and how changing it can affect file size.",
+        markPoints: [
+          "States that resolution relates to the number of pixels in the image.",
+          "States that colour depth is the number of bits used to represent each pixel's colour.",
+          "Explains that increasing resolution normally increases file size.",
+          "Explains that increasing colour depth normally increases file size.",
+          "Explains that resolution mainly affects spatial detail.",
+          "Explains that colour depth affects the range of colours that can be represented.",
+        ],
+        modelAnswer:
+          "Resolution describes the number of pixels used to represent the image, so a higher resolution can preserve more spatial detail. Colour depth describes the number of bits used for each pixel, so a greater colour depth allows more possible colours. Increasing either property normally increases the uncompressed file size, but they affect different aspects of image quality.",
+        examinerGuidance: [
+          "Award comparison credit only when the response distinguishes what resolution and colour depth represent.",
+          "Do not credit a statement that treats colour depth as the number of pixels.",
+        ],
+        misconceptions: [
+          "Saying that colour depth controls the width and height of an image.",
+          "Saying that resolution is the number of colours available.",
+        ],
+      };
+    }
+
+    return {
+      question:
+        item.marks === 1
+          ? "State what is meant by the resolution of a bitmap image."
+          : "Explain how resolution and colour depth affect a bitmap image and its uncompressed file size.",
+      context:
+        item.marks === 1
+          ? "Use precise Computer Science terminology."
+          : "Refer to pixels and bits in your answer.",
+      markPoints: [
+        "States that image resolution is the number of pixels used to represent the image.",
+        "States that colour depth is the number of bits used to represent each pixel's colour.",
+        "Explains that increasing resolution normally increases the number of stored pixels.",
+        "Explains that increasing colour depth increases the bits stored for each pixel.",
+        "Links either change to an increase in uncompressed file size.",
+        "Uses accurate terminology.",
+      ],
+      modelAnswer:
+        item.marks === 1
+          ? "Resolution is the number of pixels used to represent an image, commonly described by its width and height in pixels."
+          : "Resolution determines how many pixels are used to represent the image, while colour depth determines how many bits are used for each pixel's colour. Increasing the resolution normally stores more pixels, and increasing the colour depth stores more bits per pixel. Therefore, either change normally increases the uncompressed file size.",
+      examinerGuidance: [
+        "Credit width × height as a valid way to describe image resolution.",
+        "Do not treat resolution and colour depth as interchangeable terms.",
+      ],
+      misconceptions: [
+        "Confusing the number of pixels with the number of bits per pixel.",
+        "Claiming that higher image settings always reduce file size.",
+      ],
+    };
+  }
+
+  if (profile.id === "sound-representation") {
+    const sampleRate = variant % 2 === 0 ? 22050 : 44100;
+    const bitDepth = variant % 2 === 0 ? 16 : 8;
+    const duration = 5 + variant;
+    const bits = sampleRate * bitDepth * duration;
+    const bytes = bits / 8;
+
+    if (
+      item.questionType === "calculation" ||
+      item.questionType === "worked-calculation"
+    ) {
+      return {
+        question: `An uncompressed mono sound recording uses a sample rate of ${sampleRate} Hz and a bit depth of ${bitDepth} bits. The recording lasts ${duration} seconds. Calculate the file size in bytes. Show your working.`,
+        context: "Use 8 bits = 1 byte. Ignore file headers and compression.",
+        markPoints: [
+          `Uses ${sampleRate} samples per second.`,
+          `Multiplies sample rate × bit depth × duration to obtain ${bits} bits.`,
+          "Divides by 8 to convert bits to bytes.",
+          `Gives the final answer as ${bytes} bytes.`,
+          "Shows a correct file-size method.",
+          "Uses the correct unit.",
+        ],
+        modelAnswer: `${sampleRate} × ${bitDepth} × ${duration} = ${bits} bits.\n${bits} ÷ 8 = ${bytes} bytes.\n\nThe file size is ${bytes} bytes.`,
+        examinerGuidance: [
+          "Award method credit for sample rate × bit depth × duration even if a later arithmetic error occurs.",
+          "Do not award the byte-conversion mark if the candidate leaves the answer in bits.",
+        ],
+        misconceptions: [
+          "Adding sample rate and bit depth instead of multiplying them.",
+          "Forgetting to include the duration of the recording.",
+        ],
+      };
+    }
+
+    if (item.questionType === "multiple-choice") {
+      return {
+        question:
+          "Which statement about digital sound is correct?\n\nA. Sample rate is the number of bits used for each sample.\nB. Bit depth controls how many samples are taken each second.\nC. A higher sample rate records the waveform more frequently.\nD. Increasing bit depth always decreases file size.",
+        context: "Select one answer.",
+        markPoints: [
+          "Award 1 mark for option C: a higher sample rate records the waveform more frequently.",
+        ],
+        modelAnswer: "C",
+        examinerGuidance: [
+          "Award the mark only for option C.",
+          "Do not award multiple selections unless C is clearly indicated as the final answer.",
+        ],
+        misconceptions: [
+          "Confusing sample rate with bit depth.",
+          "Assuming higher-quality sampling settings reduce file size.",
+        ],
+      };
+    }
+
+    if (
+      item.questionType === "extended-response" ||
+      item.questionType === "discuss" ||
+      item.questionType === "evaluate" ||
+      item.questionType === "scenario-application"
+    ) {
+      return {
+        question:
+          "A school is recording speech for an online learning platform. Evaluate how sample rate, bit depth and compression should be chosen to balance sound quality, file size and streaming performance. Reach a justified recommendation.",
+        context:
+          "The recordings contain spoken explanations rather than music, and some students have limited bandwidth.",
+        markPoints: [
+          "Explains the effect of sample rate on how frequently the waveform is measured.",
+          "Explains the effect of bit depth on the precision of stored sample values.",
+          "Links higher sample rate to larger file size.",
+          "Links higher bit depth to larger file size.",
+          "Explains how compression can reduce storage or transmission requirements.",
+          "Applies the discussion to spoken audio rather than music.",
+          "Applies the discussion to students with limited bandwidth.",
+          "Uses accurate terminology.",
+          "Balances quality against file size.",
+          "Reaches a justified recommendation.",
+          "Considers an appropriate compression approach.",
+          "Maintains a clear line of reasoning.",
+        ],
+        modelAnswer:
+          "Because the recordings contain speech, the school does not need unnecessarily high sampling settings intended for high-fidelity music. The sample rate should be high enough to represent speech clearly, and the bit depth should provide sufficient amplitude precision without creating excessive file sizes. Increasing either value increases the amount of data stored. Compression should therefore be used to reduce storage and streaming bandwidth, with settings tested to ensure speech remains clear. A moderate sample rate and bit depth with controlled audio compression would provide a sensible balance for students with slower connections.",
+        examinerGuidance: [
+          "Highest-level responses must connect sampling choices to both sound quality and bandwidth/file-size constraints.",
+          "Do not reward claims that sample rate and bit depth are the same property.",
+        ],
+        misconceptions: [
+          "Saying that bit depth controls the number of samples per second.",
+          "Assuming maximum sampling settings are always the most suitable choice.",
+        ],
+      };
+    }
+
+    return {
+      question:
+        item.marks === 1
+          ? "State what is meant by the sample rate of a digital sound recording."
+          : "Explain how sample rate and bit depth affect the representation and file size of digital sound.",
+      context: "Use accurate Computer Science terminology.",
+      markPoints: [
+        "States that sample rate is the number of samples taken each second.",
+        "States that bit depth is the number of bits used to store each sample.",
+        "Explains that increasing sample rate records the waveform more frequently.",
+        "Explains that increasing bit depth allows more possible sample values.",
+        "Links higher sampling settings to increased file size.",
+        "Uses accurate terminology.",
+      ],
+      modelAnswer:
+        item.marks === 1
+          ? "Sample rate is the number of samples taken from the analogue sound wave each second."
+          : "Sample rate is the number of samples taken each second, while bit depth is the number of bits used to store each sample. A higher sample rate measures the waveform more frequently and a higher bit depth allows more precise amplitude values. Increasing either setting normally increases the uncompressed file size.",
+      examinerGuidance: [
+        "Accept sampling frequency as an alternative term for sample rate.",
+        "Do not credit an answer that reverses sample rate and bit depth.",
+      ],
+      misconceptions: [
+        "Confusing samples per second with bits per sample.",
+        "Claiming that increasing sample rate decreases file size.",
+      ],
+    };
+  }
+
+  if (profile.id === "character-representation") {
+    if (item.questionType === "compare" || item.marks >= 4) {
+      return {
+        question:
+          "Compare ASCII and Unicode as character sets. Explain why Unicode is needed even though ASCII is still widely recognised.",
+        context:
+          "Your answer should refer to the range of characters that can be represented.",
+        markPoints: [
+          "States that both character sets map characters to numeric codes.",
+          "Explains that ASCII represents a relatively limited character set.",
+          "Explains that Unicode represents a much larger range of characters.",
+          "Links Unicode to multiple languages or writing systems.",
+          "Recognises that character codes are stored in binary.",
+          "Makes a clear comparison.",
+        ],
+        modelAnswer:
+          "ASCII and Unicode both assign numeric codes to characters so that text can be stored and processed by computers. ASCII supports a relatively limited range of characters, which is sufficient for basic English letters, digits and symbols. Unicode provides codes for a far larger range of characters and writing systems, allowing software to represent text from many languages consistently. The numeric codes are ultimately stored using binary.",
+        examinerGuidance: [
+          "Credit answers that accurately distinguish the character ranges even if they do not quote specific code-space sizes.",
+          "Do not award comparison marks for saying only that Unicode is 'newer' or 'better'.",
+        ],
+        misconceptions: [
+          "Assuming ASCII and Unicode can represent exactly the same character range.",
+          "Treating a character's visible symbol as the same thing as its stored numeric code.",
+        ],
+      };
+    }
+
+    return {
+      question: "Explain how a character set allows text to be represented by a computer.",
+      context: "You may refer to ASCII or Unicode.",
+      markPoints: [
+        "States that each character is assigned a numeric code.",
+        "Explains that the numeric code can be represented in binary.",
+        "Gives ASCII or Unicode as an example of a character set.",
+        "Explains that systems must use an agreed encoding to interpret the stored value.",
+      ],
+      modelAnswer:
+        "A character set assigns a numeric code to each character. That numeric value is stored as binary, allowing the computer to store and process text. ASCII and Unicode are examples of character sets, with Unicode supporting a much larger range of characters.",
+      examinerGuidance: [
+        "Accept code point as an appropriate term for the numeric value associated with a character.",
+        "Do not award full credit for naming ASCII or Unicode without explaining the mapping to numeric codes.",
+      ],
+      misconceptions: [
+        "Saying that characters are stored directly as shapes rather than encoded values.",
+        "Assuming every character set contains the same characters.",
+      ],
+    };
+  }
+
+  if (profile.id === "compression") {
+    if (
+      item.questionType === "compare" ||
+      item.questionType === "extended-response" ||
+      item.questionType === "discuss" ||
+      item.questionType === "evaluate" ||
+      item.questionType === "scenario-application"
+    ) {
+      return {
+        question:
+          "A school needs to compress two files: a database backup and a set of photographs for its website. Compare lossy and lossless compression and recommend an appropriate method for each file.",
+        context:
+          "The database backup must be restored exactly. The photographs should download quickly while remaining visually acceptable.",
+        markPoints: [
+          "States that lossless compression preserves all original data.",
+          "States that lossy compression permanently removes some data.",
+          "Explains why lossless compression is appropriate for the database backup.",
+          "Explains why lossy compression may be appropriate for website photographs.",
+          "Links compression to reduced file size.",
+          "Links smaller files to storage or transmission benefits.",
+          "Recognises that excessive lossy compression can reduce quality.",
+          "Applies the answer to both file types.",
+          "Uses accurate terminology.",
+          "Reaches a justified recommendation.",
+          "Maintains a direct comparison.",
+          "Explains why one method is not suitable for every file.",
+        ],
+        modelAnswer:
+          "The database backup should use lossless compression because every original value must be reconstructed exactly when the backup is restored. Lossless compression reduces file size without permanently removing information. The website photographs can use controlled lossy compression because some visual detail can be discarded to achieve a greater reduction in file size, helping pages download more quickly. The school should test the compression level so that the photographs remain visually acceptable. Therefore, lossless compression is appropriate for the database backup, while moderate lossy compression is appropriate for the website photographs.",
+        examinerGuidance: [
+          "Highest-level responses must justify different compression methods for the two different requirements.",
+          "Do not award full marks for saying simply that lossy is 'smaller' and lossless is 'better quality' without explaining data preservation.",
+        ],
+        misconceptions: [
+          "Believing lossless compression permanently removes data.",
+          "Assuming lossy compression is appropriate for a backup that must be restored exactly.",
+        ],
+      };
+    }
+
+    return {
+      question:
+        "Explain the difference between lossy and lossless compression.",
+      context:
+        "Refer to what happens to the original data and give one suitable use.",
+      markPoints: [
+        "States that lossless compression preserves all original data.",
+        "States that lossy compression permanently removes some data.",
+        "Explains that both are used to reduce file size.",
+        "Gives a suitable example or use for either method.",
+      ],
+      modelAnswer:
+        "Lossless compression reduces file size while allowing the original data to be reconstructed exactly. Lossy compression reduces file size by permanently discarding some data, so the original cannot be recovered perfectly. Lossless compression is suitable for data such as documents or backups, while lossy compression can be suitable for media such as photographs or audio when some quality reduction is acceptable.",
+      examinerGuidance: [
+        "Credit equivalent wording that clearly distinguishes whether all original data can be reconstructed.",
+        "Do not accept the claim that lossless compression always produces a smaller file than lossy compression.",
+      ],
+      misconceptions: [
+        "Saying that lossless compression reduces quality.",
+        "Saying that data removed by lossy compression can always be recovered later.",
+      ],
+    };
+  }
+
+  return null;
+}
+
+function createProfileAwareDemoFallback(
+  item: AssessmentBlueprintItem,
+): DemoQuestionContent {
+  const profile = resolveTopicProfile(item.topicFocus);
+
+  if (item.questionType === "multiple-choice") {
+    const misconceptionOne =
+      profile.misconceptions[0] ||
+      `misunderstanding ${profile.displayName}`;
+
+    return {
+      question: `Which statement about ${profile.displayName} is correct?\n\nA. ${profile.definition}\nB. It is correct to assume that ${misconceptionOne}.\nC. It has no effect on how a computer system stores, processes or communicates data.\nD. It removes the need for software, hardware or algorithms.`,
+      context: "Select one answer.",
+      markPoints: [
+        `Award 1 mark for option A: ${profile.definition}`,
+      ],
+      modelAnswer: "A",
+      examinerGuidance: [
+        "Award the mark only for option A.",
+        "Do not award multiple selections unless A is clearly identified as the final answer.",
+      ],
+      misconceptions: profile.misconceptions.slice(0, 2),
+    };
+  }
+
+  if (
+    item.questionType === "extended-response" ||
+    item.questionType === "discuss" ||
+    item.questionType === "evaluate" ||
+    item.questionType === "scenario-application"
+  ) {
+    return {
+      question: `A school is making a computing decision involving ${profile.displayName}. Evaluate the most important benefits and limitations and recommend an appropriate approach.`,
+      context:
+        "Apply technical knowledge to the scenario rather than listing generic advantages and disadvantages.",
+      markPoints: [
+        `Demonstrates accurate knowledge of ${profile.displayName}.`,
+        `Explains the benefit that it ${profile.benefits[0]}.`,
+        `Explains another relevant benefit: ${profile.benefits[1]}.`,
+        `Explains the limitation that ${profile.limitations[0]}.`,
+        `Explains another relevant limitation: ${profile.limitations[1]}.`,
+        "Applies the discussion to the school scenario.",
+        `Uses relevant terminology such as ${profile.keywords.slice(0, 3).join(", ")}.`,
+        "Considers a suitable safeguard or alternative.",
+        "Makes a judgement based on the evidence.",
+        "Provides a justified recommendation.",
+        "Maintains balance.",
+        "Shows sustained reasoning.",
+      ],
+      modelAnswer: specificExtendedAnswer(
+        item.topicFocus,
+        "the school's computing decision",
+      ),
+      examinerGuidance: [
+        "Highest-level responses must apply technical points to the stated decision rather than list memorised advantages and disadvantages.",
+        "A conclusion must follow from the technical reasoning presented.",
+      ],
+      misconceptions: profile.misconceptions.slice(0, 2),
+    };
+  }
+
+  return {
+    question:
+      item.marks === 1
+        ? `State one accurate fact about ${profile.displayName}.`
+        : `Explain how ${profile.displayName} works and why it is important in a computer system.`,
+    context:
+      "Use precise Computer Science terminology and include a relevant example where appropriate.",
+    markPoints: [
+      `States an accurate principle: ${profile.definition}`,
+      `Explains: ${profile.explanation}`,
+      `Uses the example: ${profile.examples[0]}.`,
+      `Uses relevant terminology such as ${profile.keywords.slice(0, 3).join(", ")}.`,
+      `Explains a relevant benefit: ${profile.benefits[0]}.`,
+      `Recognises a relevant limitation: ${profile.limitations[0]}.`,
+    ],
+    modelAnswer:
+      item.marks === 1
+        ? profile.definition
+        : `${profile.definition} ${profile.explanation}`,
+    examinerGuidance: [
+      "Award marks only for technically accurate, distinct points.",
+      "Do not award repeated wording that does not add new Computer Science knowledge.",
+    ],
+    misconceptions: profile.misconceptions.slice(0, 2),
+  };
+}
+
 function createConcreteDemoContent(
   item: AssessmentBlueprintItem,
   index: number,
@@ -1313,6 +1976,13 @@ function createConcreteDemoContent(
   const lowerTopic = topic.toLowerCase();
 
   const variant = index + 1;
+
+  const dataRepresentationContent =
+    createDataRepresentationDemoContent(item, index);
+
+  if (dataRepresentationContent) {
+    return dataRepresentationContent;
+  }
 
   if (item.questionType === "definition") {
     return {
@@ -1542,21 +2212,7 @@ function createConcreteDemoContent(
     return content;
   }
 
-  return {
-    ...content,
-    modelAnswer:
-      item.questionType === "state-identify" && item.marks === 1
-        ? explanationForTopic(topic).split(".")[0] + "."
-        : explanationForTopic(topic),
-    markPoints: [
-      `States that ${resolveTopicProfile(topic).definition.split(".")[0]}.`,
-      `Explains: ${resolveTopicProfile(topic).explanation.split(".")[0]}.`,
-      `Uses the example: ${resolveTopicProfile(topic).examples[0]}.`,
-      `Uses relevant terminology such as ${resolveTopicProfile(topic).keywords.slice(0, 3).join(", ")}.`,
-      `Explains the benefit: ${resolveTopicProfile(topic).benefits[0]}.`,
-      `Recognises the limitation: ${resolveTopicProfile(topic).limitations[0]}.`,
-    ],
-  };
+  return createProfileAwareDemoFallback(item);
 }
 
 function createDemoQuestion(
@@ -1682,6 +2338,93 @@ function normaliseLevels(
   return cleaned.length > 0 ? cleaned : createLevelDescriptors(item.marks);
 }
 
+
+const LOW_QUALITY_QUESTION_PATTERNS: RegExp[] = [
+  /\bconnected to\b/i,
+  /\bcalculation involving\b/i,
+  /\bteacher (?:may|should) edit\b/i,
+  /\bteacher should insert\b/i,
+  /\buse two original values suitable\b/i,
+  /\bfinal published version should contain\b/i,
+  /\bapply your knowledge of .+ to the original scenario provided\b/i,
+];
+
+function hasLowQualityQuestionWording(value: string): boolean {
+  const cleaned = value.trim();
+
+  if (cleaned.length < 12) {
+    return true;
+  }
+
+  return LOW_QUALITY_QUESTION_PATTERNS.some((pattern) =>
+    pattern.test(cleaned),
+  );
+}
+
+function isGeneratedQuestionUsable(
+  item: AssessmentBlueprintItem,
+  generated: ParsedQuestion,
+): boolean {
+  if (
+    hasLowQualityQuestionWording(generated.question) ||
+    hasLowQualityQuestionWording(generated.context)
+  ) {
+    return false;
+  }
+
+  if (
+    !generated.modelAnswer.trim() ||
+    generated.modelAnswer.trim().length < 8
+  ) {
+    return false;
+  }
+
+  const markTotal = generated.markScheme.reduce(
+    (sum, point) =>
+      sum +
+      (Number.isInteger(point.marks) && point.marks > 0
+        ? point.marks
+        : 0),
+    0,
+  );
+
+  if (markTotal !== item.marks) {
+    return false;
+  }
+
+  if (
+    item.marks >= 6 &&
+    generated.levelDescriptors.length === 0
+  ) {
+    return false;
+  }
+
+  if (
+    item.marks < 6 &&
+    generated.levelDescriptors.length > 0
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function createTopicKnowledgePrompt(topic: string): string {
+  const profile = resolveTopicProfile(topic);
+
+  return [
+    `Curriculum knowledge for ${topic}:`,
+    `Precise focus: ${profile.displayName}.`,
+    `Definition: ${profile.definition}`,
+    `Core explanation: ${profile.explanation}`,
+    `Concrete examples: ${profile.examples.join(" | ")}.`,
+    `Benefits where relevant: ${profile.benefits.join(" | ")}.`,
+    `Limitations where relevant: ${profile.limitations.join(" | ")}.`,
+    `Common misconceptions to avoid or assess: ${profile.misconceptions.join(" | ")}.`,
+    `Preferred technical vocabulary: ${profile.keywords.join(", ")}.`,
+  ].join("\n");
+}
+
 function buildQuestionSet(
   request: RequestBody,
   parsed: {
@@ -1696,7 +2439,10 @@ function buildQuestionSet(
   const questions = request.blueprint.map((item, index) => {
     const generated = parsed.questions[index];
 
-    if (!generated) {
+    if (
+      !generated ||
+      !isGeneratedQuestionUsable(item, generated)
+    ) {
       return createDemoQuestion(item, index);
     }
 
@@ -1785,7 +2531,7 @@ export async function POST(request: Request) {
         questionSet: createDemoQuestionSet(body),
         source: "demo",
         warning: !apiKey
-          ? "Live AI is not configured, so a varied demo paper was generated from the blueprint."
+          ? "Live AI is not configured, so a curriculum-aware offline paper was generated from the blueprint."
           : undefined,
       });
     }
@@ -1817,6 +2563,13 @@ export async function POST(request: Request) {
         "Questions worth fewer than 6 marks must return an empty levelDescriptors array.",
         "Multiple-choice questions must contain four plausible options and exactly one correct answer, identified in the model answer and mark scheme.",
         "Calculation, conversion, table, trace, code and algorithm questions must include all values, code or data needed to answer them.",
+        "Never create placeholder wording such as 'connected to [topic]', 'a calculation involving [topic]', 'teacher may edit', 'teacher should insert', or instructions asking the teacher to supply missing values later.",
+        "A generated question must be ready for a teacher to publish without rewriting its technical content.",
+        "Use the supplied curriculum knowledge to make the question test the actual Computer Science concept, not merely repeat the topic name.",
+        "For image representation, test pixels, resolution, colour depth, file-size calculations and suitable compression choices where appropriate.",
+        "For sound representation, test sampling, sample rate, bit depth, file-size calculations and quality/file-size trade-offs where appropriate.",
+        "For character representation, test character sets, numeric codes, ASCII and Unicode where appropriate.",
+        "For compression, distinguish lossy and lossless methods and select them according to data-loss requirements.",
         "Return only JSON matching the supplied schema.",
       ].join(" "),
 
@@ -1827,8 +2580,16 @@ export async function POST(request: Request) {
         `Default difficulty: ${body.difficulty}.`,
         `Blueprint mode: ${body.generationMode}.`,
         "",
+        "Curriculum knowledge:",
+        createTopicKnowledgePrompt(body.topic),
+        "",
         "Teacher-approved blueprint:",
         createBlueprintPrompt(body.blueprint),
+        "",
+        "Blueprint-row curriculum notes:",
+        body.blueprint
+          .map((item) => createTopicKnowledgePrompt(item.topicFocus))
+          .join("\n\n"),
       ].join("\n"),
 
       text: {
@@ -1944,7 +2705,7 @@ export async function POST(request: Request) {
         questionSet: createDemoQuestionSet(body),
         source: "demo",
         warning:
-          "The live assistant returned no content, so a varied demo paper was generated from the blueprint.",
+          "The live assistant returned no content, so a curriculum-aware offline paper was generated from the blueprint.",
       });
     }
 

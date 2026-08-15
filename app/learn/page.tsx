@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  getCurriculumDefinition,
-  type CurriculumUnitDefinition,
-} from "@/data/curriculum/curriculumMap";
-import { topicLibrary } from "@/data/curriculum/topics";
+import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
 import type { Topic } from "@/types/curriculum";
 
-function difficultyLabel(difficulty: Topic["difficulty"]): string {
+function difficultyLabel(
+  difficulty: Topic["difficulty"],
+): string {
   if (difficulty === "⭐⭐⭐") {
     return "Advanced";
   }
@@ -24,14 +22,24 @@ function difficultyLabel(difficulty: Topic["difficulty"]): string {
   return "Foundation";
 }
 
-function qualificationLabel(qualification: "GCSE" | "A_LEVEL"): string {
-  return qualification === "A_LEVEL" ? "A-level" : "GCSE";
+function qualificationLabel(
+  qualification: "GCSE" | "A_LEVEL",
+): string {
+  return qualification === "A_LEVEL"
+    ? "A-level"
+    : "GCSE";
 }
 
 export default function LearnPage() {
   const router = useRouter();
 
-  const { user, profile, loading, profileReady, profileError } = useAuth();
+  const {
+    user,
+    profile,
+    loading,
+    profileReady,
+    profileError,
+  } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -49,37 +57,37 @@ export default function LearnPage() {
     ) {
       router.replace("/onboarding");
     }
-  }, [loading, user, profileReady, profile, router]);
+  }, [
+    loading,
+    user,
+    profileReady,
+    profile,
+    router,
+  ]);
 
-  const curriculum = useMemo(() => {
-    if (!profile || profile.qualification === "" || profile.examBoard === "") {
-      return undefined;
+  const coverage = useMemo(() => {
+    if (
+      !profile?.qualification ||
+      !profile.examBoard
+    ) {
+      return null;
     }
 
-    return getCurriculumDefinition(profile.qualification, profile.examBoard);
-  }, [profile]);
-
-  const availableTopicIds = useMemo(() => {
-    if (!curriculum) {
-      return [];
-    }
-
-    return Array.from(
-      new Set(
-        curriculum.units.flatMap(
-          (unit: CurriculumUnitDefinition) => unit.topicIds,
-        ),
-      ),
+    return getCurriculumCoverage(
+      profile.qualification,
+      profile.examBoard,
     );
-  }, [curriculum]);
+  }, [
+    profile?.qualification,
+    profile?.examBoard,
+  ]);
 
-  const availableTopics = useMemo(() => {
-    return availableTopicIds
-      .map((topicId) => topicLibrary[topicId])
-      .filter((topic): topic is Topic => Boolean(topic));
-  }, [availableTopicIds]);
-
-  if (loading || (user && !profileReady && !profileError)) {
+  if (
+    loading ||
+    (user &&
+      !profileReady &&
+      !profileError)
+  ) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
@@ -100,12 +108,19 @@ export default function LearnPage() {
           Your curriculum could not be loaded
         </h1>
 
-        <p className="mt-3 text-red-800">{profileError}</p>
+        <p className="mt-3 text-red-800">
+          {profileError}
+        </p>
       </section>
     );
   }
 
-  if (!profile || !profile.qualification || !profile.examBoard || !curriculum) {
+  if (
+    !profile ||
+    !profile.qualification ||
+    !profile.examBoard ||
+    !coverage
+  ) {
     return (
       <section className="rounded-3xl border border-amber-200 bg-amber-50 p-8">
         <h1 className="text-2xl font-black text-amber-950">
@@ -126,7 +141,10 @@ export default function LearnPage() {
     );
   }
 
-  const levelLabel = qualificationLabel(profile.qualification);
+  const levelLabel =
+    qualificationLabel(
+      profile.qualification,
+    );
 
   return (
     <div className="space-y-8">
@@ -134,16 +152,16 @@ export default function LearnPage() {
         <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-start">
           <div>
             <p className="text-sm font-black uppercase tracking-widest text-blue-600">
-              {profile.examBoard} {levelLabel} curriculum
+              {profile.examBoard}{" "}
+              {levelLabel} curriculum
             </p>
 
             <h1 className="mt-2 text-4xl font-black text-slate-950">
-              {curriculum.title}
+              {coverage.curriculum.title}
             </h1>
 
             <p className="mt-3 max-w-3xl text-slate-600">
-              Work through the units and topics assigned to your selected
-              qualification and exam board.
+              Your Learn page is filtered from the qualification and exam board stored in your student profile.
             </p>
           </div>
 
@@ -155,160 +173,241 @@ export default function LearnPage() {
           </Link>
         </div>
 
-        <div className="mt-7 flex flex-wrap gap-3">
-          <div className="rounded-xl bg-indigo-50 px-4 py-3">
-            <p className="text-xs font-bold uppercase text-indigo-600">Units</p>
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric
+            label="Units"
+            value={coverage.units.length}
+            className="bg-indigo-50 text-indigo-950"
+          />
 
-            <p className="mt-1 text-2xl font-black text-indigo-950">
-              {curriculum.units.length}
-            </p>
-          </div>
+          <Metric
+            label="Topics mapped"
+            value={
+              coverage.mappedTopicCount
+            }
+            className="bg-blue-50 text-blue-950"
+          />
 
-          <div className="rounded-xl bg-blue-50 px-4 py-3">
-            <p className="text-xs font-bold uppercase text-blue-600">
-              Topics available
-            </p>
+          <Metric
+            label="Topics available"
+            value={
+              coverage.availableTopicCount
+            }
+            className="bg-cyan-50 text-cyan-950"
+          />
 
-            <p className="mt-1 text-2xl font-black text-blue-950">
-              {availableTopics.length}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-emerald-50 px-4 py-3">
-            <p className="text-xs font-bold uppercase text-emerald-600">
-              Interactive lessons
-            </p>
-
-            <p className="mt-1 text-2xl font-black text-emerald-950">
-              {availableTopics.reduce(
-                (total, topic) => total + topic.lessons.length,
-                0,
-              )}
-            </p>
-          </div>
+          <Metric
+            label="Interactive lessons"
+            value={coverage.lessonCount}
+            className="bg-emerald-50 text-emerald-950"
+          />
         </div>
+
+        {!coverage.complete && (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+            <p className="font-black">
+              Curriculum authoring gap detected
+            </p>
+
+            <p className="mt-2">
+              These mapped topics are not yet published:{" "}
+              {coverage.missingTopicIds.join(", ")}.
+              They are not silently replaced with another exam board's content.
+            </p>
+          </div>
+        )}
       </section>
 
-      {curriculum.units.map((unit, unitIndex) => {
-        const unitTopics = unit.topicIds
-          .map((topicId) => topicLibrary[topicId])
-          .filter((topic): topic is Topic => Boolean(topic));
+      {coverage.units.map(
+        (unitCoverage, unitIndex) => {
+          const {
+            unit,
+            topics,
+            missingTopicIds,
+          } = unitCoverage;
 
-        return (
-          <section
-            key={unit.id}
-            className="space-y-5 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:p-8"
-          >
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-indigo-600">
-                Unit {unitIndex + 1}
-              </p>
+          return (
+            <section
+              key={unit.id}
+              className="space-y-5 rounded-3xl border border-slate-200 bg-slate-50 p-6 md:p-8"
+            >
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-indigo-600">
+                    Unit {unitIndex + 1}
+                  </p>
 
-              <h2 className="mt-2 text-3xl font-black text-slate-950">
-                {unit.title}
-              </h2>
+                  <h2 className="mt-2 text-3xl font-black text-slate-950">
+                    {unit.title}
+                  </h2>
 
-              <p className="mt-3 max-w-3xl leading-7 text-slate-600">
-                {unit.description}
-              </p>
-            </div>
+                  <p className="mt-3 max-w-3xl leading-7 text-slate-600">
+                    {unit.description}
+                  </p>
+                </div>
 
-            {unitTopics.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600">
-                Lessons for this unit are being prepared.
+                <div className="rounded-2xl bg-white px-4 py-3 text-sm font-bold text-slate-700">
+                  {topics.length} topic
+                  {topics.length === 1
+                    ? ""
+                    : "s"}{" "}
+                  · {unitCoverage.lessonCount} lessons
+                </div>
               </div>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {unitTopics.map((topic) => {
-                  const firstLesson = topic.lessons[0];
 
-                  const topicHref = firstLesson
-                    ? `/learn/${topic.id}?lesson=${firstLesson.id}`
-                    : "";
+              {missingTopicIds.length >
+                0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Authoring still required for:{" "}
+                  {missingTopicIds.join(
+                    ", ",
+                  )}
+                </div>
+              )}
 
-                  return (
-                    <article
-                      key={`${unit.id}-${topic.id}`}
-                      className="flex min-h-[370px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-widest text-blue-600">
-                            {profile.examBoard} {levelLabel}
-                          </p>
+              {topics.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-slate-600">
+                  No published lessons are currently mapped to this unit.
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {topics.map((topic) => {
+                    const firstLesson =
+                      topic.lessons[0];
 
-                          <h3 className="mt-2 text-2xl font-black text-slate-950">
-                            {topic.title}
-                          </h3>
+                    const topicHref =
+                      firstLesson
+                        ? `/learn/${topic.id}?lesson=${firstLesson.id}`
+                        : "";
+
+                    return (
+                      <article
+                        key={`${unit.id}-${topic.id}`}
+                        className="flex min-h-[390px] flex-col rounded-3xl border border-slate-200 bg-white p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-widest text-blue-600">
+                              {profile.examBoard}{" "}
+                              {levelLabel}
+                            </p>
+
+                            <h3 className="mt-2 text-2xl font-black text-slate-950">
+                              {topic.title}
+                            </h3>
+                          </div>
+
+                          <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1 text-sm font-black text-blue-700">
+                            {levelLabel}
+                          </span>
                         </div>
 
-                        <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1 text-sm font-black text-blue-700">
-                          {levelLabel}
-                        </span>
-                      </div>
+                        <p className="mt-4 leading-7 text-slate-600">
+                          {topic.description}
+                        </p>
 
-                      <p className="mt-4 leading-7 text-slate-600">
-                        {topic.description}
-                      </p>
+                        <div className="mt-6 grid grid-cols-2 gap-3">
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase text-slate-500">
+                              Lessons
+                            </p>
 
-                      <div className="mt-6 grid grid-cols-2 gap-3">
-                        <div className="rounded-2xl bg-slate-50 p-4">
-                          <p className="text-xs font-bold uppercase text-slate-500">
-                            Lessons
-                          </p>
+                            <p className="mt-1 text-xl font-black text-slate-950">
+                              {
+                                topic.lessons
+                                  .length
+                              }
+                            </p>
+                          </div>
 
-                          <p className="mt-1 text-xl font-black text-slate-950">
-                            {topic.lessons.length}
-                          </p>
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <p className="text-xs font-bold uppercase text-slate-500">
+                              Estimated time
+                            </p>
+
+                            <p className="mt-1 font-black text-slate-950">
+                              {
+                                topic.estimatedTime
+                              }
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="rounded-2xl bg-slate-50 p-4">
-                          <p className="text-xs font-bold uppercase text-slate-500">
-                            Estimated time
-                          </p>
+                        <div className="mt-4 flex items-center justify-between text-sm">
+                          <span className="font-bold text-slate-600">
+                            {topic.difficulty}
+                          </span>
 
-                          <p className="mt-1 font-black text-slate-950">
-                            {topic.estimatedTime}
-                          </p>
+                          <span className="font-bold text-slate-600">
+                            {difficultyLabel(
+                              topic.difficulty,
+                            )}
+                          </span>
                         </div>
-                      </div>
 
-                      <div className="mt-4 flex items-center justify-between text-sm">
-                        <span className="font-bold text-slate-600">
-                          {topic.difficulty}
-                        </span>
-
-                        <span className="font-bold text-slate-600">
-                          {difficultyLabel(topic.difficulty)}
-                        </span>
-                      </div>
-
-                      <div className="mt-auto pt-7">
-                        {firstLesson ? (
+                        {topic.simulator ===
+                          "python" && (
                           <Link
-                            href={topicHref}
-                            className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-6 py-4 font-black text-white transition hover:bg-blue-700"
+                            href="/programming"
+                            className="mt-5 inline-flex text-sm font-black text-violet-700 hover:text-violet-900"
                           >
-                            Start learning →
+                            Open live programming practice →
                           </Link>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled
-                            className="w-full cursor-not-allowed rounded-xl bg-slate-200 px-6 py-4 font-black text-slate-500"
-                          >
-                            Lessons coming soon
-                          </button>
                         )}
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        );
-      })}
+
+                        <div className="mt-auto pt-7">
+                          {firstLesson ? (
+                            <Link
+                              href={
+                                topicHref
+                              }
+                              className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-6 py-4 font-black text-white transition hover:bg-blue-700"
+                            >
+                              Start learning →
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className="w-full cursor-not-allowed rounded-xl bg-slate-200 px-6 py-4 font-black text-slate-500"
+                            >
+                              Lessons coming soon
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          );
+        },
+      )}
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number;
+  className: string;
+}) {
+  return (
+    <div
+      className={`rounded-xl px-4 py-3 ${className}`}
+    >
+      <p className="text-xs font-bold uppercase opacity-70">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-black">
+        {value}
+      </p>
     </div>
   );
 }

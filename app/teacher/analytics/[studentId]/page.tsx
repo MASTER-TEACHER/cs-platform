@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
+  FileText,
   Target,
 } from "lucide-react";
 
@@ -19,7 +20,10 @@ import { getTeacherStudentAnalytics } from "@/services/analytics/teacherAnalytic
 import type { TeacherStudentAnalyticsRow } from "@/types/teacherAnalytics";
 
 export default function TeacherStudentAnalyticsPage() {
-  const params = useParams<{ studentId: string }>();
+  const params = useParams<{
+    studentId: string;
+  }>();
+
   const studentId = params.studentId;
 
   const {
@@ -29,20 +33,33 @@ export default function TeacherStudentAnalyticsPage() {
   } = useAuth();
 
   const [row, setRow] =
-    useState<TeacherStudentAnalyticsRow | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [refreshKey, setRefreshKey] = useState(0);
+    useState<TeacherStudentAnalyticsRow | null>(
+      null,
+    );
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [refreshKey, setRefreshKey] =
+    useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      if (authLoading) return;
+      if (authLoading) {
+        return;
+      }
 
       if (
         !user?.uid ||
-        (profile?.role !== "teacher" && profile?.role !== "admin")
+        (
+          profile?.role !== "teacher" &&
+          profile?.role !== "admin"
+        )
       ) {
         setLoading(false);
         return;
@@ -52,10 +69,11 @@ export default function TeacherStudentAnalyticsPage() {
         setLoading(true);
         setError("");
 
-        const result = await getTeacherStudentAnalytics({
-          teacherId: user.uid,
-          studentId,
-        });
+        const result =
+          await getTeacherStudentAnalytics({
+            teacherId: user.uid,
+            studentId,
+          });
 
         if (!cancelled) {
           setRow(result);
@@ -156,27 +174,40 @@ export default function TeacherStudentAnalyticsPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
-            <div className="mb-2 flex items-center gap-2 text-sm font-black">
-              <Target className="h-4 w-4" />
-              Target grade
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Link
+              href={`/teacher/students/${studentId}#progress-report`}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-5 text-sm font-black text-white transition hover:bg-white/20"
+            >
+              <FileText className="h-4 w-4" />
+              Open progress report
+            </Link>
 
-            <TargetGradeControl
-              studentId={row.studentId}
-              classId={row.classId}
-              teacherId={user?.uid || ""}
-              qualification={row.qualification}
-              value={row.targetGrade}
-              onSaved={() =>
-                setRefreshKey((value) => value + 1)
-              }
-            />
+            <div className="rounded-2xl bg-white/10 p-4 backdrop-blur">
+              <div className="mb-2 flex items-center gap-2 text-sm font-black">
+                <Target className="h-4 w-4" />
+                Target grade
+              </div>
+
+              <TargetGradeControl
+                studentId={row.studentId}
+                classId={row.classId}
+                teacherId={user?.uid || ""}
+                qualification={row.qualification}
+                value={row.targetGrade}
+                onSaved={() =>
+                  setRefreshKey(
+                    (value) => value + 1,
+                  )
+                }
+              />
+            </div>
           </div>
         </div>
       </section>
 
-      {row.interventionPriority !== "none" && (
+      {row.interventionPriority !==
+        "none" && (
         <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
@@ -187,15 +218,24 @@ export default function TeacherStudentAnalyticsPage() {
               </h2>
 
               <ul className="mt-3 space-y-2 text-sm text-amber-900">
-                {row.interventionReasons.map((reason) => (
-                  <li key={reason}>• {reason}</li>
-                ))}
+                {row.interventionReasons.map(
+                  (reason) => (
+                    <li key={reason}>
+                      • {reason}
+                    </li>
+                  ),
+                )}
               </ul>
 
               <Link
-                href={`/teacher/interventions?studentId=${encodeURIComponent(
-                  row.studentId,
-                )}&classId=${encodeURIComponent(row.classId)}`}
+                href={
+                  `/teacher/interventions?studentId=${encodeURIComponent(
+                    row.studentId,
+                  )}` +
+                  `&classId=${encodeURIComponent(
+                    row.classId,
+                  )}`
+                }
                 className="mt-4 inline-flex font-black text-amber-900 underline"
               >
                 Open Interventions
@@ -205,9 +245,13 @@ export default function TeacherStudentAnalyticsPage() {
         </Card>
       )}
 
-      <RichAnalyticsOverview analytics={row.analytics} />
+      <RichAnalyticsOverview
+        analytics={row.analytics}
+      />
 
-      <StudentIntelligenceRecord studentId={studentId} />
+      <StudentIntelligenceRecord
+        studentId={studentId}
+      />
     </div>
   );
 }

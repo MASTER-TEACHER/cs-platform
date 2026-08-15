@@ -7,6 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
+import ExamIntegrityPolicyCard from "@/components/teacher/exam-assignments/ExamIntegrityPolicyCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
@@ -138,8 +139,9 @@ export default function ExamAssignmentMarkbookPage() {
 
     async function loadMarkbook() {
       /*
-       * Do not query protected Firestore collections until Firebase Auth has
-       * finished restoring the signed-in teacher on a hard refresh.
+       * Do not query protected Firestore data until Firebase Auth has finished
+       * restoring the signed-in teacher. This also prevents hard-refresh
+       * permission errors.
        */
       if (authLoading || !profileReady) {
         return;
@@ -174,7 +176,8 @@ export default function ExamAssignmentMarkbookPage() {
         }
 
         /*
-         * Match the Firestore ownership rule before querying submissions.
+         * Only the teacher who owns the exam should open its markbook or edit
+         * its integrity policy.
          */
         if (loadedAssignment.teacherId !== user.uid) {
           throw new Error(
@@ -344,6 +347,23 @@ export default function ExamAssignmentMarkbookPage() {
         <SummaryCard label="Class average" value={`${summary.average}%`} />
       </section>
 
+      {user?.uid && (
+        <ExamIntegrityPolicyCard
+          assignment={assignment}
+          teacherId={user.uid}
+          onSaved={(policy) =>
+            setAssignment((current) =>
+              current
+                ? {
+                    ...current,
+                    integrityPolicy: policy,
+                  }
+                : current,
+            )
+          }
+        />
+      )}
+
       <Card>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -418,6 +438,20 @@ export default function ExamAssignmentMarkbookPage() {
                       >
                         {formatStatus(status)}
                       </span>
+
+                      {submission?.integrityTerminated && (
+                        <p className="mt-2 text-xs font-black text-red-700">
+                          Integrity auto-submit
+                        </p>
+                      )}
+
+                      {submission &&
+                        submission.integrityIncidents.length > 0 && (
+                          <p className="mt-1 text-xs text-slate-500">
+                            {submission.integrityIncidents.length} integrity event
+                            {submission.integrityIncidents.length === 1 ? "" : "s"}
+                          </p>
+                        )}
                     </td>
 
                     <td className="p-4 font-semibold text-slate-700">

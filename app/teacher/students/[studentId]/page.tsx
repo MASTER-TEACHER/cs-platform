@@ -27,6 +27,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import StudentIntelligenceRecord from "@/components/teacher/student/StudentIntelligenceRecord";
+import StudentProgressReportPanel from "@/components/teacher/reports/StudentProgressReportPanel";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
@@ -618,6 +619,18 @@ export default function TeacherStudentAnalyticsPage() {
           </div>
         </Card>
       </section>
+
+      {user?.uid && (
+        <section
+          id="progress-report"
+          className="scroll-mt-6"
+        >
+          <StudentProgressReportPanel
+            teacherId={user.uid}
+            studentId={studentId}
+          />
+        </section>
+      )}
     </div>
   );
 }
