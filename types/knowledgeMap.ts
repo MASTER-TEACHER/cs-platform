@@ -2,6 +2,11 @@ import type {
   AdaptiveLearningAction,
   AdaptiveTopicMastery,
 } from "@/types/adaptiveLearning";
+import type {
+  AnalyticsEvidence,
+  AnalyticsEvidenceType,
+  TopicMastery,
+} from "@/types/analytics";
 
 export type CurriculumUnitId =
   | "data-representation"
@@ -32,6 +37,10 @@ export type KnowledgeMapTopic = {
   definition: CurriculumTopicDefinition;
   mastery: AdaptiveTopicMastery | null;
   nextAction: AdaptiveLearningAction | null;
+  analyticsMastery: TopicMastery | null;
+  analyticsEvidence: AnalyticsEvidence[];
+  evidenceSources: AnalyticsEvidenceType[];
+  writtenExamEvidenceCount: number;
 };
 
 export type KnowledgeMapUnit = {

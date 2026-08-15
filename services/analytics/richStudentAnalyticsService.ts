@@ -14,8 +14,11 @@ import { buildAnalyticsInterpretation } from "@/services/analytics/interpretatio
 import { buildTopicMastery } from "@/services/analytics/masteryAnalyticsService";
 import { getStudentTargetGrade } from "@/services/analytics/targetGradeService";
 import { buildTrend } from "@/services/analytics/trendAnalyticsService";
+import { getWrittenExamQuestionEvidence } from "@/services/analytics/writtenExamQuestionEvidenceService";
 import type {
   AnalyticsEvidence,
+  AnalyticsEvidenceSourceCounts,
+  AnalyticsEvidenceType,
   AnalyticsQualification,
   GradeLabel,
   RichStudentAnalytics,
@@ -164,7 +167,62 @@ function assignmentToEvidence(
     dueDate: assignment.dueDate,
     weight: ANALYTICS_EVIDENCE_WEIGHTS[type],
     graded,
+    sourceAssignmentId: assignment.id,
+    sourceAssessmentId: assignment.resourceId || null,
+    sourceQuestionId: null,
+    sourceQuestionNumber: null,
+    sourceLabel:
+      type === "written_exam"
+        ? "Teacher-assigned written exam"
+        : assignment.resourceType || type,
   };
+}
+
+function buildMasteryEvidence(
+  evidence: AnalyticsEvidence[],
+  examQuestionEvidence: AnalyticsEvidence[],
+): AnalyticsEvidence[] {
+  const examsWithQuestionEvidence = new Set(
+    examQuestionEvidence
+      .map((item) => item.sourceAssignmentId)
+      .filter((value): value is string => Boolean(value)),
+  );
+
+  return [
+    ...evidence.filter((item) => {
+      if (item.type !== "written_exam") return true;
+      if (!item.sourceAssignmentId) return true;
+      return !examsWithQuestionEvidence.has(item.sourceAssignmentId);
+    }),
+    ...examQuestionEvidence,
+  ];
+}
+
+function countEvidenceSources(
+  evidence: AnalyticsEvidence[],
+): AnalyticsEvidenceSourceCounts {
+  const counts: AnalyticsEvidenceSourceCounts = {
+    written_exam: 0,
+    quiz: 0,
+    ai_quiz: 0,
+    programming: 0,
+    lesson: 0,
+  };
+
+  const ids = new Map<AnalyticsEvidenceType, Set<string>>();
+
+  for (const item of evidence) {
+    const key = item.sourceAssignmentId || item.id;
+    const current = ids.get(item.type) || new Set<string>();
+    current.add(key);
+    ids.set(item.type, current);
+  }
+
+  for (const [type, values] of ids.entries()) {
+    counts[type] = values.size;
+  }
+
+  return counts;
 }
 
 export async function getRichStudentAnalytics(
@@ -197,6 +255,20 @@ export async function getRichStudentAnalytics(
   const boundarySet = getDefaultBoundarySet(qualification);
   const evidence = assignments.map(assignmentToEvidence);
 
+  const examQuestionEvidence =
+    await getWrittenExamQuestionEvidence(cleanedStudentId).catch((error) => {
+      console.warn(
+        "Written exam question evidence could not be loaded:",
+        error,
+      );
+      return [];
+    });
+
+  const masteryEvidence = buildMasteryEvidence(
+    evidence,
+    examQuestionEvidence,
+  );
+
   const completedActivityCount = assignments.filter(
     isUnifiedAssignmentComplete,
   ).length;
@@ -214,8 +286,10 @@ export async function getRichStudentAnalytics(
     boundarySet,
   });
 
-  const topics = buildTopicMastery(evidence);
+  const topics = buildTopicMastery(masteryEvidence);
+
   const strongestTopics = topics.slice(0, 3);
+
   const weakestTopics = [...topics]
     .sort((a, b) => a.weightedPercentage - b.weightedPercentage)
     .slice(0, 3);
@@ -249,6 +323,8 @@ export async function getRichStudentAnalytics(
     strongestTopics,
     weakestTopics,
     evidence,
+    masteryEvidence,
+    evidenceSourceCounts: countEvidenceSources(masteryEvidence),
     completedActivityCount,
     totalActivityCount,
     completionRate,

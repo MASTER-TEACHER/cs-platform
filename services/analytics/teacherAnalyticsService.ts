@@ -27,6 +27,8 @@ import { buildTrend } from "@/services/analytics/trendAnalyticsService";
 
 import type {
   AnalyticsEvidence,
+  AnalyticsEvidenceSourceCounts,
+  AnalyticsEvidenceType,
   AnalyticsQualification,
   GradeLabel,
   RichStudentAnalytics,
@@ -105,6 +107,82 @@ function safeStringArray(
     (item): item is string =>
       typeof item === "string",
   );
+}
+
+function safeRecordArray(
+  value: unknown,
+): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter(
+    (
+      item,
+    ): item is Record<string, unknown> =>
+      Boolean(item) &&
+      typeof item === "object" &&
+      !Array.isArray(item),
+  );
+}
+
+function examQuestionTopic(
+  question: Record<string, unknown>,
+  fallback: string,
+): string {
+  for (const value of [
+    question.topic,
+    question.topicFocus,
+    question.subtopic,
+    question.curriculumTopic,
+  ]) {
+    const topic = safeString(value);
+
+    if (topic) {
+      return topic;
+    }
+  }
+
+  return fallback;
+}
+
+function countEvidenceSources(
+  evidence: AnalyticsEvidence[],
+): AnalyticsEvidenceSourceCounts {
+  const counts: AnalyticsEvidenceSourceCounts = {
+    written_exam: 0,
+    quiz: 0,
+    ai_quiz: 0,
+    programming: 0,
+    lesson: 0,
+  };
+
+  const sourceIds = new Map<
+    AnalyticsEvidenceType,
+    Set<string>
+  >();
+
+  for (const item of evidence) {
+    const current =
+      sourceIds.get(item.type) ||
+      new Set<string>();
+
+    current.add(
+      item.sourceAssignmentId ||
+        item.id,
+    );
+
+    sourceIds.set(
+      item.type,
+      current,
+    );
+  }
+
+  for (const [type, ids] of sourceIds) {
+    counts[type] = ids.size;
+  }
+
+  return counts;
 }
 
 function qualificationFromClass(
@@ -401,6 +479,13 @@ async function getTeacherOwnedStudentAnalytics({
   const evidence: AnalyticsEvidence[] =
     [];
 
+  /*
+   * Question-level written-exam evidence is kept separately from the
+   * assessment stream. It is used for topic mastery only.
+   */
+  const examQuestionEvidence: AnalyticsEvidence[] =
+    [];
+
   let totalActivityCount = 0;
   let completedActivityCount = 0;
 
@@ -511,6 +596,18 @@ async function getTeacherOwnedStudentAnalytics({
       graded:
         completed &&
         percentage !== null,
+      sourceAssignmentId:
+        assignmentDocument.id,
+      sourceAssessmentId:
+        safeString(
+          assignment.resourceId,
+        ) || null,
+      sourceQuestionId: null,
+      sourceQuestionNumber: null,
+      sourceLabel:
+        evidenceType === "ai_quiz"
+          ? "Teacher-assigned AI quiz"
+          : "Teacher-assigned quiz",
     });
   }
 
@@ -620,6 +717,28 @@ async function getTeacherOwnedStudentAnalytics({
           ?.totalAvailableMarks,
       );
 
+    const questionSetSnapshot =
+      assignment.questionSetSnapshot &&
+      typeof assignment.questionSetSnapshot ===
+        "object"
+        ? (assignment.questionSetSnapshot as Record<
+            string,
+            unknown
+          >)
+        : {};
+
+    const fallbackExamTopic =
+      safeString(
+        assignment.topic,
+      ) ||
+      safeString(
+        questionSetSnapshot.topic,
+      ) ||
+      safeString(
+        assignment.title,
+        "Written assessment",
+      );
+
     evidence.push({
       id:
         `exam-${assignmentDocument.id}`,
@@ -629,30 +748,7 @@ async function getTeacherOwnedStudentAnalytics({
           assignment.title,
           "Written assessment",
         ),
-      topic:
-        safeString(
-          assignment.topic,
-        ) ||
-        safeString(
-          assignment
-            .questionSetSnapshot &&
-            typeof assignment
-              .questionSetSnapshot ===
-              "object"
-            ? (
-                assignment
-                  .questionSetSnapshot as
-                  Record<
-                    string,
-                    unknown
-                  >
-              ).topic
-            : "",
-        ) ||
-        safeString(
-          assignment.title,
-          "Written assessment",
-        ),
+      topic: fallbackExamTopic,
       percentage,
       rawScore,
       totalMarks,
@@ -676,7 +772,165 @@ async function getTeacherOwnedStudentAnalytics({
       graded:
         marked &&
         percentage !== null,
+      sourceAssignmentId:
+        assignmentDocument.id,
+      sourceAssessmentId:
+        safeString(
+          assignment.questionSetId,
+        ) || null,
+      sourceQuestionId: null,
+      sourceQuestionNumber: null,
+      sourceLabel:
+        "Teacher-assigned written exam",
     });
+
+    /*
+     * A marked paper contributes question-level topic evidence.
+     * Each question receives only its share of the paper's written-exam
+     * weight, so one paper is not treated as several full exams.
+     */
+    if (marked) {
+      const questions =
+        safeRecordArray(
+          questionSetSnapshot.questions,
+        );
+
+      const answers =
+        safeRecordArray(
+          submission?.answers,
+        );
+
+      const paperMarks =
+        totalMarks && totalMarks > 0
+          ? totalMarks
+          : questions.reduce(
+              (sum, question) =>
+                sum +
+                (safeNumber(
+                  question.marks,
+                ) || 0),
+              0,
+            );
+
+      for (const question of questions) {
+        const questionId =
+          safeString(question.id);
+
+        if (!questionId) {
+          continue;
+        }
+
+        const answer =
+          answers.find(
+            (item) =>
+              safeString(
+                item.questionId,
+              ) === questionId,
+          );
+
+        const availableMarks =
+          safeNumber(question.marks);
+
+        const awardedMarks =
+          safeNumber(
+            answer?.awardedMarks,
+          );
+
+        if (
+          availableMarks === null ||
+          availableMarks <= 0 ||
+          awardedMarks === null
+        ) {
+          continue;
+        }
+
+        const clampedAwardedMarks =
+          Math.max(
+            0,
+            Math.min(
+              availableMarks,
+              awardedMarks,
+            ),
+          );
+
+        const questionNumber =
+          safeNumber(
+            question.questionNumber,
+          );
+
+        const weightShare =
+          paperMarks > 0
+            ? availableMarks /
+              paperMarks
+            : 1 /
+              Math.max(
+                1,
+                questions.length,
+              );
+
+        examQuestionEvidence.push({
+          id:
+            `written-exam-question-${assignmentDocument.id}-${questionId}`,
+          type: "written_exam",
+          title:
+            `${safeString(
+              assignment.title,
+              "Written assessment",
+            )} · ${
+              questionNumber === null
+                ? "Question"
+                : `Q${questionNumber}`
+            }`,
+          topic:
+            examQuestionTopic(
+              question,
+              fallbackExamTopic,
+            ),
+          percentage:
+            Math.round(
+              (
+                clampedAwardedMarks /
+                availableMarks
+              ) * 100,
+            ),
+          rawScore:
+            clampedAwardedMarks,
+          totalMarks:
+            availableMarks,
+          completedAt:
+            toDate(
+              (
+                submission
+                  ?.markedAt ??
+                submission
+                  ?.submittedAt
+              ) as FirestoreDate,
+            ),
+          dueDate:
+            toDate(
+              assignment.dueDate as
+                FirestoreDate,
+            ),
+          weight:
+            ANALYTICS_EVIDENCE_WEIGHTS
+              .written_exam *
+            weightShare,
+          graded: true,
+          sourceAssignmentId:
+            assignmentDocument.id,
+          sourceAssessmentId:
+            safeString(
+              assignment.questionSetId,
+            ) || null,
+          sourceQuestionId:
+            questionId,
+          sourceQuestionNumber:
+            questionNumber,
+          sourceLabel:
+            "Teacher-marked written exam question",
+        });
+      }
+    }
   }
 
   /*
@@ -732,9 +986,51 @@ async function getTeacherOwnedStudentAnalytics({
       boundarySet,
     });
 
+  /*
+   * Keep one whole-paper record for grade/trend/confidence, but replace the
+   * aggregate exam topic with question-level evidence for mastery when those
+   * question marks are available.
+   */
+  const examsWithQuestionEvidence =
+    new Set(
+      examQuestionEvidence
+        .map(
+          (item) =>
+            item.sourceAssignmentId,
+        )
+        .filter(
+          (
+            value,
+          ): value is string =>
+            Boolean(value),
+        ),
+    );
+
+  const masteryEvidence = [
+    ...evidence.filter((item) => {
+      if (
+        item.type !==
+        "written_exam"
+      ) {
+        return true;
+      }
+
+      if (
+        !item.sourceAssignmentId
+      ) {
+        return true;
+      }
+
+      return !examsWithQuestionEvidence.has(
+        item.sourceAssignmentId,
+      );
+    }),
+    ...examQuestionEvidence,
+  ];
+
   const topics =
     buildTopicMastery(
-      evidence,
+      masteryEvidence,
     );
 
   const strongestTopics =
@@ -788,6 +1084,11 @@ async function getTeacherOwnedStudentAnalytics({
     strongestTopics,
     weakestTopics,
     evidence,
+    masteryEvidence,
+    evidenceSourceCounts:
+      countEvidenceSources(
+        masteryEvidence,
+      ),
     completedActivityCount,
     totalActivityCount,
     completionRate,

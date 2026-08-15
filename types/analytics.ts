@@ -71,6 +71,11 @@ export type AnalyticsEvidence = {
   dueDate: Date | null;
   weight: number;
   graded: boolean;
+  sourceAssignmentId?: string | null;
+  sourceAssessmentId?: string | null;
+  sourceQuestionId?: string | null;
+  sourceQuestionNumber?: number | null;
+  sourceLabel?: string | null;
 };
 
 export type TopicMastery = {
@@ -119,6 +124,11 @@ export type StudentAnalyticsInterpretation = {
   nextActions: string[];
 };
 
+export type AnalyticsEvidenceSourceCounts = Record<
+  AnalyticsEvidenceType,
+  number
+>;
+
 export type RichStudentAnalytics = {
   studentId: string;
   qualification: AnalyticsQualification;
@@ -133,6 +143,8 @@ export type RichStudentAnalytics = {
   strongestTopics: TopicMastery[];
   weakestTopics: TopicMastery[];
   evidence: AnalyticsEvidence[];
+  masteryEvidence: AnalyticsEvidence[];
+  evidenceSourceCounts: AnalyticsEvidenceSourceCounts;
   completedActivityCount: number;
   totalActivityCount: number;
   completionRate: number;
