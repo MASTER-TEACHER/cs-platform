@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Download,
   FileBarChart2,
+  GraduationCap,
   ShieldAlert,
   Target,
   TrendingDown,
@@ -21,6 +22,9 @@ import type {
   ExamAssignment,
   ExamSubmission,
 } from "@/types/examAssignment";
+import type {
+  ExamAssessmentObjectiveIntelligence,
+} from "@/types/examIntelligence";
 
 function percentage(
   value: number | null,
@@ -52,6 +56,26 @@ function priorityClass(
   return "bg-emerald-100 text-emerald-700";
 }
 
+function aoDescription(
+  item: ExamAssessmentObjectiveIntelligence,
+): string {
+  if (
+    item.assessmentObjective ===
+    "AO1"
+  ) {
+    return "Knowledge and understanding";
+  }
+
+  if (
+    item.assessmentObjective ===
+    "AO2"
+  ) {
+    return "Application of knowledge and understanding";
+  }
+
+  return "Analysis, evaluation and problem solving";
+}
+
 export default function ExamAssignmentIntelligencePanel({
   assignment,
   submissions,
@@ -64,6 +88,9 @@ export default function ExamAssignmentIntelligencePanel({
       assignment,
       submissions,
     );
+
+  const grade =
+    intelligence.gradeIntelligence;
 
   const priorityStudents =
     intelligence.studentPriorities.filter(
@@ -93,63 +120,214 @@ export default function ExamAssignmentIntelligencePanel({
         <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-violet-900 p-6 text-white">
           <div className="flex items-center gap-2 text-violet-200">
             <BarChart3 className="h-5 w-5" />
-
             <p className="text-xs font-black uppercase tracking-[0.16em]">
               Exam intelligence
             </p>
           </div>
 
           <h2 className="mt-2 text-2xl font-black">
-            Class performance and integrity overview
+            Enhanced question-level analysis
           </h2>
 
           <p className="mt-2 max-w-4xl text-sm leading-6 text-white/70">
-            Use marked evidence to identify difficult questions, weak curriculum
-            areas and students requiring follow-up. Integrity events are contextual
-            evidence for teacher review and do not by themselves prove misconduct.
+            Review grade outcomes, grade boundaries, question facility, topic
+            performance, assessment objectives, marks lost and student priorities.
+            Integrity events remain contextual evidence for teacher review.
           </p>
         </div>
 
-        <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-7">
           <Metric
             label="Submission"
             value={`${intelligence.submissionPercentage}%`}
           />
-
           <Metric
             label="Marking"
             value={`${intelligence.markingPercentage}%`}
           />
-
           <Metric
             label="Class average"
-            value={percentage(
-              intelligence.classAverage,
-            )}
+            value={percentage(grade.classAveragePercentage)}
           />
-
+          <Metric
+            label="Median"
+            value={percentage(intelligence.medianPercentage)}
+          />
           <Metric
             label="Highest"
-            value={percentage(
-              intelligence.highestPercentage,
-            )}
+            value={percentage(intelligence.highestPercentage)}
           />
-
           <Metric
             label="Lowest"
-            value={percentage(
-              intelligence.lowestPercentage,
-            )}
+            value={percentage(intelligence.lowestPercentage)}
           />
-
           <Metric
             label="Integrity events"
-            value={String(
-              intelligence.integrity.totalIncidents,
-            )}
+            value={String(intelligence.integrity.totalIncidents)}
           />
         </div>
       </Card>
+
+      <Card className="overflow-hidden rounded-3xl border border-indigo-200">
+        <div className="flex flex-col gap-5 bg-indigo-50 p-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-indigo-600 p-3 text-white">
+              <GraduationCap className="h-5 w-5" />
+            </div>
+
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-700">
+                Grade intelligence
+              </p>
+
+              <h3 className="mt-1 text-2xl font-black text-slate-950">
+                Assessment grade and next-grade distance
+              </h3>
+
+              <p className="mt-2 text-sm text-slate-600">
+                {grade.boundarySetTitle}
+              </p>
+
+              <p className="mt-1 text-xs font-bold text-slate-500">
+                Source: {grade.boundarySource}
+                {grade.boundaryAcademicYear
+                  ? ` · ${grade.boundaryAcademicYear}`
+                  : ""}
+              </p>
+
+              {!grade.isOfficialBoundarySet && (
+                <p className="mt-3 max-w-3xl rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-900">
+                  This paper does not currently carry an official exam-series
+                  boundary set, so CS Master is using the configured{" "}
+                  {grade.boundarySource} boundaries. When official boundaries are
+                  attached to a paper, the same QLA will use them automatically.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid min-w-[320px] grid-cols-2 gap-3">
+            <SmallMetric
+              label="Average mark"
+              value={
+                grade.classAverageMark === null
+                  ? "—"
+                  : `${grade.classAverageMark}/${grade.totalMarks}`
+              }
+            />
+
+            <SmallMetric
+              label="Assessment grade"
+              value={grade.classAverageGrade || "—"}
+            />
+
+            <SmallMetric
+              label="Next grade"
+              value={grade.classNextGrade || "—"}
+            />
+
+            <SmallMetric
+              label="Marks to next"
+              value={
+                grade.classMarksToNextGrade === null
+                  ? "—"
+                  : String(grade.classMarksToNextGrade)
+              }
+            />
+          </div>
+        </div>
+
+        {grade.boundaries.length > 0 && (
+          <div className="border-t border-indigo-100 p-6">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+              Grade boundaries for this paper
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {grade.boundaries.map((boundary) => (
+                <span
+                  key={boundary.grade}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700"
+                >
+                  {boundary.grade}: {boundary.minimumMark}/{grade.totalMarks} (
+                  {boundary.minimumPercentage}%)
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {grade.studentOutcomes.length > 0 && (
+        <Card className="rounded-3xl border border-slate-200">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">
+              Student grade outcomes
+            </p>
+            <h3 className="mt-2 text-2xl font-black text-slate-950">
+              Grade, score and distance to next grade
+            </h3>
+          </div>
+
+          <div className="mt-6 overflow-x-auto">
+            <table className="w-full min-w-[1000px]">
+              <thead>
+                <tr className="border-b bg-slate-50 text-left">
+                  <th className="p-4">Student</th>
+                  <th className="p-4">Mark</th>
+                  <th className="p-4">Percentage</th>
+                  <th className="p-4">Grade</th>
+                  <th className="p-4">Next grade</th>
+                  <th className="p-4">Marks to next</th>
+                  <th className="p-4">Vs class</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {grade.studentOutcomes.map((student) => (
+                  <tr
+                    key={student.studentId}
+                    className="border-b border-slate-100"
+                  >
+                    <td className="p-4">
+                      <p className="font-black text-slate-950">
+                        {student.studentName}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {student.studentEmail}
+                      </p>
+                    </td>
+                    <td className="p-4 font-black">
+                      {student.awardedMarks}/{student.availableMarks}
+                    </td>
+                    <td className="p-4 font-black">
+                      {student.percentage}%
+                    </td>
+                    <td className="p-4">
+                      <span className="rounded-lg bg-indigo-100 px-3 py-1.5 text-sm font-black text-indigo-800">
+                        {student.grade}
+                      </span>
+                    </td>
+                    <td className="p-4 font-bold">
+                      {student.nextGrade || "Top grade"}
+                    </td>
+                    <td className="p-4 font-black">
+                      {student.marksToNextGrade === null
+                        ? "—"
+                        : student.marksToNextGrade}
+                    </td>
+                    <td className="p-4 font-bold">
+                      {student.differenceFromClassAverage === null
+                        ? "—"
+                        : `${student.differenceFromClassAverage > 0 ? "+" : ""}${student.differenceFromClassAverage}pp`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="rounded-3xl border border-slate-200">
@@ -157,12 +335,10 @@ export default function ExamAssignmentIntelligencePanel({
             <div className="rounded-xl bg-red-100 p-3 text-red-700">
               <TrendingDown className="h-5 w-5" />
             </div>
-
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-red-600">
                 Reteaching priority
               </p>
-
               <h3 className="mt-1 text-xl font-black text-slate-950">
                 Weakest assessed area
               </h3>
@@ -174,19 +350,16 @@ export default function ExamAssignmentIntelligencePanel({
               <p className="text-lg font-black text-red-950">
                 {intelligence.weakestTopic.topic}
               </p>
-
               <p className="mt-2 text-sm text-red-800">
-                Average success:{" "}
+                Marks-weighted success:{" "}
                 {percentage(
-                  intelligence.weakestTopic
-                    .averageSuccessPercentage,
+                  intelligence.weakestTopic.averageSuccessPercentage,
                 )}
               </p>
-
               <p className="mt-1 text-sm text-red-800">
+                Marks lost: {intelligence.weakestTopic.marksLost} ·{" "}
                 {intelligence.weakestTopic.questionCount} question
-                {intelligence.weakestTopic.questionCount === 1 ? "" : "s"} ·{" "}
-                {intelligence.weakestTopic.availableMarks} available marks
+                {intelligence.weakestTopic.questionCount === 1 ? "" : "s"}
               </p>
             </div>
           ) : (
@@ -219,12 +392,10 @@ export default function ExamAssignmentIntelligencePanel({
             <div className="rounded-xl bg-emerald-100 p-3 text-emerald-700">
               <TrendingUp className="h-5 w-5" />
             </div>
-
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-emerald-600">
                 Strength
               </p>
-
               <h3 className="mt-1 text-xl font-black text-slate-950">
                 Strongest assessed area
               </h3>
@@ -236,12 +407,10 @@ export default function ExamAssignmentIntelligencePanel({
               <p className="text-lg font-black text-emerald-950">
                 {intelligence.strongestTopic.topic}
               </p>
-
               <p className="mt-2 text-sm text-emerald-800">
-                Average success:{" "}
+                Marks-weighted success:{" "}
                 {percentage(
-                  intelligence.strongestTopic
-                    .averageSuccessPercentage,
+                  intelligence.strongestTopic.averageSuccessPercentage,
                 )}
               </p>
             </div>
@@ -253,25 +422,70 @@ export default function ExamAssignmentIntelligencePanel({
         </Card>
       </div>
 
+      {intelligence.assessmentObjectiveIntelligence.length > 0 && (
+        <Card className="rounded-3xl border border-slate-200">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-600">
+            Assessment-objective analysis
+          </p>
+
+          <h3 className="mt-2 text-2xl font-black text-slate-950">
+            AO1 / AO2 / AO3 performance
+          </h3>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            {intelligence.assessmentObjectiveIntelligence.map((item) => (
+              <div
+                key={item.assessmentObjective}
+                className="rounded-2xl bg-slate-50 p-5"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-lg font-black text-slate-950">
+                    {item.assessmentObjective}
+                  </p>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-black ${
+                      item.priority === "high"
+                        ? "bg-red-100 text-red-700"
+                        : item.priority === "medium"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-emerald-100 text-emerald-700"
+                    }`}
+                  >
+                    {item.priority}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs font-bold text-slate-500">
+                  {aoDescription(item)}
+                </p>
+
+                <p className="mt-4 text-3xl font-black text-slate-950">
+                  {percentage(item.averageSuccessPercentage)}
+                </p>
+
+                <p className="mt-2 text-sm text-slate-600">
+                  {item.availableMarks} marks on paper · {item.marksLost} class marks lost
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card className="rounded-3xl border border-slate-200">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">
               Question-level analysis
             </p>
-
             <h3 className="mt-2 text-2xl font-black text-slate-950">
-              Which questions caused difficulty?
+              Which questions cost the most marks?
             </h3>
 
             {intelligence.hardestQuestion && (
               <p className="mt-2 text-sm font-bold text-slate-500">
-                Hardest: Q
-                {intelligence.hardestQuestion.questionNumber} ·{" "}
-                {percentage(
-                  intelligence.hardestQuestion
-                    .successPercentage,
-                )}
+                Hardest: Q{intelligence.hardestQuestion.questionNumber} ·{" "}
+                {percentage(intelligence.hardestQuestion.successPercentage)}
               </p>
             )}
           </div>
@@ -287,101 +501,96 @@ export default function ExamAssignmentIntelligencePanel({
             className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-indigo-700"
           >
             <Download className="h-4 w-4" />
-            Download QLA CSV
+            Download Enhanced QLA CSV
           </button>
         </div>
 
         <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1250px]">
             <thead>
               <tr className="border-b bg-slate-50 text-left">
-                <th className="p-4">
-                  Question
-                </th>
-
-                <th className="p-4">
-                  Topic
-                </th>
-
-                <th className="p-4">
-                  Avg marks
-                </th>
-
-                <th className="p-4">
-                  Success
-                </th>
-
-                <th className="p-4">
-                  Attempted
-                </th>
-
-                <th className="p-4">
-                  Zero marks
-                </th>
-
-                <th className="p-4">
-                  Interpretation
-                </th>
+                <th className="p-4">Question</th>
+                <th className="p-4">Topic</th>
+                <th className="p-4">AO</th>
+                <th className="p-4">Avg marks</th>
+                <th className="p-4">Success</th>
+                <th className="p-4">Attempted</th>
+                <th className="p-4">Omitted</th>
+                <th className="p-4">Zero</th>
+                <th className="p-4">Full marks</th>
+                <th className="p-4">Marks lost</th>
+                <th className="p-4">Interpretation</th>
               </tr>
             </thead>
 
             <tbody>
-              {intelligence.questionIntelligence.map(
-                (question) => (
-                  <tr
-                    key={question.questionId}
-                    className="border-b border-slate-100"
-                  >
-                    <td className="p-4 font-black text-slate-950">
-                      Q{question.questionNumber}{" "}
-                      <span className="font-normal text-slate-400">
-                        / {question.availableMarks}
-                      </span>
-                    </td>
+              {intelligence.questionIntelligence.map((question) => (
+                <tr
+                  key={question.questionId}
+                  className="border-b border-slate-100"
+                >
+                  <td className="p-4 font-black text-slate-950">
+                    Q{question.questionNumber}{" "}
+                    <span className="font-normal text-slate-400">
+                      / {question.availableMarks}
+                    </span>
+                  </td>
 
-                    <td className="p-4 text-sm font-bold text-slate-700">
-                      {question.topic}
-                    </td>
+                  <td className="p-4 text-sm font-bold text-slate-700">
+                    {question.topic}
+                  </td>
 
-                    <td className="p-4 text-sm font-bold text-slate-700">
-                      {question.averageAwardedMarks === null
-                        ? "—"
-                        : `${question.averageAwardedMarks}/${question.availableMarks}`}
-                    </td>
+                  <td className="p-4 text-sm font-black text-violet-700">
+                    {question.assessmentObjective || "—"}
+                  </td>
 
-                    <td className="p-4 font-black text-slate-900">
-                      {percentage(
-                        question.successPercentage,
-                      )}
-                    </td>
+                  <td className="p-4 text-sm font-bold text-slate-700">
+                    {question.averageAwardedMarks === null
+                      ? "—"
+                      : `${question.averageAwardedMarks}/${question.availableMarks}`}
+                  </td>
 
-                    <td className="p-4 text-sm text-slate-700">
-                      {question.attemptedStudents}/
-                      {question.markedStudents}
-                    </td>
+                  <td className="p-4 font-black text-slate-900">
+                    {percentage(question.successPercentage)}
+                  </td>
 
-                    <td className="p-4 text-sm text-slate-700">
-                      {question.zeroMarkStudents}
-                    </td>
+                  <td className="p-4 text-sm text-slate-700">
+                    {question.attemptedStudents}/{question.markedStudents}
+                  </td>
 
-                    <td className="p-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-black capitalize ${
-                          question.difficulty === "priority"
-                            ? "bg-red-100 text-red-700"
-                            : question.difficulty === "developing"
-                              ? "bg-amber-100 text-amber-700"
-                              : question.difficulty === "secure"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {question.difficulty}
-                      </span>
-                    </td>
-                  </tr>
-                ),
-              )}
+                  <td className="p-4 text-sm text-slate-700">
+                    {question.omittedStudents}
+                  </td>
+
+                  <td className="p-4 text-sm text-slate-700">
+                    {question.zeroMarkStudents}
+                  </td>
+
+                  <td className="p-4 text-sm text-slate-700">
+                    {question.fullMarkStudents}
+                  </td>
+
+                  <td className="p-4 text-sm font-black text-red-700">
+                    {question.marksLost}
+                  </td>
+
+                  <td className="p-4">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black capitalize ${
+                        question.difficulty === "priority"
+                          ? "bg-red-100 text-red-700"
+                          : question.difficulty === "developing"
+                            ? "bg-amber-100 text-amber-700"
+                            : question.difficulty === "secure"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {question.difficulty}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -393,12 +602,10 @@ export default function ExamAssignmentIntelligencePanel({
             <div className="rounded-xl bg-violet-100 p-3 text-violet-700">
               <ShieldAlert className="h-5 w-5" />
             </div>
-
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-violet-600">
                 Integrity intelligence
               </p>
-
               <h3 className="mt-1 text-xl font-black text-slate-950">
                 Context for teacher review
               </h3>
@@ -410,17 +617,14 @@ export default function ExamAssignmentIntelligencePanel({
               label="Clean submissions"
               value={intelligence.integrity.cleanSubmissionCount}
             />
-
             <MiniMetric
               label="With incidents"
               value={intelligence.integrity.submissionsWithIncidents}
             />
-
             <MiniMetric
               label="Auto-terminated"
               value={intelligence.integrity.integrityTerminatedCount}
             />
-
             <MiniMetric
               label="Total incidents"
               value={intelligence.integrity.totalIncidents}
@@ -439,12 +643,10 @@ export default function ExamAssignmentIntelligencePanel({
             <div className="rounded-xl bg-amber-100 p-3 text-amber-700">
               <Target className="h-5 w-5" />
             </div>
-
             <div>
               <p className="text-xs font-black uppercase tracking-wide text-amber-600">
                 Student priorities
               </p>
-
               <h3 className="mt-1 text-xl font-black text-slate-950">
                 Review next
               </h3>
@@ -454,117 +656,101 @@ export default function ExamAssignmentIntelligencePanel({
           {priorityStudents.length === 0 ? (
             <div className="mt-5 flex items-center gap-3 rounded-2xl bg-emerald-50 p-5 text-emerald-900">
               <CheckCircle2 className="h-5 w-5" />
-
               <p className="font-bold">
                 No marked or integrity evidence currently meets the review thresholds.
               </p>
             </div>
           ) : (
             <div className="mt-5 space-y-3">
-              {priorityStudents
-                .slice(0, 8)
-                .map((student) => {
-                  const focusTopic =
-                    student.weakestExamTopic ||
-                    weakestTopic;
+              {priorityStudents.slice(0, 8).map((student) => {
+                const focusTopic =
+                  student.weakestExamTopic ||
+                  weakestTopic;
 
-                  const reason =
-                    student.reasons[0] ||
-                    `Written exam evidence indicates that ${focusTopic} should be reviewed.`;
+                const reason =
+                  student.reasons[0] ||
+                  `Written exam evidence indicates that ${focusTopic} should be reviewed.`;
 
-                  const interventionHref =
-                    `/teacher/interventions?studentId=${encodeURIComponent(student.studentId)}` +
-                    `&classId=${encodeURIComponent(assignment.classId)}` +
-                    `&topic=${encodeURIComponent(focusTopic)}` +
-                    `&reason=${encodeURIComponent(reason)}` +
-                    `&source=exam` +
-                    `&assignmentId=${encodeURIComponent(assignment.id)}`;
+                const interventionHref =
+                  `/teacher/interventions?studentId=${encodeURIComponent(student.studentId)}` +
+                  `&classId=${encodeURIComponent(assignment.classId)}` +
+                  `&topic=${encodeURIComponent(focusTopic)}` +
+                  `&reason=${encodeURIComponent(reason)}` +
+                  `&source=exam` +
+                  `&assignmentId=${encodeURIComponent(assignment.id)}`;
 
-                  return (
-                    <div
-                      key={student.studentId}
-                      className="rounded-2xl border border-slate-200 p-4"
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-black text-slate-950">
-                              {student.studentName}
-                            </p>
-
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-black capitalize ${priorityClass(
-                                student.priority,
-                              )}`}
-                            >
-                              {student.priority}
-                            </span>
-                          </div>
-
-                          <p className="mt-2 text-sm text-slate-500">
-                            {student.percentage === null
-                              ? "Result not yet marked"
-                              : `${student.percentage}%`}
-                            {" · "}
-                            {student.integrityIncidentCount} integrity event
-                            {student.integrityIncidentCount === 1 ? "" : "s"}
+                return (
+                  <div
+                    key={student.studentId}
+                    className="rounded-2xl border border-slate-200 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-black text-slate-950">
+                            {student.studentName}
                           </p>
-
-                          {student.weakestExamTopic && (
-                            <p className="mt-2 text-xs font-black text-indigo-700">
-                              Exam focus: {student.weakestExamTopic}
-                              {student.weakestQuestionNumber
-                                ? ` · Q${student.weakestQuestionNumber}`
-                                : ""}
-                              {student.weakestQuestionSuccessPercentage !== null
-                                ? ` · ${student.weakestQuestionSuccessPercentage}%`
-                                : ""}
-                            </p>
-                          )}
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-black capitalize ${priorityClass(
+                              student.priority,
+                            )}`}
+                          >
+                            {student.priority}
+                          </span>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.studentId}`}
-                            className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white"
-                          >
-                            Submission
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Link>
-
-                          <Link
-                            href={`/teacher/analytics/${student.studentId}`}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700"
-                          >
-                            Analytics
-                          </Link>
-
-                          <Link
-                            href={interventionHref}
-                            className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-black text-white"
-                          >
-                            Intervention
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </Link>
-                        </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          {student.percentage === null
+                            ? "Result not yet marked"
+                            : `${student.percentage}%`}
+                          {" · "}
+                          {student.integrityIncidentCount} integrity event
+                          {student.integrityIncidentCount === 1 ? "" : "s"}
+                        </p>
                       </div>
 
-                      {student.reasons.length > 0 && (
-                        <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
-                          {student.reasons.map((reasonItem) => (
-                            <li
-                              key={reasonItem}
-                              className="flex items-start gap-2"
-                            >
-                              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                              {reasonItem}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.studentId}`}
+                          className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-black text-white"
+                        >
+                          Submission
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
+
+                        <Link
+                          href={`/teacher/analytics/${student.studentId}`}
+                          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-black text-slate-700"
+                        >
+                          Analytics
+                        </Link>
+
+                        <Link
+                          href={interventionHref}
+                          className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-2 text-xs font-black text-white"
+                        >
+                          Intervention
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
                     </div>
-                  );
-                })}
+
+                    {student.reasons.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-xs leading-5 text-slate-600">
+                        {student.reasons.map((reasonItem) => (
+                          <li
+                            key={reasonItem}
+                            className="flex items-start gap-2"
+                          >
+                            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            {reasonItem}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -585,8 +771,26 @@ function Metric({
       <p className="text-xs font-black uppercase tracking-wide text-slate-400">
         {label}
       </p>
-
       <p className="mt-2 text-2xl font-black text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function SmallMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-white p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-xl font-black text-slate-950">
         {value}
       </p>
     </div>
@@ -605,7 +809,6 @@ function MiniMetric({
       <p className="text-xs font-black uppercase tracking-wide text-slate-400">
         {label}
       </p>
-
       <p className="mt-1 text-2xl font-black text-slate-950">
         {value}
       </p>

@@ -3,7 +3,11 @@ import type {
   ExamIntegrityIncidentType,
   ExamSubmission,
 } from "@/types/examAssignment";
+import {
+  buildExamGradeIntelligence,
+} from "@/services/analytics/examGradeIntelligenceService";
 import type {
+  ExamAssessmentObjectiveIntelligence,
   ExamClassIntelligence,
   ExamQuestionDifficulty,
   ExamQuestionIntelligence,
@@ -23,15 +27,49 @@ function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function median(
+  values: number[],
+): number | null {
+  if (!values.length) {
+    return null;
+  }
+
+  const sorted = [...values].sort(
+    (a, b) => a - b,
+  );
+
+  const middle =
+    Math.floor(
+      sorted.length / 2,
+    );
+
+  return sorted.length % 2 === 0
+    ? round(
+        (sorted[middle - 1] +
+          sorted[middle]) /
+          2,
+      )
+    : sorted[middle];
+}
+
+function questionRecord(
+  question: unknown,
+): Record<string, unknown> {
+  return question &&
+    typeof question === "object"
+    ? (question as Record<
+        string,
+        unknown
+      >)
+    : {};
+}
+
 function questionTopic(
   question: unknown,
   fallback: string,
 ): string {
-  if (!question || typeof question !== "object") {
-    return fallback;
-  }
-
-  const data = question as Record<string, unknown>;
+  const data =
+    questionRecord(question);
 
   const candidates = [
     data.topic,
@@ -50,6 +88,53 @@ function questionTopic(
   }
 
   return fallback;
+}
+
+function assessmentObjective(
+  question: unknown,
+): "AO1" | "AO2" | "AO3" | null {
+  const value =
+    questionRecord(
+      question,
+    ).assessmentObjective;
+
+  return value === "AO1" ||
+    value === "AO2" ||
+    value === "AO3"
+    ? value
+    : null;
+}
+
+function commandWord(
+  question: unknown,
+): string | null {
+  const value =
+    questionRecord(
+      question,
+    ).commandWord;
+
+  return typeof value === "string" &&
+    value.trim()
+    ? value.trim()
+    : null;
+}
+
+function priorityFromPercentage(
+  successPercentage: number | null,
+): "high" | "medium" | "low" {
+  if (successPercentage === null) {
+    return "low";
+  }
+
+  if (successPercentage < 50) {
+    return "high";
+  }
+
+  if (successPercentage < 70) {
+    return "medium";
+  }
+
+  return "low";
 }
 
 function questionDifficulty(
@@ -85,7 +170,9 @@ function getStudentExamWeakness(
   submission: ExamSubmission,
   fallbackTopic: string,
 ): StudentExamWeakness {
-  if (submission.status !== "marked") {
+  if (
+    submission.status !== "marked"
+  ) {
     return {
       topic: null,
       questionNumber: null,
@@ -93,47 +180,52 @@ function getStudentExamWeakness(
     };
   }
 
-  const scored = assignment.questionSetSnapshot.questions
-    .map((question) => {
-      const answer = submission.answers.find(
-        (item) =>
-          item.questionId === question.id,
+  const scored =
+    assignment.questionSetSnapshot
+      .questions
+      .map((question) => {
+        const answer =
+          submission.answers.find(
+            (item) =>
+              item.questionId ===
+              question.id,
+          );
+
+        if (
+          !answer ||
+          answer.awardedMarks ===
+            null ||
+          question.marks <= 0
+        ) {
+          return null;
+        }
+
+        return {
+          topic: questionTopic(
+            question,
+            fallbackTopic,
+          ),
+          questionNumber:
+            question.questionNumber,
+          successPercentage: round(
+            (answer.awardedMarks /
+              question.marks) *
+              100,
+          ),
+        };
+      })
+      .filter(
+        (
+          value,
+        ): value is NonNullable<
+          typeof value
+        > => Boolean(value),
+      )
+      .sort(
+        (first, second) =>
+          first.successPercentage -
+          second.successPercentage,
       );
-
-      if (
-        !answer ||
-        answer.awardedMarks === null ||
-        question.marks <= 0
-      ) {
-        return null;
-      }
-
-      return {
-        topic: questionTopic(
-          question,
-          fallbackTopic,
-        ),
-        questionNumber:
-          question.questionNumber,
-        successPercentage: round(
-          (answer.awardedMarks /
-            question.marks) *
-            100,
-        ),
-      };
-    })
-    .filter(
-      (
-        value,
-      ): value is NonNullable<
-        typeof value
-      > => Boolean(value),
-    )
-    .sort(
-      (first, second) =>
-        first.successPercentage -
-        second.successPercentage,
-    );
 
   const weakest = scored[0];
 
@@ -164,7 +256,9 @@ function buildStudentPriority(
   let priority: ExamStudentPriority["priority"] =
     "none";
 
-  if (submission.integrityTerminated) {
+  if (
+    submission.integrityTerminated
+  ) {
     priority = "high";
     reasons.push(
       "The attempt was automatically submitted by an integrity rule.",
@@ -172,7 +266,8 @@ function buildStudentPriority(
   }
 
   if (
-    submission.integrityIncidents.length >= 3
+    submission.integrityIncidents
+      .length >= 3
   ) {
     if (priority !== "high") {
       priority = "medium";
@@ -182,8 +277,8 @@ function buildStudentPriority(
       `${submission.integrityIncidents.length} integrity-monitoring events were recorded for teacher review.`,
     );
   } else if (
-    submission.integrityIncidents.length >
-      0 &&
+    submission.integrityIncidents
+      .length > 0 &&
     priority === "none"
   ) {
     priority = "monitor";
@@ -210,7 +305,8 @@ function buildStudentPriority(
   } else if (
     percentage !== null &&
     classAverage !== null &&
-    percentage <= classAverage - 15
+    percentage <=
+      classAverage - 15
   ) {
     if (priority !== "high") {
       priority = "medium";
@@ -222,7 +318,10 @@ function buildStudentPriority(
   }
 
   if (
-    ["submitted", "marking"].includes(
+    [
+      "submitted",
+      "marking",
+    ].includes(
       submission.status,
     ) &&
     priority === "none"
@@ -234,15 +333,17 @@ function buildStudentPriority(
     );
   }
 
-  const weakness = getStudentExamWeakness(
-    assignment,
-    submission,
-    fallbackTopic,
-  );
+  const weakness =
+    getStudentExamWeakness(
+      assignment,
+      submission,
+      fallbackTopic,
+    );
 
   if (
     weakness.topic &&
-    weakness.successPercentage !== null &&
+    weakness.successPercentage !==
+      null &&
     weakness.successPercentage < 50
   ) {
     if (priority === "none") {
@@ -255,19 +356,23 @@ function buildStudentPriority(
   }
 
   return {
-    studentId: submission.studentId,
-    studentName: submission.studentName,
+    studentId:
+      submission.studentId,
+    studentName:
+      submission.studentName,
     studentEmail:
       submission.studentEmail,
     status: submission.status,
     percentage,
     integrityIncidentCount:
-      submission.integrityIncidents.length,
+      submission.integrityIncidents
+        .length,
     integrityTerminated:
       submission.integrityTerminated,
     priority,
     reasons,
-    weakestExamTopic: weakness.topic,
+    weakestExamTopic:
+      weakness.topic,
     weakestQuestionNumber:
       weakness.questionNumber,
     weakestQuestionSuccessPercentage:
@@ -275,28 +380,416 @@ function buildStudentPriority(
   };
 }
 
+function buildQuestionIntelligence(
+  assignment: ExamAssignment,
+  marked: ExamSubmission[],
+  fallbackTopic: string,
+): ExamQuestionIntelligence[] {
+  return assignment.questionSetSnapshot
+    .questions.map((question) => {
+      let attemptedStudents = 0;
+      let omittedStudents = 0;
+      let zeroMarkStudents = 0;
+      let fullMarkStudents = 0;
+      let totalAwardedMarks = 0;
+
+      for (const submission of marked) {
+        const answer =
+          submission.answers.find(
+            (item) =>
+              item.questionId ===
+              question.id,
+          );
+
+        const response =
+          answer?.response?.trim() ||
+          "";
+
+        if (response) {
+          attemptedStudents += 1;
+        } else {
+          omittedStudents += 1;
+        }
+
+        const awarded =
+          answer?.awardedMarks ??
+          0;
+
+        totalAwardedMarks +=
+          awarded;
+
+        if (awarded === 0) {
+          zeroMarkStudents += 1;
+        }
+
+        if (
+          question.marks > 0 &&
+          awarded >= question.marks
+        ) {
+          fullMarkStudents += 1;
+        }
+      }
+
+      const markedStudents =
+        marked.length;
+
+      const totalPossibleClassMarks =
+        question.marks *
+        markedStudents;
+
+      const averageAwardedMarks =
+        markedStudents > 0
+          ? round(
+              totalAwardedMarks /
+                markedStudents,
+            )
+          : null;
+
+      const successPercentage =
+        totalPossibleClassMarks > 0
+          ? round(
+              (totalAwardedMarks /
+                totalPossibleClassMarks) *
+                100,
+            )
+          : null;
+
+      const marksLost =
+        Math.max(
+          0,
+          totalPossibleClassMarks -
+            totalAwardedMarks,
+        );
+
+      return {
+        questionId: question.id,
+        questionNumber:
+          question.questionNumber,
+        questionText:
+          question.question,
+        topic: questionTopic(
+          question,
+          fallbackTopic,
+        ),
+        assessmentObjective:
+          assessmentObjective(
+            question,
+          ),
+        commandWord:
+          commandWord(question),
+
+        availableMarks:
+          question.marks,
+        markedStudents,
+        attemptedStudents,
+        omittedStudents,
+        zeroMarkStudents,
+        fullMarkStudents,
+
+        totalAwardedMarks,
+        totalPossibleClassMarks,
+        marksLost,
+
+        averageAwardedMarks,
+        successPercentage,
+
+        attemptPercentage:
+          markedStudents > 0
+            ? round(
+                (attemptedStudents /
+                  markedStudents) *
+                  100,
+              )
+            : null,
+
+        zeroMarkPercentage:
+          markedStudents > 0
+            ? round(
+                (zeroMarkStudents /
+                  markedStudents) *
+                  100,
+              )
+            : null,
+
+        fullMarkPercentage:
+          markedStudents > 0
+            ? round(
+                (fullMarkStudents /
+                  markedStudents) *
+                  100,
+              )
+            : null,
+
+        marksLostPercentage:
+          totalPossibleClassMarks >
+          0
+            ? round(
+                (marksLost /
+                  totalPossibleClassMarks) *
+                  100,
+              )
+            : null,
+
+        difficulty:
+          questionDifficulty(
+            successPercentage,
+            markedStudents,
+          ),
+      };
+    });
+}
+
+function buildTopicIntelligence(
+  questions: ExamQuestionIntelligence[],
+): ExamTopicIntelligence[] {
+  const map = new Map<
+    string,
+    ExamQuestionIntelligence[]
+  >();
+
+  for (const question of questions) {
+    const current =
+      map.get(question.topic) || [];
+
+    current.push(question);
+    map.set(
+      question.topic,
+      current,
+    );
+  }
+
+  return Array.from(
+    map.entries(),
+  )
+    .map(
+      (
+        [topic, items],
+      ): ExamTopicIntelligence => {
+        const awardedMarks =
+          items.reduce(
+            (sum, item) =>
+              sum +
+              item.totalAwardedMarks,
+            0,
+          );
+
+        const possibleMarks =
+          items.reduce(
+            (sum, item) =>
+              sum +
+              item.totalPossibleClassMarks,
+            0,
+          );
+
+        const marksLost =
+          Math.max(
+            0,
+            possibleMarks -
+              awardedMarks,
+          );
+
+        const averageSuccessPercentage =
+          possibleMarks > 0
+            ? round(
+                (awardedMarks /
+                  possibleMarks) *
+                  100,
+              )
+            : null;
+
+        return {
+          topic,
+          questionCount:
+            items.length,
+          availableMarks:
+            items.reduce(
+              (sum, item) =>
+                sum +
+                item.availableMarks,
+              0,
+            ),
+          averageSuccessPercentage,
+          awardedMarks,
+          possibleMarks,
+          marksLost,
+          marksLostPercentage:
+            possibleMarks > 0
+              ? round(
+                  (marksLost /
+                    possibleMarks) *
+                    100,
+                )
+              : null,
+          priority:
+            priorityFromPercentage(
+              averageSuccessPercentage,
+            ),
+        };
+      },
+    )
+    .sort((first, second) => {
+      if (
+        first.averageSuccessPercentage ===
+        null
+      ) {
+        return 1;
+      }
+
+      if (
+        second.averageSuccessPercentage ===
+        null
+      ) {
+        return -1;
+      }
+
+      return (
+        first.averageSuccessPercentage -
+        second.averageSuccessPercentage
+      );
+    });
+}
+
+function buildAssessmentObjectiveIntelligence(
+  questions: ExamQuestionIntelligence[],
+): ExamAssessmentObjectiveIntelligence[] {
+  const objectives: (
+    | "AO1"
+    | "AO2"
+    | "AO3"
+  )[] = ["AO1", "AO2", "AO3"];
+
+  return objectives
+    .map((objective) => {
+      const items =
+        questions.filter(
+          (question) =>
+            question.assessmentObjective ===
+            objective,
+        );
+
+      if (!items.length) {
+        return null;
+      }
+
+      const awardedMarks =
+        items.reduce(
+          (sum, item) =>
+            sum +
+            item.totalAwardedMarks,
+          0,
+        );
+
+      const possibleMarks =
+        items.reduce(
+          (sum, item) =>
+            sum +
+            item.totalPossibleClassMarks,
+          0,
+        );
+
+      const marksLost =
+        Math.max(
+          0,
+          possibleMarks -
+            awardedMarks,
+        );
+
+      const averageSuccessPercentage =
+        possibleMarks > 0
+          ? round(
+              (awardedMarks /
+                possibleMarks) *
+                100,
+            )
+          : null;
+
+      return {
+        assessmentObjective:
+          objective,
+        questionCount:
+          items.length,
+        availableMarks:
+          items.reduce(
+            (sum, item) =>
+              sum +
+              item.availableMarks,
+            0,
+          ),
+        awardedMarks,
+        possibleMarks,
+        averageSuccessPercentage,
+        marksLost,
+        marksLostPercentage:
+          possibleMarks > 0
+            ? round(
+                (marksLost /
+                  possibleMarks) *
+                  100,
+              )
+            : null,
+        priority:
+          priorityFromPercentage(
+            averageSuccessPercentage,
+          ),
+      } satisfies ExamAssessmentObjectiveIntelligence;
+    })
+    .filter(
+      (
+        value,
+      ): value is ExamAssessmentObjectiveIntelligence =>
+        Boolean(value),
+    )
+    .sort((a, b) => {
+      if (
+        a.averageSuccessPercentage ===
+        null
+      ) {
+        return 1;
+      }
+
+      if (
+        b.averageSuccessPercentage ===
+        null
+      ) {
+        return -1;
+      }
+
+      return (
+        a.averageSuccessPercentage -
+        b.averageSuccessPercentage
+      );
+    });
+}
+
 export function buildExamClassIntelligence(
   assignment: ExamAssignment,
   submissions: ExamSubmission[],
 ): ExamClassIntelligence {
-  const submitted = submissions.filter(
-    (submission) =>
-      [
-        "submitted",
-        "marking",
+  const submitted =
+    submissions.filter(
+      (submission) =>
+        [
+          "submitted",
+          "marking",
+          "marked",
+        ].includes(
+          submission.status,
+        ),
+    );
+
+  const marked =
+    submissions.filter(
+      (submission) =>
+        submission.status ===
         "marked",
-      ].includes(submission.status),
-  );
+    );
 
-  const marked = submissions.filter(
-    (submission) =>
-      submission.status === "marked",
-  );
-
-  const started = submissions.filter(
-    (submission) =>
-      submission.status !== "not_started",
-  );
+  const started =
+    submissions.filter(
+      (submission) =>
+        submission.status !==
+        "not_started",
+    );
 
   const markedPercentages =
     marked.map(
@@ -318,204 +811,43 @@ export function buildExamClassIntelligence(
 
   const highestPercentage =
     markedPercentages.length > 0
-      ? Math.max(...markedPercentages)
+      ? Math.max(
+          ...markedPercentages,
+        )
       : null;
 
   const lowestPercentage =
     markedPercentages.length > 0
-      ? Math.min(...markedPercentages)
+      ? Math.min(
+          ...markedPercentages,
+        )
       : null;
 
+  const medianPercentage =
+    median(markedPercentages);
+
   const fallbackTopic =
-    assignment.questionSetSnapshot.topic ||
+    assignment.questionSetSnapshot
+      .topic ||
     assignment.questionSetTitle ||
     "General Computer Science";
 
-  const questionIntelligence: ExamQuestionIntelligence[] =
-    assignment.questionSetSnapshot.questions.map(
-      (question) => {
-        const relevantAnswers = marked
-          .map((submission) =>
-            submission.answers.find(
-              (answer) =>
-                answer.questionId ===
-                question.id,
-            ),
-          )
-          .filter(
-            (
-              answer,
-            ): answer is NonNullable<
-              typeof answer
-            > => Boolean(answer),
-          );
-
-        const awardedMarks =
-          relevantAnswers.map(
-            (answer) =>
-              answer.awardedMarks ?? 0,
-          );
-
-        const attemptedStudents =
-          relevantAnswers.filter(
-            (answer) =>
-              answer.response.trim().length >
-              0,
-          ).length;
-
-        const zeroMarkStudents =
-          relevantAnswers.filter(
-            (answer) =>
-              (answer.awardedMarks ?? 0) ===
-              0,
-          ).length;
-
-        const averageAwardedMarks =
-          awardedMarks.length > 0
-            ? round(
-                awardedMarks.reduce(
-                  (sum, value) =>
-                    sum + value,
-                  0,
-                ) /
-                  awardedMarks.length,
-              )
-            : null;
-
-        const successPercentage =
-          averageAwardedMarks !== null &&
-          question.marks > 0
-            ? round(
-                (averageAwardedMarks /
-                  question.marks) *
-                  100,
-              )
-            : null;
-
-        return {
-          questionId: question.id,
-          questionNumber:
-            question.questionNumber,
-          questionText:
-            question.question,
-          topic: questionTopic(
-            question,
-            fallbackTopic,
-          ),
-          availableMarks:
-            question.marks,
-          markedStudents:
-            relevantAnswers.length,
-          attemptedStudents,
-          zeroMarkStudents,
-          averageAwardedMarks,
-          successPercentage,
-          difficulty:
-            questionDifficulty(
-              successPercentage,
-              relevantAnswers.length,
-            ),
-        };
-      },
+  const questionIntelligence =
+    buildQuestionIntelligence(
+      assignment,
+      marked,
+      fallbackTopic,
     );
 
-  const topicMap = new Map<
-    string,
-    ExamQuestionIntelligence[]
-  >();
-
-  for (
-    const question of
-    questionIntelligence
-  ) {
-    const current =
-      topicMap.get(question.topic) || [];
-
-    current.push(question);
-    topicMap.set(
-      question.topic,
-      current,
+  const topicIntelligence =
+    buildTopicIntelligence(
+      questionIntelligence,
     );
-  }
 
-  const topicIntelligence: ExamTopicIntelligence[] =
-    Array.from(topicMap.entries())
-      .map(
-        (
-          [topic, questions],
-        ): ExamTopicIntelligence => {
-          const scored =
-            questions.filter(
-              (question) =>
-                question.successPercentage !==
-                null,
-            );
-
-          const averageSuccessPercentage =
-            scored.length > 0
-              ? round(
-                  scored.reduce(
-                    (
-                      sum,
-                      question,
-                    ) =>
-                      sum +
-                      (question.successPercentage ||
-                        0),
-                    0,
-                  ) / scored.length,
-                )
-              : null;
-
-          return {
-            topic,
-            questionCount:
-              questions.length,
-            availableMarks:
-              questions.reduce(
-                (
-                  sum,
-                  question,
-                ) =>
-                  sum +
-                  question.availableMarks,
-                0,
-              ),
-            averageSuccessPercentage,
-            priority:
-              averageSuccessPercentage ===
-              null
-                ? "low"
-                : averageSuccessPercentage <
-                    50
-                  ? "high"
-                  : averageSuccessPercentage <
-                      70
-                    ? "medium"
-                    : "low",
-          };
-        },
-      )
-      .sort((first, second) => {
-        if (
-          first.averageSuccessPercentage ===
-          null
-        ) {
-          return 1;
-        }
-
-        if (
-          second.averageSuccessPercentage ===
-          null
-        ) {
-          return -1;
-        }
-
-        return (
-          first.averageSuccessPercentage -
-          second.averageSuccessPercentage
-        );
-      });
+  const assessmentObjectiveIntelligence =
+    buildAssessmentObjectiveIntelligence(
+      questionIntelligence,
+    );
 
   const assessedQuestions =
     questionIntelligence
@@ -526,8 +858,10 @@ export function buildExamClassIntelligence(
       )
       .sort(
         (first, second) =>
-          (first.successPercentage || 0) -
-          (second.successPercentage || 0),
+          (first.successPercentage ||
+            0) -
+          (second.successPercentage ||
+            0),
       );
 
   const integrityByType =
@@ -579,6 +913,12 @@ export function buildExamClassIntelligence(
         );
       });
 
+  const gradeIntelligence =
+    buildExamGradeIntelligence(
+      assignment,
+      submissions,
+    );
+
   return {
     studentCount:
       assignment.studentIds.length,
@@ -609,10 +949,14 @@ export function buildExamClassIntelligence(
     classAverage,
     highestPercentage,
     lowestPercentage,
+    medianPercentage,
 
     questionIntelligence,
     topicIntelligence,
+    assessmentObjectiveIntelligence,
     studentPriorities,
+
+    gradeIntelligence,
 
     integrity: {
       cleanSubmissionCount:
@@ -621,7 +965,8 @@ export function buildExamClassIntelligence(
             submission
               .integrityIncidents
               .length === 0 &&
-            !submission.integrityTerminated,
+            !submission
+              .integrityTerminated,
         ).length,
 
       submissionsWithIncidents:
@@ -635,7 +980,8 @@ export function buildExamClassIntelligence(
       integrityTerminatedCount:
         submitted.filter(
           (submission) =>
-            submission.integrityTerminated,
+            submission
+              .integrityTerminated,
         ).length,
 
       totalIncidents,
@@ -649,7 +995,8 @@ export function buildExamClassIntelligence(
     easiestQuestion:
       assessedQuestions.length > 0
         ? assessedQuestions[
-            assessedQuestions.length - 1
+            assessedQuestions.length -
+              1
           ]
         : null,
 
@@ -666,6 +1013,24 @@ export function buildExamClassIntelligence(
         .find(
           (topic) =>
             topic.averageSuccessPercentage !==
+            null,
+        ) || null,
+
+    weakestAssessmentObjective:
+      assessmentObjectiveIntelligence.find(
+        (item) =>
+          item.averageSuccessPercentage !==
+          null,
+      ) || null,
+
+    strongestAssessmentObjective:
+      [
+        ...assessmentObjectiveIntelligence,
+      ]
+        .reverse()
+        .find(
+          (item) =>
+            item.averageSuccessPercentage !==
             null,
         ) || null,
   };
