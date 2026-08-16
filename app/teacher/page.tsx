@@ -17,6 +17,7 @@ import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
 import TeacherAnalyticsSnapshot from "@/components/teacher/dashboard/TeacherAnalyticsSnapshot";
 import TeacherPrioritySnapshot from "@/components/teacher/intelligence/TeacherPrioritySnapshot";
 import TeacherActionCentre from "@/components/teacher/dashboard/TeacherActionCentre";
+import TeacherInterventionPlanner from "@/components/teacher/dashboard/TeacherInterventionPlanner";
 import {
   getCompletionMessage,
   getPerformanceMessage,
@@ -34,7 +35,8 @@ const assessmentTools = [
     accent:
       "border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50",
     iconStyle: "bg-indigo-600 text-white",
-    buttonStyle: "bg-indigo-600 text-white hover:bg-indigo-700",
+    buttonStyle:
+      "bg-indigo-600 text-white hover:bg-indigo-700",
   },
   {
     title: "Question Bank",
@@ -46,7 +48,8 @@ const assessmentTools = [
     accent:
       "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50",
     iconStyle: "bg-emerald-600 text-white",
-    buttonStyle: "bg-emerald-600 text-white hover:bg-emerald-700",
+    buttonStyle:
+      "bg-emerald-600 text-white hover:bg-emerald-700",
   },
   {
     title: "Exam Assignments",
@@ -58,7 +61,8 @@ const assessmentTools = [
     accent:
       "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50",
     iconStyle: "bg-amber-600 text-white",
-    buttonStyle: "bg-amber-600 text-white hover:bg-amber-700",
+    buttonStyle:
+      "bg-amber-600 text-white hover:bg-amber-700",
   },
 ];
 
@@ -88,6 +92,7 @@ export default function TeacherPage() {
       ? classPerformance[classPerformance.length - 1]
       : null;
   const topStudent = topStudents[0] ?? null;
+
   const performanceMessage = getPerformanceMessage(averageScore);
   const completionMessage = getCompletionMessage(completionRate);
 
@@ -220,6 +225,8 @@ export default function TeacherPage() {
         atRiskStudents={atRiskStudents}
         classPerformance={classPerformance}
       />
+
+      <TeacherInterventionPlanner students={atRiskStudents} />
 
       <TeacherQuickActions />
 
