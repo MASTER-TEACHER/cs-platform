@@ -20,6 +20,11 @@ import type {
   ExamStudentGradeOutcome,
 } from "@/types/examIntelligence";
 
+type ResolvedBoundarySet = GradeBoundarySet & {
+  sourceNote?: string;
+  verifiedAt?: string;
+};
+
 function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
@@ -69,15 +74,10 @@ function validGrade(
     : null;
 }
 
-/*
- * The current CS Master analytics foundation ships with indicative percentage
- * bands. If a future exam paper snapshot carries an official/teacher boundary
- * set, this resolver will use it automatically.
- */
 function boundarySetFromSnapshot(
   assignment: ExamAssignment,
   qualification: AnalyticsQualification,
-): GradeBoundarySet | null {
+): ResolvedBoundarySet | null {
   const snapshot =
     assignment.questionSetSnapshot as unknown as
       Record<string, unknown>;
@@ -99,6 +99,11 @@ function boundarySetFromSnapshot(
     return null;
   }
 
+  const totalMarks =
+    assignment.totalMarks > 0
+      ? assignment.totalMarks
+      : assignment.questionSetSnapshot.totalMarks;
+
   const boundaries: GradeBoundary[] =
     data.boundaries
       .map((item) => {
@@ -118,11 +123,21 @@ function boundarySetFromSnapshot(
             qualification,
           );
 
-        const minimumPercentage =
+        let minimumPercentage =
           typeof row.minimumPercentage === "number" &&
           Number.isFinite(row.minimumPercentage)
             ? row.minimumPercentage
             : null;
+
+        if (
+          minimumPercentage === null &&
+          typeof row.minimumMark === "number" &&
+          Number.isFinite(row.minimumMark) &&
+          totalMarks > 0
+        ) {
+          minimumPercentage =
+            (row.minimumMark / totalMarks) * 100;
+        }
 
         if (
           !grade ||
@@ -178,13 +193,21 @@ function boundarySetFromSnapshot(
         data.source,
       ) || "teacher",
     boundaries,
+    sourceNote:
+      typeof data.sourceNote === "string"
+        ? data.sourceNote
+        : undefined,
+    verifiedAt:
+      typeof data.verifiedAt === "string"
+        ? data.verifiedAt
+        : undefined,
   };
 }
 
 function resolveBoundarySet(
   assignment: ExamAssignment,
   qualification: AnalyticsQualification,
-): GradeBoundarySet {
+): ResolvedBoundarySet {
   return (
     boundarySetFromSnapshot(
       assignment,
@@ -226,10 +249,7 @@ function gradeFromPercentage(
       (boundary) =>
         percentage >=
         boundary.minimumPercentage,
-    )?.grade ||
-    (qualification === "A_LEVEL"
-      ? "U"
-      : "U")
+    )?.grade || "U"
   );
 }
 
@@ -252,9 +272,7 @@ function nextGradeInformation({
   percentagePointsToNextGrade: number | null;
 } {
   const order =
-    getGradeOrder(
-      qualification,
-    );
+    getGradeOrder(qualification);
 
   const gradeIndex =
     order.indexOf(grade);
@@ -278,8 +296,7 @@ function nextGradeInformation({
   const nextBoundary =
     boundarySet.boundaries.find(
       (boundary) =>
-        boundary.grade ===
-        nextGrade,
+        boundary.grade === nextGrade,
     );
 
   if (!nextBoundary) {
@@ -295,13 +312,13 @@ function nextGradeInformation({
     Math.ceil(
       (nextBoundary.minimumPercentage /
         100) *
-        totalMarks,
+        totalMarks -
+        1e-9,
     );
 
   const currentPercentage =
     totalMarks > 0
-      ? (awardedMarks / totalMarks) *
-        100
+      ? (awardedMarks / totalMarks) * 100
       : 0;
 
   return {
@@ -379,8 +396,7 @@ export function buildExamGradeIntelligence(
   const marked =
     submissions.filter(
       (submission) =>
-        submission.status ===
-        "marked",
+        submission.status === "marked",
     );
 
   const provisionalOutcomes =
@@ -473,13 +489,16 @@ export function buildExamGradeIntelligence(
         percentagePointsToNextGrade:
           next.percentagePointsToNextGrade,
         differenceFromClassAverage:
-          classAveragePercentage ===
-          null
+          classAveragePercentage === null
             ? null
             : round(
                 score.percentage -
                   classAveragePercentage,
               ),
+        nearNextGradeBoundary:
+          next.marksToNextGrade !== null &&
+          next.marksToNextGrade > 0 &&
+          next.marksToNextGrade <= 2,
       }),
     );
 
@@ -551,12 +570,13 @@ export function buildExamGradeIntelligence(
     ).map((boundary) => ({
       grade: boundary.grade,
       minimumPercentage:
-        boundary.minimumPercentage,
+        round(boundary.minimumPercentage),
       minimumMark:
         Math.ceil(
           (boundary.minimumPercentage /
             100) *
-            totalMarks,
+            totalMarks -
+            1e-9,
         ),
     }));
 
@@ -572,6 +592,10 @@ export function buildExamGradeIntelligence(
       boundarySet.title,
     boundarySource:
       boundarySet.source,
+    boundarySourceNote:
+      boundarySet.sourceNote || null,
+    boundaryVerifiedAt:
+      boundarySet.verifiedAt || null,
     boundaryAcademicYear:
       boundarySet.academicYear ||
       null,
@@ -579,8 +603,7 @@ export function buildExamGradeIntelligence(
       boundarySet.assessmentTitle ||
       null,
     isOfficialBoundarySet:
-      boundarySet.source ===
-      "official",
+      boundarySet.source === "official",
 
     totalMarks,
     boundaries,
@@ -598,6 +621,11 @@ export function buildExamGradeIntelligence(
       classNext.percentagePointsToNextGrade,
 
     studentOutcomes,
+    nearBoundaryStudents:
+      studentOutcomes.filter(
+        (student) =>
+          student.nearNextGradeBoundary,
+      ),
     gradeDistribution,
   };
 }

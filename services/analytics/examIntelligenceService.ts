@@ -7,8 +7,10 @@ import {
   buildExamGradeIntelligence,
 } from "@/services/analytics/examGradeIntelligenceService";
 import type {
+  ExamAnalysisConfidence,
   ExamAssessmentObjectiveIntelligence,
   ExamClassIntelligence,
+  ExamDiscriminationLabel,
   ExamQuestionDifficulty,
   ExamQuestionIntelligence,
   ExamStudentPriority,
@@ -27,21 +29,21 @@ function round(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 function median(
   values: number[],
 ): number | null {
-  if (!values.length) {
-    return null;
-  }
+  if (!values.length) return null;
 
   const sorted = [...values].sort(
     (a, b) => a - b,
   );
 
   const middle =
-    Math.floor(
-      sorted.length / 2,
-    );
+    Math.floor(sorted.length / 2);
 
   return sorted.length % 2 === 0
     ? round(
@@ -57,10 +59,7 @@ function questionRecord(
 ): Record<string, unknown> {
   return question &&
     typeof question === "object"
-    ? (question as Record<
-        string,
-        unknown
-      >)
+    ? (question as Record<string, unknown>)
     : {};
 }
 
@@ -68,17 +67,14 @@ function questionTopic(
   question: unknown,
   fallback: string,
 ): string {
-  const data =
-    questionRecord(question);
+  const data = questionRecord(question);
 
-  const candidates = [
+  for (const value of [
     data.topic,
     data.topicFocus,
     data.subtopic,
     data.curriculumTopic,
-  ];
-
-  for (const value of candidates) {
+  ]) {
     if (
       typeof value === "string" &&
       value.trim()
@@ -122,18 +118,9 @@ function commandWord(
 function priorityFromPercentage(
   successPercentage: number | null,
 ): "high" | "medium" | "low" {
-  if (successPercentage === null) {
-    return "low";
-  }
-
-  if (successPercentage < 50) {
-    return "high";
-  }
-
-  if (successPercentage < 70) {
-    return "medium";
-  }
-
+  if (successPercentage === null) return "low";
+  if (successPercentage < 50) return "high";
+  if (successPercentage < 70) return "medium";
   return "low";
 }
 
@@ -148,15 +135,136 @@ function questionDifficulty(
     return "insufficient";
   }
 
-  if (successPercentage >= 70) {
-    return "secure";
-  }
-
-  if (successPercentage >= 50) {
-    return "developing";
-  }
-
+  if (successPercentage >= 70) return "secure";
+  if (successPercentage >= 50) return "developing";
   return "priority";
+}
+
+function discriminationLabel(
+  value: number | null,
+): ExamDiscriminationLabel {
+  if (value === null) return "insufficient";
+  if (value < 0) return "negative";
+  if (value < 0.2) return "weak";
+  if (value < 0.3) return "moderate";
+  return "strong";
+}
+
+function questionDiscrimination({
+  questionId,
+  availableMarks,
+  marked,
+}: {
+  questionId: string;
+  availableMarks: number;
+  marked: ExamSubmission[];
+}): number | null {
+  /*
+   * Small cohorts produce unstable discrimination statistics.
+   * Wait until at least 10 marked submissions are available.
+   */
+  if (
+    marked.length < 10 ||
+    availableMarks <= 0
+  ) {
+    return null;
+  }
+
+  const sorted = [...marked].sort(
+    (first, second) =>
+      second.percentage -
+      first.percentage,
+  );
+
+  const groupSize =
+    Math.max(
+      2,
+      Math.floor(
+        sorted.length * 0.27,
+      ),
+    );
+
+  const top = sorted.slice(
+    0,
+    groupSize,
+  );
+
+  const bottom = sorted.slice(
+    -groupSize,
+  );
+
+  function groupFacility(
+    group: ExamSubmission[],
+  ): number {
+    const awarded =
+      group.reduce(
+        (sum, submission) => {
+          const answer =
+            submission.answers.find(
+              (item) =>
+                item.questionId ===
+                questionId,
+            );
+
+          return (
+            sum +
+            (answer?.awardedMarks ?? 0)
+          );
+        },
+        0,
+      );
+
+    return (
+      awarded /
+      (group.length *
+        availableMarks)
+    );
+  }
+
+  return round2(
+    groupFacility(top) -
+      groupFacility(bottom),
+  );
+}
+
+function analysisConfidence(
+  markedCount: number,
+): {
+  confidence: ExamAnalysisConfidence;
+  warnings: string[];
+} {
+  if (markedCount === 0) {
+    return {
+      confidence: "insufficient",
+      warnings: [
+        "No marked submissions are available, so class-level QLA interpretation is not yet possible.",
+      ],
+    };
+  }
+
+  if (markedCount < 5) {
+    return {
+      confidence: "limited",
+      warnings: [
+        `Only ${markedCount} marked submission${markedCount === 1 ? " is" : "s are"} available. Treat class-level percentages and priorities cautiously.`,
+        "Question discrimination is withheld until at least 10 marked submissions are available.",
+      ],
+    };
+  }
+
+  if (markedCount < 10) {
+    return {
+      confidence: "developing",
+      warnings: [
+        `${markedCount} marked submissions provide useful early class evidence, but question discrimination is withheld until the sample reaches 10.`,
+      ],
+    };
+  }
+
+  return {
+    confidence: "robust",
+    warnings: [],
+  };
 }
 
 type StudentExamWeakness = {
@@ -193,8 +301,7 @@ function getStudentExamWeakness(
 
         if (
           !answer ||
-          answer.awardedMarks ===
-            null ||
+          answer.awardedMarks === null ||
           question.marks <= 0
         ) {
           return null;
@@ -256,9 +363,7 @@ function buildStudentPriority(
   let priority: ExamStudentPriority["priority"] =
     "none";
 
-  if (
-    submission.integrityTerminated
-  ) {
+  if (submission.integrityTerminated) {
     priority = "high";
     reasons.push(
       "The attempt was automatically submitted by an integrity rule.",
@@ -266,8 +371,7 @@ function buildStudentPriority(
   }
 
   if (
-    submission.integrityIncidents
-      .length >= 3
+    submission.integrityIncidents.length >= 3
   ) {
     if (priority !== "high") {
       priority = "medium";
@@ -277,8 +381,7 @@ function buildStudentPriority(
       `${submission.integrityIncidents.length} integrity-monitoring events were recorded for teacher review.`,
     );
   } else if (
-    submission.integrityIncidents
-      .length > 0 &&
+    submission.integrityIncidents.length > 0 &&
     priority === "none"
   ) {
     priority = "monitor";
@@ -342,8 +445,7 @@ function buildStudentPriority(
 
   if (
     weakness.topic &&
-    weakness.successPercentage !==
-      null &&
+    weakness.successPercentage !== null &&
     weakness.successPercentage < 50
   ) {
     if (priority === "none") {
@@ -365,8 +467,7 @@ function buildStudentPriority(
     status: submission.status,
     percentage,
     integrityIncidentCount:
-      submission.integrityIncidents
-        .length,
+      submission.integrityIncidents.length,
     integrityTerminated:
       submission.integrityTerminated,
     priority,
@@ -402,8 +503,7 @@ function buildQuestionIntelligence(
           );
 
         const response =
-          answer?.response?.trim() ||
-          "";
+          answer?.response?.trim() || "";
 
         if (response) {
           attemptedStudents += 1;
@@ -412,11 +512,9 @@ function buildQuestionIntelligence(
         }
 
         const awarded =
-          answer?.awardedMarks ??
-          0;
+          answer?.awardedMarks ?? 0;
 
-        totalAwardedMarks +=
-          awarded;
+        totalAwardedMarks += awarded;
 
         if (awarded === 0) {
           zeroMarkStudents += 1;
@@ -461,6 +559,14 @@ function buildQuestionIntelligence(
             totalAwardedMarks,
         );
 
+      const discriminationIndex =
+        questionDiscrimination({
+          questionId: question.id,
+          availableMarks:
+            question.marks,
+          marked,
+        });
+
       return {
         questionId: question.id,
         questionNumber:
@@ -472,9 +578,7 @@ function buildQuestionIntelligence(
           fallbackTopic,
         ),
         assessmentObjective:
-          assessmentObjective(
-            question,
-          ),
+          assessmentObjective(question),
         commandWord:
           commandWord(question),
 
@@ -502,6 +606,15 @@ function buildQuestionIntelligence(
               )
             : null,
 
+        omissionPercentage:
+          markedStudents > 0
+            ? round(
+                (omittedStudents /
+                  markedStudents) *
+                  100,
+              )
+            : null,
+
         zeroMarkPercentage:
           markedStudents > 0
             ? round(
@@ -521,14 +634,19 @@ function buildQuestionIntelligence(
             : null,
 
         marksLostPercentage:
-          totalPossibleClassMarks >
-          0
+          totalPossibleClassMarks > 0
             ? round(
                 (marksLost /
                   totalPossibleClassMarks) *
                   100,
               )
             : null,
+
+        discriminationIndex,
+        discriminationLabel:
+          discriminationLabel(
+            discriminationIndex,
+          ),
 
         difficulty:
           questionDifficulty(
@@ -552,15 +670,10 @@ function buildTopicIntelligence(
       map.get(question.topic) || [];
 
     current.push(question);
-    map.set(
-      question.topic,
-      current,
-    );
+    map.set(question.topic, current);
   }
 
-  return Array.from(
-    map.entries(),
-  )
+  return Array.from(map.entries())
     .map(
       (
         [topic, items],
@@ -780,8 +893,7 @@ export function buildExamClassIntelligence(
   const marked =
     submissions.filter(
       (submission) =>
-        submission.status ===
-        "marked",
+        submission.status === "marked",
     );
 
   const started =
@@ -811,20 +923,21 @@ export function buildExamClassIntelligence(
 
   const highestPercentage =
     markedPercentages.length > 0
-      ? Math.max(
-          ...markedPercentages,
-        )
+      ? Math.max(...markedPercentages)
       : null;
 
   const lowestPercentage =
     markedPercentages.length > 0
-      ? Math.min(
-          ...markedPercentages,
-        )
+      ? Math.min(...markedPercentages)
       : null;
 
   const medianPercentage =
     median(markedPercentages);
+
+  const confidence =
+    analysisConfidence(
+      marked.length,
+    );
 
   const fallbackTopic =
     assignment.questionSetSnapshot
@@ -858,10 +971,8 @@ export function buildExamClassIntelligence(
       )
       .sort(
         (first, second) =>
-          (first.successPercentage ||
-            0) -
-          (second.successPercentage ||
-            0),
+          (first.successPercentage || 0) -
+          (second.successPercentage || 0),
       );
 
   const integrityByType =
@@ -919,6 +1030,31 @@ export function buildExamClassIntelligence(
       submissions,
     );
 
+  const analysisWarnings = [
+    ...confidence.warnings,
+  ];
+
+  if (
+    gradeIntelligence.boundarySource ===
+    "indicative"
+  ) {
+    analysisWarnings.push(
+      "The assessment grade uses CS Master indicative boundaries, not an official exam-series boundary set.",
+    );
+  }
+
+  if (
+    questionIntelligence.every(
+      (question) =>
+        question.assessmentObjective ===
+        null,
+    )
+  ) {
+    analysisWarnings.push(
+      "Assessment-objective metadata is unavailable for this paper, so AO analysis cannot be produced.",
+    );
+  }
+
   return {
     studentCount:
       assignment.studentIds.length,
@@ -931,8 +1067,7 @@ export function buildExamClassIntelligence(
       assignment.studentIds.length > 0
         ? Math.round(
             (submitted.length /
-              assignment.studentIds
-                .length) *
+              assignment.studentIds.length) *
               100,
           )
         : 0,
@@ -951,6 +1086,10 @@ export function buildExamClassIntelligence(
     lowestPercentage,
     medianPercentage,
 
+    analysisConfidence:
+      confidence.confidence,
+    analysisWarnings,
+
     questionIntelligence,
     topicIntelligence,
     assessmentObjectiveIntelligence,
@@ -962,26 +1101,20 @@ export function buildExamClassIntelligence(
       cleanSubmissionCount:
         submitted.filter(
           (submission) =>
-            submission
-              .integrityIncidents
-              .length === 0 &&
-            !submission
-              .integrityTerminated,
+            submission.integrityIncidents.length === 0 &&
+            !submission.integrityTerminated,
         ).length,
 
       submissionsWithIncidents:
         submitted.filter(
           (submission) =>
-            submission
-              .integrityIncidents
-              .length > 0,
+            submission.integrityIncidents.length > 0,
         ).length,
 
       integrityTerminatedCount:
         submitted.filter(
           (submission) =>
-            submission
-              .integrityTerminated,
+            submission.integrityTerminated,
         ).length,
 
       totalIncidents,
@@ -995,8 +1128,7 @@ export function buildExamClassIntelligence(
     easiestQuestion:
       assessedQuestions.length > 0
         ? assessedQuestions[
-            assessedQuestions.length -
-              1
+            assessedQuestions.length - 1
           ]
         : null,
 

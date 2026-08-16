@@ -15,10 +15,7 @@ function csvCell(
       ? ""
       : String(value);
 
-  return `"${text.replace(
-    /"/g,
-    '""',
-  )}"`;
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 function safeFileName(
@@ -27,14 +24,8 @@ function safeFileName(
   const cleaned = value
     .trim()
     .toLowerCase()
-    .replace(
-      /[^a-z0-9]+/g,
-      "-",
-    )
-    .replace(
-      /^-+|-+$/g,
-      "",
-    );
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
   return cleaned || "exam";
 }
@@ -56,11 +47,6 @@ export function buildExamQuestionLevelAnalysisCsv({
   const grade =
     intelligence.gradeIntelligence;
 
-  /*
-   * A single CSV cannot contain worksheets, so the first column identifies
-   * each QLA section. Excel can then filter/sort or teachers can split the
-   * sections into worksheets later.
-   */
   const headers = [
     "Section",
     "Assignment",
@@ -79,11 +65,33 @@ export function buildExamQuestionLevelAnalysisCsv({
   const common = [
     assignment.title,
     assignment.className,
-    assignment.questionSetSnapshot
-      .examBoard || "",
-    assignment.questionSetSnapshot
-      .qualification || "",
+    assignment.questionSetSnapshot.examBoard || "",
+    assignment.questionSetSnapshot.qualification || "",
   ];
+
+  rows.push([
+    "DATA QUALITY",
+    ...common,
+    "Analysis confidence",
+    "",
+    intelligence.analysisConfidence,
+    intelligence.markedCount,
+    "",
+    "",
+    intelligence.analysisWarnings.join(" | "),
+  ]);
+
+  rows.push([
+    "BOUNDARY PROVENANCE",
+    ...common,
+    grade.boundarySetTitle,
+    "",
+    grade.boundarySource,
+    grade.boundaryAcademicYear,
+    grade.boundaryAssessmentTitle,
+    grade.boundaryVerifiedAt,
+    grade.boundarySourceNote || "",
+  ]);
 
   rows.push([
     "SUMMARY",
@@ -142,9 +150,7 @@ export function buildExamQuestionLevelAnalysisCsv({
     grade.classMarksToNextGrade,
     grade.classNextGradeMinimumMark,
     grade.classPercentagePointsToNextGrade,
-    grade.isOfficialBoundarySet
-      ? "Official boundary set"
-      : `Boundary source: ${grade.boundarySource}`,
+    `Boundary source: ${grade.boundarySource}`,
   ]);
 
   grade.boundaries.forEach(
@@ -190,7 +196,7 @@ export function buildExamQuestionLevelAnalysisCsv({
         student.availableMarks,
         student.percentage,
         student.grade,
-        `Next grade: ${student.nextGrade || "—"}; marks to next: ${student.marksToNextGrade ?? "—"}; vs class: ${student.differenceFromClassAverage ?? "—"}pp`,
+        `Next grade: ${student.nextGrade || "—"}; marks to next: ${student.marksToNextGrade ?? "—"}; near boundary: ${student.nearNextGradeBoundary ? "yes" : "no"}; vs class: ${student.differenceFromClassAverage ?? "—"}pp`,
       ]);
     },
   );
@@ -243,9 +249,11 @@ export function buildExamQuestionLevelAnalysisCsv({
             ? `Command: ${question.commandWord}`
             : "",
           `Attempted ${question.attemptedStudents}/${question.markedStudents}`,
-          `Omitted ${question.omittedStudents}`,
+          `Omitted ${question.omittedStudents} (${question.omissionPercentage ?? "—"}%)`,
           `Zero marks ${question.zeroMarkStudents}`,
           `Full marks ${question.fullMarkStudents}`,
+          `Marks lost ${question.marksLost}`,
+          `Discrimination ${question.discriminationIndex ?? "insufficient"} (${question.discriminationLabel})`,
           `Interpretation ${question.difficulty}`,
           `Question: ${question.questionText}`,
         ]
@@ -256,13 +264,9 @@ export function buildExamQuestionLevelAnalysisCsv({
   );
 
   return [
-    headers
-      .map(csvCell)
-      .join(","),
+    headers.map(csvCell).join(","),
     ...rows.map((row) =>
-      row
-        .map(csvCell)
-        .join(","),
+      row.map(csvCell).join(","),
     ),
   ].join("\r\n");
 }
@@ -274,9 +278,7 @@ export function downloadExamQuestionLevelAnalysisCsv({
   assignment: ExamAssignment;
   intelligence: ExamClassIntelligence;
 }): void {
-  if (
-    typeof window === "undefined"
-  ) {
+  if (typeof window === "undefined") {
     return;
   }
 
@@ -302,12 +304,9 @@ export function downloadExamQuestionLevelAnalysisCsv({
   link.href = url;
   link.download =
     `${safeFileName(assignment.className)}-` +
-    `${safeFileName(assignment.title)}-enhanced-qla.csv`;
+    `${safeFileName(assignment.title)}-final-qla.csv`;
 
-  document.body.appendChild(
-    link,
-  );
-
+  document.body.appendChild(link);
   link.click();
   link.remove();
 

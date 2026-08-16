@@ -14,6 +14,19 @@ export type ExamQuestionDifficulty =
   | "priority"
   | "insufficient";
 
+export type ExamDiscriminationLabel =
+  | "strong"
+  | "moderate"
+  | "weak"
+  | "negative"
+  | "insufficient";
+
+export type ExamAnalysisConfidence =
+  | "insufficient"
+  | "limited"
+  | "developing"
+  | "robust";
+
 export type ExamQuestionIntelligence = {
   questionId: string;
   questionNumber: number;
@@ -36,9 +49,13 @@ export type ExamQuestionIntelligence = {
   averageAwardedMarks: number | null;
   successPercentage: number | null;
   attemptPercentage: number | null;
+  omissionPercentage: number | null;
   zeroMarkPercentage: number | null;
   fullMarkPercentage: number | null;
   marksLostPercentage: number | null;
+
+  discriminationIndex: number | null;
+  discriminationLabel: ExamDiscriminationLabel;
 
   difficulty: ExamQuestionDifficulty;
 };
@@ -47,18 +64,11 @@ export type ExamTopicIntelligence = {
   topic: string;
   questionCount: number;
   availableMarks: number;
-
-  /*
-   * Backwards-compatible field used by existing cards.
-   * It now represents marks-weighted topic success.
-   */
   averageSuccessPercentage: number | null;
-
   awardedMarks: number;
   possibleMarks: number;
   marksLost: number;
   marksLostPercentage: number | null;
-
   priority: "high" | "medium" | "low";
 };
 
@@ -93,6 +103,7 @@ export type ExamStudentGradeOutcome = {
   marksToNextGrade: number | null;
   percentagePointsToNextGrade: number | null;
   differenceFromClassAverage: number | null;
+  nearNextGradeBoundary: boolean;
 };
 
 export type ExamGradeDistributionItem = {
@@ -108,6 +119,8 @@ export type ExamGradeIntelligence = {
   boundarySetId: string;
   boundarySetTitle: string;
   boundarySource: AnalyticsBoundarySource;
+  boundarySourceNote: string | null;
+  boundaryVerifiedAt: string | null;
   boundaryAcademicYear: string | null;
   boundaryAssessmentTitle: string | null;
   isOfficialBoundarySet: boolean;
@@ -124,6 +137,7 @@ export type ExamGradeIntelligence = {
   classPercentagePointsToNextGrade: number | null;
 
   studentOutcomes: ExamStudentGradeOutcome[];
+  nearBoundaryStudents: ExamStudentGradeOutcome[];
   gradeDistribution: ExamGradeDistributionItem[];
 };
 
@@ -163,6 +177,9 @@ export type ExamClassIntelligence = {
   highestPercentage: number | null;
   lowestPercentage: number | null;
   medianPercentage: number | null;
+
+  analysisConfidence: ExamAnalysisConfidence;
+  analysisWarnings: string[];
 
   questionIntelligence: ExamQuestionIntelligence[];
   topicIntelligence: ExamTopicIntelligence[];
