@@ -16,6 +16,7 @@ import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
 import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
 import TeacherAnalyticsSnapshot from "@/components/teacher/dashboard/TeacherAnalyticsSnapshot";
 import TeacherPrioritySnapshot from "@/components/teacher/intelligence/TeacherPrioritySnapshot";
+import TeacherActionCentre from "@/components/teacher/dashboard/TeacherActionCentre";
 import {
   getCompletionMessage,
   getPerformanceMessage,
@@ -30,7 +31,8 @@ const assessmentTools = [
     href: "/teacher/exam-question-generator",
     icon: "🧠",
     label: "Build a paper",
-    accent: "border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50",
+    accent:
+      "border-indigo-200 bg-gradient-to-br from-indigo-50 to-violet-50",
     iconStyle: "bg-indigo-600 text-white",
     buttonStyle: "bg-indigo-600 text-white hover:bg-indigo-700",
   },
@@ -41,7 +43,8 @@ const assessmentTools = [
     href: "/teacher/question-bank",
     icon: "🗂️",
     label: "Open question bank",
-    accent: "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50",
+    accent:
+      "border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50",
     iconStyle: "bg-emerald-600 text-white",
     buttonStyle: "bg-emerald-600 text-white hover:bg-emerald-700",
   },
@@ -52,7 +55,8 @@ const assessmentTools = [
     href: "/teacher/exam-assignments",
     icon: "✍️",
     label: "Open exam assignments",
-    accent: "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50",
+    accent:
+      "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50",
     iconStyle: "bg-amber-600 text-white",
     buttonStyle: "bg-amber-600 text-white hover:bg-amber-700",
   },
@@ -78,16 +82,12 @@ export default function TeacherPage() {
   } = useTeacherDashboard();
 
   const loading = profileLoading || dashboardLoading;
-
   const strongestTopic = classPerformance[0] ?? null;
-
   const weakestTopic =
     classPerformance.length > 0
       ? classPerformance[classPerformance.length - 1]
       : null;
-
   const topStudent = topStudents[0] ?? null;
-
   const performanceMessage = getPerformanceMessage(averageScore);
   const completionMessage = getCompletionMessage(completionRate);
 
@@ -105,11 +105,9 @@ export default function TeacherPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
               Teaching Overview
             </p>
-
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Live classroom analytics
             </h2>
-
             <p className="mt-2 text-slate-600">
               Monitor participation, performance and intervention priorities.
             </p>
@@ -139,13 +137,7 @@ export default function TeacherPage() {
             value={`${averageScore}%`}
             description={performanceMessage}
             icon="🎯"
-            tone={
-              averageScore >= 70
-                ? "green"
-                : averageScore >= 50
-                  ? "amber"
-                  : "red"
-            }
+            tone={averageScore >= 70 ? "green" : averageScore >= 50 ? "amber" : "red"}
           />
 
           <AnalyticsCard
@@ -214,8 +206,21 @@ export default function TeacherPage() {
           />
         </div>
       </section>
-<TeacherAnalyticsSnapshot />
-<TeacherPrioritySnapshot />
+
+      <TeacherAnalyticsSnapshot />
+      <TeacherPrioritySnapshot />
+
+      <TeacherActionCentre
+        studentCount={studentCount}
+        classCount={classCount}
+        assignmentCount={assignmentCount}
+        activeAssignmentCount={activeAssignmentCount}
+        averageScore={averageScore}
+        completionRate={completionRate}
+        atRiskStudents={atRiskStudents}
+        classPerformance={classPerformance}
+      />
+
       <TeacherQuickActions />
 
       <section>
@@ -224,11 +229,9 @@ export default function TeacherPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
               Assessment Centre
             </p>
-
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Build, assign and mark
             </h2>
-
             <p className="mt-2 max-w-3xl text-slate-600">
               Create original exam-style papers, manage your saved question sets
               and mark written student submissions.
