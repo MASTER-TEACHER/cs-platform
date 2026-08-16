@@ -2,26 +2,28 @@
 
 import Link from "next/link";
 
-import AtRiskStudents from "@/components/teacher/AtRiskStudents";
-import RecentStudentActivity from "@/components/teacher/RecentStudentActivity";
 import TeacherHero from "@/components/teacher/TeacherHero";
-import TeacherQuickActions from "@/components/teacher/TeacherQuickActions";
+import RecentStudentActivity from "@/components/teacher/RecentStudentActivity";
+import AtRiskStudents from "@/components/teacher/AtRiskStudents";
 import TopStudents from "@/components/teacher/TopStudents";
-import AnalyticsCard from "@/components/teacher/dashboard/AnalyticsCard";
-import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
-import TeacherActionCentre from "@/components/teacher/dashboard/TeacherActionCentre";
-import TeacherCommandCentre from "@/components/teacher/dashboard/TeacherCommandCentre";
-import TeacherDashboardSkeleton from "@/components/teacher/dashboard/TeacherDashboardSkeleton";
-import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
-import TeacherInterventionPlanner from "@/components/teacher/dashboard/TeacherInterventionPlanner";
-import TopicAnalytics from "@/components/teacher/dashboard/TopicAnalytics";
+import TeacherQuickActions from "@/components/teacher/TeacherQuickActions";
 import Card from "@/components/ui/Card";
-import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
+import AnalyticsCard from "@/components/teacher/dashboard/AnalyticsCard";
+import TeacherDashboardCommandCentre from "@/components/teacher/dashboard/TeacherDashboardCommandCentre";
+import TeacherDashboardSkeleton from "@/components/teacher/dashboard/TeacherDashboardSkeleton";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import TopicAnalytics from "@/components/teacher/dashboard/TopicAnalytics";
+import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
+import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
+import TeacherAnalyticsSnapshot from "@/components/teacher/dashboard/TeacherAnalyticsSnapshot";
+import TeacherPrioritySnapshot from "@/components/teacher/intelligence/TeacherPrioritySnapshot";
+import TeacherActionCentre from "@/components/teacher/dashboard/TeacherActionCentre";
+import TeacherInterventionPlanner from "@/components/teacher/dashboard/TeacherInterventionPlanner";
 import {
   getCompletionMessage,
   getPerformanceMessage,
 } from "@/lib/teacherDashboard";
+import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
 
 const assessmentTools = [
   {
@@ -85,21 +87,15 @@ export default function TeacherPage() {
   } = useTeacherDashboard();
 
   const loading = profileLoading || dashboardLoading;
-
   const strongestTopic = classPerformance[0] ?? null;
-
   const weakestTopic =
     classPerformance.length > 0
       ? classPerformance[classPerformance.length - 1]
       : null;
-
   const topStudent = topStudents[0] ?? null;
 
-  const performanceMessage =
-    getPerformanceMessage(averageScore);
-
-  const completionMessage =
-    getCompletionMessage(completionRate);
+  const performanceMessage = getPerformanceMessage(averageScore);
+  const completionMessage = getCompletionMessage(completionRate);
 
   if (loading) {
     return <TeacherDashboardSkeleton />;
@@ -109,21 +105,27 @@ export default function TeacherPage() {
     <div className="space-y-8">
       <TeacherHero name={profile?.name || "Teacher"} />
 
-      <TeacherCommandCentre />
+      <TeacherDashboardCommandCentre
+        studentCount={studentCount}
+        classCount={classCount}
+        assignmentCount={assignmentCount}
+        activeAssignmentCount={activeAssignmentCount}
+        averageScore={averageScore}
+        completionRate={completionRate}
+        atRiskCount={atRiskStudents.length}
+      />
 
-      <section>
+      <section id="live-overview">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-              Classroom operations
+              Teaching Overview
             </p>
-
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Live activity
+              Live classroom analytics
             </h2>
-
             <p className="mt-2 text-slate-600">
-              Current participation, assignment and classroom workflow data.
+              Monitor participation, performance and evidence collection before moving into deeper intelligence.
             </p>
           </div>
 
@@ -139,9 +141,7 @@ export default function TeacherPage() {
           <AnalyticsCard
             label="Students"
             value={studentCount.toString()}
-            description={`${classCount} ${
-              classCount === 1 ? "class" : "classes"
-            } currently managed`}
+            description={`${classCount} ${classCount === 1 ? "class" : "classes"} currently managed`}
             icon="👨‍🎓"
             tone="blue"
           />
@@ -151,13 +151,7 @@ export default function TeacherPage() {
             value={`${averageScore}%`}
             description={performanceMessage}
             icon="🎯"
-            tone={
-              averageScore >= 70
-                ? "green"
-                : averageScore >= 50
-                  ? "amber"
-                  : "red"
-            }
+            tone={averageScore >= 70 ? "green" : averageScore >= 50 ? "amber" : "red"}
           />
 
           <AnalyticsCard
@@ -165,21 +159,13 @@ export default function TeacherPage() {
             value={`${completionRate}%`}
             description={completionMessage}
             icon="📈"
-            tone={
-              completionRate >= 80
-                ? "green"
-                : completionRate >= 50
-                  ? "amber"
-                  : "red"
-            }
+            tone={completionRate >= 80 ? "green" : completionRate >= 50 ? "amber" : "red"}
           />
 
           <AnalyticsCard
             label="Active Assignments"
             value={activeAssignmentCount.toString()}
-            description={`${assignmentCount} total assignment${
-              assignmentCount === 1 ? "" : "s"
-            }`}
+            description={`${assignmentCount} total assignment${assignmentCount === 1 ? "" : "s"}`}
             icon="📋"
             tone="indigo"
           />
@@ -209,11 +195,7 @@ export default function TeacherPage() {
                 : "Scoring below the intervention threshold"
             }
             icon="⚠️"
-            tone={
-              atRiskStudents.length > 0
-                ? "red"
-                : "green"
-            }
+            tone={atRiskStudents.length > 0 ? "red" : "green"}
           />
 
           <AnalyticsCard
@@ -231,37 +213,46 @@ export default function TeacherPage() {
         </div>
       </section>
 
-      <TeacherActionCentre
-        studentCount={studentCount}
-        classCount={classCount}
-        assignmentCount={assignmentCount}
-        activeAssignmentCount={activeAssignmentCount}
-        averageScore={averageScore}
-        completionRate={completionRate}
-        atRiskStudents={atRiskStudents}
-        classPerformance={classPerformance}
-      />
+      <section id="teacher-intelligence">
+        <TeacherAnalyticsSnapshot />
+      </section>
 
-      <TeacherInterventionPlanner
-        students={atRiskStudents}
-      />
+      <section id="teacher-priorities">
+        <TeacherPrioritySnapshot />
+      </section>
 
-      <TeacherQuickActions />
+      <section id="teacher-actions">
+        <TeacherActionCentre
+          studentCount={studentCount}
+          classCount={classCount}
+          assignmentCount={assignmentCount}
+          activeAssignmentCount={activeAssignmentCount}
+          averageScore={averageScore}
+          completionRate={completionRate}
+          atRiskStudents={atRiskStudents}
+          classPerformance={classPerformance}
+        />
+      </section>
 
-      <section>
+      <section id="intervention-planning">
+        <TeacherInterventionPlanner students={atRiskStudents} />
+      </section>
+
+      <section id="quick-actions">
+        <TeacherQuickActions />
+      </section>
+
+      <section id="assessment-centre">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
               Assessment Centre
             </p>
-
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Build, assign and mark
             </h2>
-
             <p className="mt-2 max-w-3xl text-slate-600">
-              Create original exam-style papers, manage your saved question
-              sets and mark written student submissions.
+              Create original exam-style papers, manage saved question sets and mark written student submissions.
             </p>
           </div>
 
@@ -275,10 +266,7 @@ export default function TeacherPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {assessmentTools.map((tool) => (
-            <Card
-              key={tool.href}
-              className={`border ${tool.accent}`}
-            >
+            <Card key={tool.href} className={`border ${tool.accent}`}>
               <div className="flex h-full flex-col">
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl ${tool.iconStyle}`}
@@ -306,42 +294,53 @@ export default function TeacherPage() {
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <TopicAnalytics
-            topics={classPerformance}
+      <section id="supporting-analytics">
+        <div className="mb-5">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Supporting analytics
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">
+            Detailed classroom evidence
+          </h2>
+          <p className="mt-2 max-w-3xl text-slate-600">
+            Use these supporting views when you need more context behind the action centre, intervention plan or reports.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <div className="xl:col-span-2">
+            <TopicAnalytics
+              topics={classPerformance}
+              strongestTopic={strongestTopic}
+              weakestTopic={weakestTopic}
+            />
+          </div>
+
+          <TeacherInsights
+            averageScore={averageScore}
+            completionRate={completionRate}
+            activeAssignments={activeAssignmentCount}
+            atRiskCount={atRiskStudents.length}
             strongestTopic={strongestTopic}
             weakestTopic={weakestTopic}
           />
         </div>
 
-        <TeacherInsights
-          averageScore={averageScore}
-          completionRate={completionRate}
-          activeAssignments={activeAssignmentCount}
-          atRiskCount={atRiskStudents.length}
-          strongestTopic={strongestTopic}
-          weakestTopic={weakestTopic}
-        />
-      </section>
+        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <RecentStudentActivity activities={recentActivities} />
+          <TopStudents students={topStudents} />
+        </div>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <RecentStudentActivity
-          activities={recentActivities}
-        />
-        <TopStudents students={topStudents} />
-      </section>
-
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <AtRiskStudents students={atRiskStudents} />
-
-        <ClassSummary
-          studentCount={studentCount}
-          classCount={classCount}
-          assignmentCount={assignmentCount}
-          activeAssignmentCount={activeAssignmentCount}
-          completionRate={completionRate}
-        />
+        <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <AtRiskStudents students={atRiskStudents} />
+          <ClassSummary
+            studentCount={studentCount}
+            classCount={classCount}
+            assignmentCount={assignmentCount}
+            activeAssignmentCount={activeAssignmentCount}
+            completionRate={completionRate}
+          />
+        </div>
       </section>
     </div>
   );
