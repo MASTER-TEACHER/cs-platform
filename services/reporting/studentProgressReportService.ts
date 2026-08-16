@@ -1,6 +1,48 @@
 import { getTeacherStudentAnalytics } from "@/services/analytics/teacherAnalyticsService";
 import { getTeacherStudentInterventionHistory } from "@/services/teacherStudentInterventionHistoryService";
+import type {
+  AnalyticsEvidenceSourceCounts,
+} from "@/types/analytics";
 import type { StudentProgressReport } from "@/types/reporting";
+
+function evidenceWarnings({
+  confidence,
+  evidenceCounts,
+  completionRate,
+}: {
+  confidence: string;
+  evidenceCounts: AnalyticsEvidenceSourceCounts;
+  completionRate: number;
+}): string[] {
+  const warnings: string[] = [];
+
+  if (
+    confidence === "insufficient" ||
+    confidence === "low"
+  ) {
+    warnings.push(
+      "Evidence confidence is currently low. Treat the working grade and topic priorities cautiously until more graded evidence is available.",
+    );
+  }
+
+  if (
+    evidenceCounts.written_exam === 0 &&
+    evidenceCounts.quiz === 0 &&
+    evidenceCounts.ai_quiz === 0
+  ) {
+    warnings.push(
+      "No written-exam or quiz evidence is currently contributing to this report.",
+    );
+  }
+
+  if (completionRate < 70) {
+    warnings.push(
+      "Low assignment completion may make the current attainment picture unrepresentative.",
+    );
+  }
+
+  return warnings;
+}
 
 export async function buildStudentProgressReport({
   teacherId,
@@ -46,13 +88,6 @@ export async function buildStudentProgressReport({
       mastery: topic.weightedPercentage,
     }));
 
-  /*
-   * RichStudentAnalytics does not expose `recentEvidence`.
-   * It exposes the complete `evidence` array.
-   *
-   * Build recent report evidence from graded items only and
-   * order them by the most recent completion/marking date.
-   */
   const recentEvidence = [...analytics.analytics.evidence]
     .filter(
       (item) =>
@@ -71,6 +106,15 @@ export async function buildStudentProgressReport({
       completedAt: item.completedAt,
     }));
 
+  const evidenceSourceCounts =
+    analytics.analytics.evidenceSourceCounts;
+
+  const reportEvidenceWarnings = evidenceWarnings({
+    confidence: String(analytics.confidence),
+    evidenceCounts: evidenceSourceCounts,
+    completionRate: analytics.completionRate,
+  });
+
   const teacherCommentary: string[] = [];
   const studentNextSteps: string[] = [];
 
@@ -80,6 +124,10 @@ export async function buildStudentProgressReport({
         analytics.gradeGap < 0
         ? `${analytics.studentName} is currently working below the target grade and needs focused support to close the gap.`
         : `${analytics.studentName} is currently working at or above the target grade.`,
+    );
+  } else {
+    teacherCommentary.push(
+      "No target grade is currently set, so target-gap interpretation is unavailable.",
     );
   }
 
@@ -109,6 +157,12 @@ export async function buildStudentProgressReport({
     );
   }
 
+  if (interventions.some((item) => item.status === "active")) {
+    teacherCommentary.push(
+      "This learner currently has an active intervention; review subsequent graded evidence before deciding whether to close or escalate support.",
+    );
+  }
+
   return {
     studentId: analytics.studentId,
     studentName: analytics.studentName,
@@ -126,16 +180,14 @@ export async function buildStudentProgressReport({
 
     trend: analytics.trend,
     completionRate: analytics.completionRate,
-
-    /*
-     * TeacherStudentAnalyticsRow already stores the
-     * confidence level as a string such as high/medium/low.
-     */
     confidence: analytics.confidence,
 
     strengths,
     priorities,
     recentEvidence,
+
+    evidenceSourceCounts,
+    evidenceWarnings: reportEvidenceWarnings,
 
     interventionSummary: {
       active: interventions.filter(
