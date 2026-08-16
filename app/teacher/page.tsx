@@ -2,27 +2,26 @@
 
 import Link from "next/link";
 
-import TeacherHero from "@/components/teacher/TeacherHero";
-import RecentStudentActivity from "@/components/teacher/RecentStudentActivity";
 import AtRiskStudents from "@/components/teacher/AtRiskStudents";
-import TopStudents from "@/components/teacher/TopStudents";
+import RecentStudentActivity from "@/components/teacher/RecentStudentActivity";
+import TeacherHero from "@/components/teacher/TeacherHero";
 import TeacherQuickActions from "@/components/teacher/TeacherQuickActions";
-import Card from "@/components/ui/Card";
+import TopStudents from "@/components/teacher/TopStudents";
 import AnalyticsCard from "@/components/teacher/dashboard/AnalyticsCard";
-import TeacherDashboardSkeleton from "@/components/teacher/dashboard/TeacherDashboardSkeleton";
-import { useUserProfile } from "@/hooks/useUserProfile";
-import TopicAnalytics from "@/components/teacher/dashboard/TopicAnalytics";
-import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
 import ClassSummary from "@/components/teacher/dashboard/ClassSummary";
-import TeacherAnalyticsSnapshot from "@/components/teacher/dashboard/TeacherAnalyticsSnapshot";
-import TeacherPrioritySnapshot from "@/components/teacher/intelligence/TeacherPrioritySnapshot";
 import TeacherActionCentre from "@/components/teacher/dashboard/TeacherActionCentre";
+import TeacherCommandCentre from "@/components/teacher/dashboard/TeacherCommandCentre";
+import TeacherDashboardSkeleton from "@/components/teacher/dashboard/TeacherDashboardSkeleton";
+import TeacherInsights from "@/components/teacher/dashboard/TeacherInsights";
 import TeacherInterventionPlanner from "@/components/teacher/dashboard/TeacherInterventionPlanner";
+import TopicAnalytics from "@/components/teacher/dashboard/TopicAnalytics";
+import Card from "@/components/ui/Card";
+import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import {
   getCompletionMessage,
   getPerformanceMessage,
 } from "@/lib/teacherDashboard";
-import { useTeacherDashboard } from "@/hooks/useTeacherDashboard";
 
 const assessmentTools = [
   {
@@ -86,15 +85,21 @@ export default function TeacherPage() {
   } = useTeacherDashboard();
 
   const loading = profileLoading || dashboardLoading;
+
   const strongestTopic = classPerformance[0] ?? null;
+
   const weakestTopic =
     classPerformance.length > 0
       ? classPerformance[classPerformance.length - 1]
       : null;
+
   const topStudent = topStudents[0] ?? null;
 
-  const performanceMessage = getPerformanceMessage(averageScore);
-  const completionMessage = getCompletionMessage(completionRate);
+  const performanceMessage =
+    getPerformanceMessage(averageScore);
+
+  const completionMessage =
+    getCompletionMessage(completionRate);
 
   if (loading) {
     return <TeacherDashboardSkeleton />;
@@ -104,17 +109,21 @@ export default function TeacherPage() {
     <div className="space-y-8">
       <TeacherHero name={profile?.name || "Teacher"} />
 
+      <TeacherCommandCentre />
+
       <section>
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-              Teaching Overview
+              Classroom operations
             </p>
+
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Live classroom analytics
+              Live activity
             </h2>
+
             <p className="mt-2 text-slate-600">
-              Monitor participation, performance and intervention priorities.
+              Current participation, assignment and classroom workflow data.
             </p>
           </div>
 
@@ -142,7 +151,13 @@ export default function TeacherPage() {
             value={`${averageScore}%`}
             description={performanceMessage}
             icon="🎯"
-            tone={averageScore >= 70 ? "green" : averageScore >= 50 ? "amber" : "red"}
+            tone={
+              averageScore >= 70
+                ? "green"
+                : averageScore >= 50
+                  ? "amber"
+                  : "red"
+            }
           />
 
           <AnalyticsCard
@@ -194,7 +209,11 @@ export default function TeacherPage() {
                 : "Scoring below the intervention threshold"
             }
             icon="⚠️"
-            tone={atRiskStudents.length > 0 ? "red" : "green"}
+            tone={
+              atRiskStudents.length > 0
+                ? "red"
+                : "green"
+            }
           />
 
           <AnalyticsCard
@@ -212,9 +231,6 @@ export default function TeacherPage() {
         </div>
       </section>
 
-      <TeacherAnalyticsSnapshot />
-      <TeacherPrioritySnapshot />
-
       <TeacherActionCentre
         studentCount={studentCount}
         classCount={classCount}
@@ -226,7 +242,9 @@ export default function TeacherPage() {
         classPerformance={classPerformance}
       />
 
-      <TeacherInterventionPlanner students={atRiskStudents} />
+      <TeacherInterventionPlanner
+        students={atRiskStudents}
+      />
 
       <TeacherQuickActions />
 
@@ -236,12 +254,14 @@ export default function TeacherPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
               Assessment Centre
             </p>
+
             <h2 className="mt-2 text-2xl font-bold text-slate-900">
               Build, assign and mark
             </h2>
+
             <p className="mt-2 max-w-3xl text-slate-600">
-              Create original exam-style papers, manage your saved question sets
-              and mark written student submissions.
+              Create original exam-style papers, manage your saved question
+              sets and mark written student submissions.
             </p>
           </div>
 
@@ -255,7 +275,10 @@ export default function TeacherPage() {
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {assessmentTools.map((tool) => (
-            <Card key={tool.href} className={`border ${tool.accent}`}>
+            <Card
+              key={tool.href}
+              className={`border ${tool.accent}`}
+            >
               <div className="flex h-full flex-col">
                 <div
                   className={`flex h-12 w-12 items-center justify-center rounded-2xl text-2xl ${tool.iconStyle}`}
@@ -303,7 +326,9 @@ export default function TeacherPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <RecentStudentActivity activities={recentActivities} />
+        <RecentStudentActivity
+          activities={recentActivities}
+        />
         <TopStudents students={topStudents} />
       </section>
 

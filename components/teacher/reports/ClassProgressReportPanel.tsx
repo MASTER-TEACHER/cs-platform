@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeft,
   ArrowRight,
   BarChart3,
   Download,
   FileCheck2,
+  Search,
   Target,
   Users,
 } from "lucide-react";
@@ -29,6 +31,10 @@ export default function ClassProgressReportPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [examSearch, setExamSearch] = useState("");
+  const [examPage, setExamPage] = useState(1);
+  const [examPageSize, setExamPageSize] = useState(6);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -42,7 +48,11 @@ export default function ClassProgressReportPanel({
           classId,
         });
 
-        if (!cancelled) setReport(next);
+        if (!cancelled) {
+          setReport(next);
+          setExamSearch("");
+          setExamPage(1);
+        }
       } catch (caughtError) {
         if (!cancelled) {
           setError(
@@ -62,6 +72,50 @@ export default function ClassProgressReportPanel({
       cancelled = true;
     };
   }, [teacherId, classId]);
+
+  const filteredExamSummaries = useMemo(() => {
+    if (!report) return [];
+
+    const term = examSearch.trim().toLowerCase();
+
+    if (!term) {
+      return report.examSummaries;
+    }
+
+    return report.examSummaries.filter((exam) =>
+      [
+        exam.title,
+        exam.classAverageGrade || "",
+        exam.weakestTopic || "",
+        exam.strongestTopic || "",
+        exam.weakestAssessmentObjective || "",
+        exam.analysisConfidence,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [examSearch, report]);
+
+  const examPageCount = Math.max(
+    1,
+    Math.ceil(filteredExamSummaries.length / examPageSize),
+  );
+
+  const safeExamPage = Math.min(examPage, examPageCount);
+
+  const visibleExamSummaries = useMemo(() => {
+    const start = (safeExamPage - 1) * examPageSize;
+
+    return filteredExamSummaries.slice(
+      start,
+      start + examPageSize,
+    );
+  }, [examPageSize, filteredExamSummaries, safeExamPage]);
+
+  useEffect(() => {
+    setExamPage(1);
+  }, [examSearch, examPageSize]);
 
   if (loading) {
     return (
@@ -247,7 +301,7 @@ export default function ClassProgressReportPanel({
       </div>
 
       <div className="border-t border-slate-100 p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-wide text-indigo-600">
               Written assessment intelligence
@@ -255,6 +309,12 @@ export default function ClassProgressReportPanel({
             <h3 className="mt-1 text-xl font-black text-slate-950">
               QLA report summary
             </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              {report.examSummaries.length} written assessment
+              {report.examSummaries.length === 1 ? "" : "s"} available for
+              this class. The on-screen summary is paginated so a large
+              assessment history remains manageable.
+            </p>
           </div>
 
           <Link
@@ -271,90 +331,208 @@ export default function ClassProgressReportPanel({
             No written exam assignments are available for this class yet.
           </p>
         ) : (
-          <div className="mt-5 grid gap-4 xl:grid-cols-2">
-            {report.examSummaries.map((exam) => (
-              <div
-                key={exam.assignmentId}
-                className="rounded-2xl border border-slate-200 p-5"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black text-slate-950">
-                      {exam.title}
-                    </p>
-                    <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
-                      {exam.analysisConfidence} confidence · {exam.markedCount}/
-                      {exam.studentCount} marked
-                    </p>
-                  </div>
-
-                  <Link
-                    href={`/teacher/exam-assignments/${exam.assignmentId}`}
-                    className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white"
-                  >
-                    Open QLA
-                  </Link>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <SmallMetric
-                    label="Average"
-                    value={
-                      exam.classAverage === null
-                        ? "—"
-                        : `${exam.classAverage}%`
-                    }
-                  />
-                  <SmallMetric
-                    label="Grade"
-                    value={exam.classAverageGrade || "—"}
-                  />
-                  <SmallMetric
-                    label="Next grade"
-                    value={
-                      exam.classMarksToNextGrade === null
-                        ? "—"
-                        : `${exam.classMarksToNextGrade} marks`
-                    }
-                  />
-                  <SmallMetric
-                    label="Near boundary"
-                    value={exam.nearBoundaryCount}
+          <>
+            <div className="mt-5 grid gap-3 rounded-2xl bg-slate-50 p-4 lg:grid-cols-[1fr_auto] lg:items-end">
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                  Search assessments
+                </span>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={examSearch}
+                    onChange={(event) => setExamSearch(event.target.value)}
+                    placeholder="Search title, topic, AO, grade or confidence"
+                    className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-indigo-400"
                   />
                 </div>
+              </label>
 
-                <div className="mt-4 space-y-2 text-sm text-slate-600">
-                  <p>
-                    <strong>Weakest topic:</strong>{" "}
-                    {exam.weakestTopic || "Insufficient evidence"}
-                    {exam.weakestTopicSuccess !== null
-                      ? ` (${exam.weakestTopicSuccess}%)`
-                      : ""}
-                  </p>
-                  <p>
-                    <strong>Hardest question:</strong>{" "}
-                    {exam.hardestQuestionNumber === null
-                      ? "Insufficient evidence"
-                      : `Q${exam.hardestQuestionNumber}`}
-                    {exam.hardestQuestionSuccess !== null
-                      ? ` (${exam.hardestQuestionSuccess}%)`
-                      : ""}
-                  </p>
-                  <p>
-                    <strong>Weakest AO:</strong>{" "}
-                    {exam.weakestAssessmentObjective ||
-                      "Insufficient AO evidence"}
-                    {exam.weakestAssessmentObjectiveSuccess !== null
-                      ? ` (${exam.weakestAssessmentObjectiveSuccess}%)`
-                      : ""}
-                  </p>
-                  <p>
-                    <strong>Marks lost:</strong> {exam.marksLost}
-                  </p>
-                </div>
+              <label className="block">
+                <span className="mb-2 block text-xs font-black uppercase tracking-wide text-slate-500">
+                  Per page
+                </span>
+                <select
+                  value={examPageSize}
+                  onChange={(event) =>
+                    setExamPageSize(Number(event.target.value))
+                  }
+                  className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:border-indigo-400"
+                >
+                  <option value={6}>6</option>
+                  <option value={12}>12</option>
+                  <option value={24}>24</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                Showing{" "}
+                <span className="font-black text-slate-800">
+                  {filteredExamSummaries.length === 0
+                    ? 0
+                    : (safeExamPage - 1) * examPageSize + 1}
+                  -
+                  {Math.min(
+                    safeExamPage * examPageSize,
+                    filteredExamSummaries.length,
+                  )}
+                </span>{" "}
+                of{" "}
+                <span className="font-black text-slate-800">
+                  {filteredExamSummaries.length}
+                </span>{" "}
+                {examSearch.trim() ? "matching" : ""} assessment
+                {filteredExamSummaries.length === 1 ? "" : "s"}.
+              </p>
+
+              <p>
+                Page{" "}
+                <span className="font-black text-slate-800">
+                  {safeExamPage}
+                </span>{" "}
+                of{" "}
+                <span className="font-black text-slate-800">
+                  {examPageCount}
+                </span>
+              </p>
+            </div>
+
+            {visibleExamSummaries.length === 0 ? (
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+                No written assessments match “{examSearch}”.
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                {visibleExamSummaries.map((exam) => (
+                  <div
+                    key={exam.assignmentId}
+                    className="rounded-2xl border border-slate-200 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-slate-950">
+                          {exam.title}
+                        </p>
+                        <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+                          {exam.analysisConfidence} confidence ·{" "}
+                          {exam.markedCount}/{exam.studentCount} marked
+                        </p>
+                      </div>
+
+                      <Link
+                        href={`/teacher/exam-assignments/${exam.assignmentId}`}
+                        className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white"
+                      >
+                        Open QLA
+                      </Link>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <SmallMetric
+                        label="Average"
+                        value={
+                          exam.classAverage === null
+                            ? "—"
+                            : `${exam.classAverage}%`
+                        }
+                      />
+                      <SmallMetric
+                        label="Grade"
+                        value={exam.classAverageGrade || "—"}
+                      />
+                      <SmallMetric
+                        label="Next grade"
+                        value={
+                          exam.classMarksToNextGrade === null
+                            ? "—"
+                            : `${exam.classMarksToNextGrade} marks`
+                        }
+                      />
+                      <SmallMetric
+                        label="Near boundary"
+                        value={exam.nearBoundaryCount}
+                      />
+                    </div>
+
+                    <div className="mt-4 space-y-2 text-sm text-slate-600">
+                      <p>
+                        <strong>Weakest topic:</strong>{" "}
+                        {exam.weakestTopic || "Insufficient evidence"}
+                        {exam.weakestTopicSuccess !== null
+                          ? ` (${exam.weakestTopicSuccess}%)`
+                          : ""}
+                      </p>
+                      <p>
+                        <strong>Hardest question:</strong>{" "}
+                        {exam.hardestQuestionNumber === null
+                          ? "Insufficient evidence"
+                          : `Q${exam.hardestQuestionNumber}`}
+                        {exam.hardestQuestionSuccess !== null
+                          ? ` (${exam.hardestQuestionSuccess}%)`
+                          : ""}
+                      </p>
+                      <p>
+                        <strong>Weakest AO:</strong>{" "}
+                        {exam.weakestAssessmentObjective ||
+                          "Insufficient AO evidence"}
+                        {exam.weakestAssessmentObjectiveSuccess !== null
+                          ? ` (${exam.weakestAssessmentObjectiveSuccess}%)`
+                          : ""}
+                      </p>
+                      <p>
+                        <strong>Marks lost:</strong> {exam.marksLost}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <button
+                type="button"
+                disabled={safeExamPage <= 1}
+                onClick={() =>
+                  setExamPage((current) => Math.max(1, current - 1))
+                }
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Previous
+              </button>
+
+              <div className="flex items-center justify-center gap-2">
+                <span className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">
+                  {safeExamPage}
+                </span>
+                <span className="text-sm font-bold text-slate-400">
+                  / {examPageCount}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={safeExamPage >= examPageCount}
+                onClick={() =>
+                  setExamPage((current) =>
+                    Math.min(examPageCount, current + 1),
+                  )
+                }
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-black text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <p className="mt-4 rounded-2xl bg-indigo-50 px-4 py-3 text-xs font-bold leading-5 text-indigo-900">
+              Pagination only changes what is displayed on screen. Export
+              intelligence CSV still receives the complete QLA history, so if
+              the class has 100 written assessments the CSV contains all 100.
+            </p>
+          </>
         )}
       </div>
 
