@@ -6,6 +6,7 @@ import { Activity, ArrowRight } from "lucide-react";
 
 import CreateInterventionModal from "@/components/teacher/interventions/CreateInterventionModal";
 import InterventionActionContext from "@/components/teacher/interventions/InterventionActionContext";
+import InterventionEffectivenessOverview from "@/components/teacher/interventions/InterventionEffectivenessOverview";
 import InterventionFilters from "@/components/teacher/interventions/InterventionFilters";
 import InterventionImpactCard from "@/components/teacher/interventions/InterventionImpactCard";
 import InterventionStudentRow from "@/components/teacher/interventions/InterventionStudentRow";
@@ -83,6 +84,17 @@ export default function TeacherInterventionsPage() {
     );
   }, [candidates, priority, search]);
 
+  const effectivenessSources = useMemo(
+    () =>
+      interventions.map((intervention) => ({
+        id: intervention.id,
+        studentName: intervention.studentName,
+        topic: intervention.topic,
+        status: intervention.status,
+      })),
+    [interventions],
+  );
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -105,7 +117,8 @@ export default function TeacherInterventionsPage() {
             </h1>
             <p className="mt-3 text-teal-100">
               Turn assessment evidence into targeted lesson, quiz and exam
-              pathways.
+              pathways, then measure whether support actually improves learner
+              outcomes.
             </p>
           </div>
 
@@ -119,25 +132,27 @@ export default function TeacherInterventionsPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Summary
-          label="Students reviewed"
-          value={candidates.length}
-        />
+        <Summary label="Students reviewed" value={candidates.length} />
         <Summary
           label="Active interventions"
           value={
-            interventions.filter((item) => item.status === "active")
-              .length
+            interventions.filter((item) => item.status === "active").length
           }
         />
         <Summary
           label="Completed"
           value={
-            interventions.filter((item) => item.status === "completed")
-              .length
+            interventions.filter((item) => item.status === "completed").length
           }
         />
       </div>
+
+      {user?.uid && (
+        <InterventionEffectivenessOverview
+          teacherId={user.uid}
+          interventions={effectivenessSources}
+        />
+      )}
 
       <InterventionFilters
         search={search}
@@ -293,12 +308,8 @@ function Summary({
 }) {
   return (
     <Card>
-      <p className="text-sm font-bold text-slate-500">
-        {label}
-      </p>
-      <p className="mt-2 text-3xl font-black">
-        {value}
-      </p>
+      <p className="text-sm font-bold text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-black">{value}</p>
     </Card>
   );
 }
