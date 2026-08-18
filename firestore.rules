@@ -1,0 +1,1356 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────
+    // Shared helper functions
+    // ─────────────────────────────────────────────
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUserId() {
+      return request.auth.uid;
+    }
+
+    function userProfileExists() {
+      return signedIn() &&
+        exists(
+          /databases/$(database)/documents/users/$(currentUserId())
+        );
+    }
+
+    function currentUserProfile() {
+      return get(
+        /databases/$(database)/documents/users/$(currentUserId())
+      ).data;
+    }
+
+    function isTeacher() {
+      return userProfileExists() &&
+        (
+          currentUserProfile().role == "teacher" ||
+          currentUserProfile().role == "admin"
+        );
+    }
+
+    function isAdmin() {
+      return userProfileExists() &&
+        currentUserProfile().role == "admin";
+    }
+
+    function validQualification(data) {
+      return !("qualification" in data) ||
+        data.qualification == null ||
+        data.qualification == "GCSE" ||
+        data.qualification == "A_LEVEL";
+    }
+
+    function validExamBoard(data) {
+      return !("examBoard" in data) ||
+        data.examBoard == null ||
+        data.examBoard == "AQA" ||
+        data.examBoard == "OCR" ||
+        data.examBoard == "EDEXCEL";
+    }
+
+    function validOnboardingStatus(data) {
+      return !("onboardingComplete" in data) ||
+        data.onboardingComplete is bool;
+    }
+
+    function ownsClass(classId) {
+      return isTeacher() &&
+        exists(
+          /databases/$(database)/documents/classes/$(classId)
+        ) &&
+        get(
+          /databases/$(database)/documents/classes/$(classId)
+        ).data.teacherId == currentUserId();
+    }
+
+    function belongsToClass(classId) {
+      return signedIn() &&
+        exists(
+          /databases/$(database)/documents/classes/$(classId)
+        ) &&
+        currentUserId() in get(
+          /databases/$(database)/documents/classes/$(classId)
+        ).data.studentIds;
+    }
+
+    function assignmentExists(assignmentId) {
+      return exists(
+        /databases/$(database)/documents/assignments/$(assignmentId)
+      );
+    }
+
+    function assignmentData(assignmentId) {
+      return get(
+        /databases/$(database)/documents/assignments/$(assignmentId)
+      ).data;
+    }
+
+    function isTeacherForClassAssignment(assignmentId) {
+      return signedIn() &&
+        exists(
+          /databases/$(database)/documents/classAssignments/$(assignmentId)
+        ) &&
+        (
+          get(
+            /databases/$(database)/documents/classAssignments/$(assignmentId)
+          ).data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+    function examAssignmentExists(assignmentId) {
+      return exists(
+        /databases/$(database)/documents/examAssignments/$(assignmentId)
+      );
+    }
+
+    function examAssignmentData(assignmentId) {
+      return get(
+        /databases/$(database)/documents/examAssignments/$(assignmentId)
+      ).data;
+    }
+
+    function isStudentForExamAssignment(assignmentId) {
+      return signedIn() &&
+        examAssignmentExists(assignmentId) &&
+        currentUserId() in
+          examAssignmentData(assignmentId).studentIds;
+    }
+    
+    
+    
+    match /studentTargets/{studentId} {
+  function signedInForTarget() {
+    return request.auth != null;
+  }
+
+  function isTargetStudent() {
+    return signedInForTarget() && request.auth.uid == studentId;
+  }
+
+  function isTargetAdmin() {
+    return signedInForTarget()
+      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
+  }
+
+  function teacherOwnsTargetClass(classId) {
+    return signedInForTarget()
+      && classId is string
+      && exists(/databases/$(database)/documents/classes/$(classId))
+      && get(/databases/$(database)/documents/classes/$(classId)).data.teacherId == request.auth.uid
+      && studentId in get(/databases/$(database)/documents/classes/$(classId)).data.studentIds;
+  }
+
+  allow read: if isTargetStudent()
+    || isTargetAdmin()
+    || (
+      resource.data.teacherId == request.auth.uid
+      && teacherOwnsTargetClass(resource.data.classId)
+    );
+
+  allow create: if isTargetAdmin()
+    || (
+      request.resource.data.studentId == studentId
+      && request.resource.data.teacherId == request.auth.uid
+      && teacherOwnsTargetClass(request.resource.data.classId)
+    );
+
+  allow update: if isTargetAdmin()
+    || (
+      resource.data.studentId == studentId
+      && request.resource.data.studentId == studentId
+      && request.resource.data.teacherId == request.auth.uid
+      && teacherOwnsTargetClass(request.resource.data.classId)
+    );
+
+  allow delete: if isTargetAdmin()
+    || (
+      resource.data.teacherId == request.auth.uid
+      && teacherOwnsTargetClass(resource.data.classId)
+    );
+}
+
+
+    // ─────────────────────────────────────────────
+    // Users
+    // ─────────────────────────────────────────────
+
+   match /users/{userId} {
+
+  allow get: if signedIn() &&
+    (
+      currentUserId() == userId ||
+      isTeacher()
+    );
+
+  allow list: if isTeacher();
+
+  /*
+   * Public registration.
+   *
+   * Every self-registered account begins with the protected
+   * Firestore role "student".
+   *
+   * accountIntent controls which journey the account follows:
+   * - student -> curriculum onboarding
+   * - teacher -> teacher-access request
+   *
+   * A user can NEVER grant themselves the teacher/admin role.
+   */
+  allow create: if signedIn() &&
+    currentUserId() == userId &&
+    request.resource.data.uid == currentUserId() &&
+    request.resource.data.role == "student" &&
+    request.resource.data.email ==
+      request.auth.token.email &&
+    (
+      !("accountIntent" in request.resource.data) ||
+      request.resource.data.accountIntent == "student" ||
+      request.resource.data.accountIntent == "teacher"
+    ) &&
+    (
+      !("teacherAccessStatus" in request.resource.data) ||
+      request.resource.data.teacherAccessStatus == "not_submitted" ||
+      request.resource.data.teacherAccessStatus == "pending"
+    ) &&
+    validQualification(request.resource.data) &&
+    validExamBoard(request.resource.data) &&
+    validOnboardingStatus(request.resource.data);
+
+  /*
+   * A user may maintain their own safe profile,
+   * curriculum and progress fields.
+   *
+   * They may also move through the teacher-application journey,
+   * but they CANNOT promote their own role.
+   *
+   * Existing role must remain unchanged.
+   */
+  allow update: if signedIn() &&
+    currentUserId() == userId &&
+    request.resource.data.uid == currentUserId() &&
+    request.resource.data.email == resource.data.email &&
+    (
+      (
+        "role" in resource.data &&
+        request.resource.data.role == resource.data.role
+      ) ||
+      (
+        !("role" in resource.data) &&
+        request.resource.data.role == "student"
+      )
+    ) &&
+    (
+      !("accountIntent" in request.resource.data) ||
+      request.resource.data.accountIntent == "student" ||
+      request.resource.data.accountIntent == "teacher"
+    ) &&
+    (
+      !("teacherAccessStatus" in request.resource.data) ||
+      request.resource.data.teacherAccessStatus == "not_submitted" ||
+      request.resource.data.teacherAccessStatus == "pending"
+    ) &&
+    validQualification(request.resource.data) &&
+    validExamBoard(request.resource.data) &&
+    validOnboardingStatus(request.resource.data) &&
+    request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "uid",
+        "name",
+        "email",
+        "role",
+
+        // Account journey
+        "accountIntent",
+        "teacherAccessStatus",
+
+        // Student curriculum
+        "currentCourse",
+        "qualification",
+        "examBoard",
+        "onboardingComplete",
+
+        // Student progress
+        "xp",
+        "streak",
+        "badges",
+        "completedLessons",
+        "completedTopics",
+        "completedUnits",
+        "completedPapers",
+        "classIds",
+
+        // General
+        "updatedAt"
+      ]);
+
+  /*
+   * Teachers may only change class membership fields
+   * on student profiles.
+   *
+   * They cannot change identity, account intent,
+   * approval status, role or curriculum.
+   */
+  allow update: if isTeacher() &&
+    resource.data.role == "student" &&
+    request.resource.data.role == resource.data.role &&
+    request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "classIds",
+        "updatedAt"
+      ]);
+
+  allow delete: if isAdmin();
+}
+
+    // ─────────────────────────────────────────────
+    // Classes
+    // ─────────────────────────────────────────────
+
+    match /classes/{classId} {
+
+      allow get, list: if signedIn() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          currentUserId() in resource.data.studentIds ||
+          isAdmin()
+        );
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId == currentUserId() &&
+        request.resource.data.studentIds is list &&
+        request.resource.data.assignmentIds is list;
+
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Existing quiz/test assignments
+    // ─────────────────────────────────────────────
+
+    match /assignments/{assignmentId} {
+
+      allow get, list: if signedIn() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          belongsToClass(resource.data.classId) ||
+          isAdmin()
+        );
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId == currentUserId() &&
+        ownsClass(request.resource.data.classId);
+
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Teacher resource class assignments
+    // ─────────────────────────────────────────────
+
+    match /classAssignments/{assignmentId} {
+
+      /*
+       * Teachers may read their own assignments.
+       * Enrolled students may read assignments containing their UID.
+       * Admins may read all assignments.
+       */
+      allow get, list: if signedIn() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          currentUserId() in resource.data.studentIds ||
+          isAdmin()
+        );
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId == currentUserId() &&
+        request.resource.data.studentIds is list;
+
+      /*
+       * Teacher or admin management updates.
+       */
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      /*
+       * Students may only update the completion counter and timestamp.
+       * They cannot edit the resource, class, teacher, due date,
+       * instructions or student list.
+       */
+      allow update: if signedIn() &&
+        currentUserId() in resource.data.studentIds &&
+        request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "completedCount",
+            "updatedAt"
+          ]) &&
+        request.resource.data.completedCount is int &&
+        request.resource.data.completedCount >=
+          resource.data.completedCount &&
+        request.resource.data.completedCount <=
+          resource.data.studentCount;
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Individual student resource progress
+    // ─────────────────────────────────────────────
+
+    match /assignmentProgress/{progressId} {
+
+  /*
+   * Students can read their own progress.
+   * The teacher who owns the corresponding class assignment
+   * can read the student's progress.
+   * Admins can read all progress.
+   *
+   * A missing progress document may still be read directly by
+   * its expected student because its document ID follows:
+   * assignmentId_studentId
+   */
+  allow get: if signedIn() &&
+    (
+      /*
+       * Existing progress document.
+       */
+      (
+        resource != null &&
+        (
+          resource.data.studentId == currentUserId() ||
+          isTeacherForClassAssignment(
+            resource.data.assignmentId
+          ) ||
+          isAdmin()
+        )
+      ) ||
+
+      /*
+       * Allows the app to check a student's own missing document.
+       */
+      progressId.matches(
+        "^.*_" + currentUserId() + "$"
+      ) ||
+
+      /*
+       * A teacher-side analytics loader may directly check an expected
+       * progress document before the student has created it. Returning
+       * "not found" for a missing document does not expose student data.
+       */
+      (resource == null && isTeacher())
+    );
+
+  allow list: if signedIn() &&
+    (
+      resource.data.studentId == currentUserId() ||
+      isTeacherForClassAssignment(
+        resource.data.assignmentId
+      ) ||
+      isAdmin()
+    );
+
+  allow create: if signedIn() &&
+    request.resource.data.studentId ==
+      currentUserId() &&
+    request.resource.data.assignmentId is string &&
+    request.resource.data.status in [
+      "not_started",
+      "in_progress",
+      "completed"
+    ];
+
+  allow update: if signedIn() &&
+    resource.data.studentId ==
+      currentUserId() &&
+    request.resource.data.studentId ==
+      resource.data.studentId &&
+    request.resource.data.assignmentId ==
+      resource.data.assignmentId &&
+    request.resource.data.status in [
+      "not_started",
+      "in_progress",
+      "completed"
+    ] &&
+    request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "status",
+        "startedAt",
+        "completedAt",
+        "updatedAt"
+      ]);
+      
+      /*
+ * Programming-assignment evidence.
+ *
+ * Students may save programming evidence only to their own
+ * assignmentProgress document, only for a real programming
+ * assignment in which they are enrolled.
+ *
+ * Assignment identity, student identity, class/teacher ownership
+ * and assignment configuration cannot be changed here.
+ */
+allow update: if signedIn() &&
+
+  // This must remain the student's own progress document.
+  resource.data.studentId == currentUserId() &&
+  request.resource.data.studentId == resource.data.studentId &&
+  request.resource.data.assignmentId == resource.data.assignmentId &&
+
+  // The corresponding class assignment must exist.
+  exists(
+    /databases/$(database)/documents/classAssignments/$(resource.data.assignmentId)
+  ) &&
+
+  // It must specifically be a programming assignment.
+  get(
+    /databases/$(database)/documents/classAssignments/$(resource.data.assignmentId)
+  ).data.resourceType == "programming-challenge" &&
+
+  // The signed-in student must actually be enrolled in it.
+  currentUserId() in get(
+    /databases/$(database)/documents/classAssignments/$(resource.data.assignmentId)
+  ).data.studentIds &&
+
+  // The submitted challenge must be the exact challenge assigned.
+  request.resource.data.programmingChallengeId ==
+    get(
+      /databases/$(database)/documents/classAssignments/$(resource.data.assignmentId)
+    ).data.resourceId &&
+
+  // Required programming values.
+  request.resource.data.programmingCode is string &&
+  request.resource.data.programmingAttempts is int &&
+  request.resource.data.programmingAttempts >= 1 &&
+  request.resource.data.programmingPassedCount is int &&
+  request.resource.data.programmingPassedCount >= 0 &&
+  request.resource.data.programmingTotalTests is int &&
+  request.resource.data.programmingTotalTests >= 0 &&
+  request.resource.data.programmingPassedCount <=
+    request.resource.data.programmingTotalTests &&
+  request.resource.data.programmingPercentage is int &&
+  request.resource.data.programmingPercentage >= 0 &&
+  request.resource.data.programmingPercentage <= 100 &&
+  request.resource.data.programmingLastPassed is bool &&
+  request.resource.data.programmingLastError is string &&
+  request.resource.data.studentName is string &&
+
+  // An attempt may increase by exactly one.
+  (
+    (
+      !("programmingAttempts" in resource.data) &&
+      request.resource.data.programmingAttempts == 1
+    ) ||
+    (
+      "programmingAttempts" in resource.data &&
+      request.resource.data.programmingAttempts ==
+        resource.data.programmingAttempts + 1
+    )
+  ) &&
+
+  // Nothing else can be modified by this programming-evidence write.
+  request.resource.data
+    .diff(resource.data)
+    .affectedKeys()
+    .hasOnly([
+      "studentName",
+      "programmingChallengeId",
+      "programmingCode",
+      "programmingAttempts",
+      "programmingPassedCount",
+      "programmingTotalTests",
+      "programmingPercentage",
+      "programmingLastPassed",
+      "programmingLastError",
+      "updatedAt"
+    ]);
+
+  allow delete: if false;
+}
+
+
+    // ─────────────────────────────────────────────
+    // Assignment results
+    // ─────────────────────────────────────────────
+
+    match /assignmentResults/{resultId} {
+
+  /*
+   * Students may read their own existing result.
+   *
+   * The result document ID uses:
+   * assignmentId_studentId
+   *
+   * The suffix check also allows a student to perform a direct
+   * get before the result exists. Firestore can then return
+   * "document not found" and the app displays "Not started".
+   *
+   * Teachers may read results belonging to their assignments.
+   * Admins may read all results.
+   */
+  allow get: if signedIn() &&
+    (
+      (
+        resource != null &&
+        (
+          resource.data.studentId ==
+            currentUserId() ||
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        )
+      ) ||
+
+      resultId.matches(
+        "^.*_" + currentUserId() + "$"
+      ) ||
+
+      /*
+       * Teacher analytics may check an expected quiz result before it
+       * exists. Permit only the missing-document lookup; existing result
+       * documents remain protected by teacherId/studentId ownership above.
+       */
+      (resource == null && isTeacher())
+    );
+
+  /*
+   * Queries remain restricted to the student, owning teacher
+   * or an administrator.
+   */
+  allow list: if signedIn() &&
+    (
+      resource.data.studentId ==
+        currentUserId() ||
+      resource.data.teacherId ==
+        currentUserId() ||
+      isAdmin()
+    );
+
+  /*
+   * Students may create only their own completed result.
+   * Assignment, class and teacher values must match the
+   * original quiz assignment document.
+   */
+  allow create: if signedIn() &&
+    request.resource.data.studentId ==
+      currentUserId() &&
+    assignmentExists(
+      request.resource.data.assignmentId
+    ) &&
+    request.resource.data.classId ==
+      assignmentData(
+        request.resource.data.assignmentId
+      ).classId &&
+    request.resource.data.teacherId ==
+      assignmentData(
+        request.resource.data.assignmentId
+      ).teacherId &&
+    request.resource.data.resourceId ==
+      assignmentData(
+        request.resource.data.assignmentId
+      ).resourceId &&
+    request.resource.data.assignmentType ==
+      "quiz" &&
+    belongsToClass(
+      request.resource.data.classId
+    ) &&
+    request.resource.data.status ==
+      "completed";
+
+  /*
+   * Students may update only their own result while preserving
+   * assignment ownership and identity fields.
+   */
+  allow update: if signedIn() &&
+    resource.data.studentId ==
+      currentUserId() &&
+    request.resource.data.studentId ==
+      resource.data.studentId &&
+    request.resource.data.assignmentId ==
+      resource.data.assignmentId &&
+    request.resource.data.classId ==
+      resource.data.classId &&
+    request.resource.data.teacherId ==
+      resource.data.teacherId &&
+    request.resource.data.resourceId ==
+      resource.data.resourceId &&
+    request.resource.data.assignmentType ==
+      resource.data.assignmentType &&
+    request.resource.data.status ==
+      "completed" &&
+    request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "score",
+        "totalQuestions",
+        "percentage",
+        "earnedXP",
+        "timeTakenSeconds",
+        "status",
+        "completedAt"
+      ]);
+
+  allow delete: if isTeacher() &&
+    (
+      resource.data.teacherId ==
+        currentUserId() ||
+      isAdmin()
+    );
+}
+
+
+    // ─────────────────────────────────────────────
+    // AI-generated quizzes
+    // ─────────────────────────────────────────────
+
+    match /generatedQuizzes/{quizId} {
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId ==
+          currentUserId();
+
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        );
+
+      allow list: if isTeacher();
+
+      /*
+       * Signed-in students may load an assigned quiz directly.
+       */
+      allow get: if signedIn();
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Student quiz results
+    // users/{userId}/quizResults/{resultId}
+    // ─────────────────────────────────────────────
+
+    match /users/{userId}/quizResults/{resultId} {
+
+      allow get, list: if signedIn() &&
+        (
+          currentUserId() == userId ||
+          isTeacher()
+        );
+
+      allow create: if signedIn() &&
+        currentUserId() == userId &&
+        request.resource.data.uid ==
+          currentUserId();
+
+      allow update: if signedIn() &&
+        currentUserId() == userId &&
+        request.resource.data.uid ==
+          resource.data.uid &&
+        request.resource.data.uid ==
+          currentUserId();
+
+      allow delete: if signedIn() &&
+        (
+          currentUserId() == userId ||
+          isAdmin()
+        );
+    }
+
+
+    // Supports collectionGroup(db, "quizResults").
+    match /{path=**}/quizResults/{resultId} {
+      allow get, list: if isTeacher();
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Teacher access requests
+    // ─────────────────────────────────────────────
+
+    match /teacherRequests/{requestId} {
+
+  /*
+   * A signed-in user may submit only a pending teacher request
+   * belonging to their own Firebase UID.
+   */
+  allow create: if signedIn() &&
+    request.resource.data.userId == currentUserId() &&
+    request.resource.data.status == "pending" &&
+    request.resource.data.name is string &&
+    request.resource.data.email is string &&
+    request.resource.data.schoolName is string &&
+    request.resource.data.jobTitle is string &&
+    request.resource.data.message is string;
+
+  /*
+   * Applicant may open their own request.
+   * Admin may open any request.
+   */
+  allow get: if signedIn() &&
+    (
+      resource.data.userId == currentUserId() ||
+      isAdmin()
+    );
+
+  /*
+   * Applicants need this because teacherRequestService performs:
+   *
+   * where("userId", "==", currentUserId())
+   *
+   * Firestore treats that as a LIST/query operation.
+   *
+   * Rules still protect other applicants: the query must only
+   * return documents whose userId matches the signed-in user.
+   */
+  allow list: if signedIn() &&
+    (
+      resource.data.userId == currentUserId() ||
+      isAdmin()
+    );
+
+  /*
+   * Applicants cannot approve, reject or modify requests.
+   * Review remains administrator-only.
+   */
+  allow update, delete: if isAdmin();
+}
+
+    // ─────────────────────────────────────────────
+    // Teacher resource library
+    // ─────────────────────────────────────────────
+
+    match /teacherResources/{resourceId} {
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId ==
+          currentUserId();
+
+      /*
+       * Teachers may query their own resource library.
+       */
+      allow list: if isTeacher();
+
+      /*
+       * Teachers/admins may open managed resources.
+       * Signed-in students may directly open published resources.
+       */
+      allow get: if signedIn() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin() ||
+          resource.data.status == "published"
+        );
+
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+
+    // ─────────────────────────────────────────────
+    // Exam-style question sets
+    // ─────────────────────────────────────────────
+
+    match /examQuestionSets/{questionSetId} {
+
+      /*
+       * Teachers may create question sets only for themselves.
+       */
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId ==
+          currentUserId();
+
+      /*
+       * Teachers may read only their own question sets.
+       * Admins may read all question sets.
+       */
+      allow get, list: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        );
+
+      /*
+       * Teachers may update only their own question sets.
+       * The teacherId must never be changed.
+       */
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId ==
+          resource.data.teacherId;
+
+      /*
+       * Teachers may delete only their own question sets.
+       * Admins may delete any question set.
+       */
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId ==
+            currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+
+    // ─────────────────────────────────────────────
+    // Written exam assignments
+    // ─────────────────────────────────────────────
+
+    match /examAssignments/{assignmentId} {
+
+      allow get, list: if signedIn() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          currentUserId() in resource.data.studentIds ||
+          isAdmin()
+        );
+
+      allow create: if isTeacher() &&
+        request.resource.data.teacherId == currentUserId() &&
+        ownsClass(request.resource.data.classId) &&
+        request.resource.data.studentIds is list &&
+        request.resource.data.questionSetSnapshot is map &&
+        request.resource.data.status == "active";
+
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.classId == resource.data.classId &&
+        request.resource.data.studentIds == resource.data.studentIds;
+
+      allow update: if signedIn() &&
+        currentUserId() in resource.data.studentIds &&
+        request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "submittedCount",
+            "updatedAt"
+          ]) &&
+        request.resource.data.submittedCount is int &&
+        request.resource.data.submittedCount >=
+          resource.data.submittedCount &&
+        request.resource.data.submittedCount <=
+          resource.data.studentIds.size();
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Student written exam submissions
+    // ─────────────────────────────────────────────
+
+    match /examSubmissions/{submissionId} {
+
+      /*
+       * Written exam submission document ID:
+       * assignmentId_studentId
+       *
+       * Students can read their own submission.
+       * The owning teacher and administrators can also read it.
+       */
+      allow get: if signedIn() &&
+        (
+          (
+            resource != null &&
+            (
+              resource.data.studentId == currentUserId() ||
+              resource.data.teacherId == currentUserId() ||
+              isAdmin()
+            )
+          ) ||
+          submissionId.matches(
+            "^.*_" + currentUserId() + "$"
+          ) ||
+          (resource == null && isTeacher())
+        );
+
+      allow list: if signedIn() &&
+        (
+          resource.data.studentId == currentUserId() ||
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+
+      /*
+       * A student may create only their own initial submission for an exam
+       * assignment that is actually assigned to them.
+       */
+      allow create: if signedIn() &&
+        request.resource.data.studentId == currentUserId() &&
+        submissionId.matches(
+          "^.*_" + currentUserId() + "$"
+        ) &&
+        request.resource.data.assignmentId is string &&
+        isStudentForExamAssignment(
+          request.resource.data.assignmentId
+        ) &&
+        request.resource.data.teacherId ==
+          examAssignmentData(
+            request.resource.data.assignmentId
+          ).teacherId &&
+        request.resource.data.classId ==
+          examAssignmentData(
+            request.resource.data.assignmentId
+          ).classId &&
+        request.resource.data.status == "in_progress" &&
+        request.resource.data.answers is list &&
+        request.resource.data.totalAvailableMarks is int &&
+        request.resource.data.totalAvailableMarks > 0 &&
+        request.resource.data.totalAwardedMarks == 0 &&
+        request.resource.data.percentage == 0 &&
+        request.resource.data.overallFeedback == "" &&
+        request.resource.data.integrityIncidents is list &&
+        request.resource.data.integrityIncidents.size() == 0 &&
+        request.resource.data.integrityTerminated == false &&
+        request.resource.data.integrityTerminationReason == "";
+
+      /*
+       * Student updates:
+       * - autosave answers
+       * - normal submission
+       * - start integrity monitoring
+       * - record fullscreen/page-visibility incidents
+       * - track current question
+       * - integrity termination + automatic submission
+       *
+       * Identity and teacher-marking fields remain protected.
+       */
+      allow update: if signedIn() &&
+        resource.data.studentId == currentUserId() &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.assignmentId == resource.data.assignmentId &&
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.classId == resource.data.classId &&
+        isStudentForExamAssignment(
+          resource.data.assignmentId
+        ) &&
+        request.resource.data.status in [
+          "in_progress",
+          "submitted"
+        ] &&
+        request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "answers",
+            "status",
+            "submittedAt",
+            "updatedAt",
+            "integrityPolicySnapshot",
+            "integrityIncidents",
+            "integrityTerminated",
+            "integrityTerminationReason",
+            "integritySessionStartedAt",
+            "integrityLastQuestionNumber"
+          ]);
+
+      /*
+       * Teacher/admin marking updates.
+       */
+      allow update: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        ) &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.assignmentId == resource.data.assignmentId &&
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.classId == resource.data.classId &&
+        request.resource.data.status in [
+          "marking",
+          "marked"
+        ] &&
+        request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "answers",
+            "overallFeedback",
+            "totalAwardedMarks",
+            "totalAvailableMarks",
+            "percentage",
+            "status",
+            "markedAt",
+            "updatedAt"
+          ]);
+
+      allow delete: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
+    }
+
+
+match /interventions/{interventionId} {
+  allow create: if isTeacher() &&
+    request.resource.data.teacherId == request.auth.uid;
+
+  allow get, list: if signedIn() &&
+    (
+      resource.data.teacherId == request.auth.uid ||
+      resource.data.studentId == request.auth.uid ||
+      isAdmin()
+    );
+
+  allow update: if signedIn() &&
+    (
+      (
+        resource.data.teacherId == request.auth.uid &&
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.studentId == resource.data.studentId
+      ) ||
+      (
+        resource.data.studentId == request.auth.uid &&
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          "steps", "status", "completedAt", "updatedAt"
+        ])
+      ) ||
+      isAdmin()
+    );
+
+  allow delete: if isAdmin() ||
+    (isTeacher() && resource.data.teacherId == request.auth.uid);
+}
+
+
+match /studentTutorConversations/{conversationId} {
+  allow create: if signedIn() && request.resource.data.studentId == currentUserId();
+  allow get, list: if signedIn() && (resource.data.studentId == currentUserId() || isAdmin());
+  allow update: if signedIn() &&
+    resource.data.studentId == currentUserId() &&
+    request.resource.data.studentId == resource.data.studentId &&
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title", "messages", "updatedAt"]);
+  allow delete: if signedIn() && (resource.data.studentId == currentUserId() || isAdmin());
+  
+  }
+
+
+
+ match /lessonProgress/{progressId} {
+
+  /*
+   * Lesson-progress document IDs use:
+   * {studentId}_{lessonId}
+   */
+
+  allow get: if signedIn() &&
+    (
+      (
+        resource != null &&
+        resource.data.studentId == currentUserId()
+      ) ||
+      progressId.matches(
+        "^" + currentUserId() + "_.*$"
+      ) ||
+      isTeacher() ||
+      isAdmin()
+    );
+
+  /*
+   * Students may query only their own progress.
+   * Teachers and administrators may query student progress.
+   */
+  allow list: if signedIn() &&
+    (
+      resource.data.studentId == currentUserId() ||
+      isTeacher() ||
+      isAdmin()
+    );
+
+  /*
+   * Students may create only their own lesson-progress record.
+   */
+  allow create: if signedIn() &&
+    request.resource.data.studentId == currentUserId() &&
+    request.resource.data.lessonId is string &&
+    request.resource.data.topicId is string &&
+    request.resource.data.currentStepIndex is int &&
+    request.resource.data.completedStepIds is list &&
+    request.resource.data.practiceResponses is list &&
+    request.resource.data.checkpointResponses is list &&
+    request.resource.data.status in [
+      "in_progress",
+      "completed"
+    ] &&
+    progressId.matches(
+      "^" + currentUserId() + "_.*$"
+    );
+
+  /*
+   * Students may update the interactive state of only their
+   * own progress record. Identity fields cannot be changed.
+   */
+  allow update: if signedIn() &&
+    resource.data.studentId == currentUserId() &&
+    request.resource.data.studentId ==
+      resource.data.studentId &&
+    request.resource.data.lessonId ==
+      resource.data.lessonId &&
+    request.resource.data.topicId ==
+      resource.data.topicId &&
+    progressId.matches(
+      "^" + currentUserId() + "_.*$"
+    ) &&
+    request.resource.data.status in [
+      "in_progress",
+      "completed"
+    ] &&
+    request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "currentStepIndex",
+        "completedStepIds",
+        "practiceResponses",
+        "checkpointResponses",
+        "examResponse",
+        "examMarking",
+        "reflection",
+        "audioEnabled",
+        "audioRate",
+        "selectedVoiceName",
+        "practiceAccuracy",
+        "checkpointAccuracy",
+        "examAccuracy",
+        "overallAccuracy",
+        "masteryImpact",
+        "reviewAt",
+        "status",
+        "startedAt",
+        "updatedAt",
+        "completedAt"
+      ]);
+
+  allow delete: if signedIn() &&
+    (
+      resource.data.studentId == currentUserId() ||
+      isAdmin()
+    );
+}
+
+    match /examTrainerAttempts/{attemptId} {
+  allow create: if request.auth != null
+    && request.resource.data.studentId == request.auth.uid;
+
+  allow read: if request.auth != null
+    && resource.data.studentId == request.auth.uid;
+
+  allow update: if request.auth != null
+    && resource.data.studentId == request.auth.uid
+    && request.resource.data.studentId == resource.data.studentId;
+
+  allow delete: if false;
+}
+
+
+    match /users/{userId}/examTrainerResults/{resultId} {
+  allow read, create, update: if request.auth != null
+    && request.auth.uid == userId;
+
+  allow delete: if false;
+}
+
+    // ─────────────────────────────────────────────
+    // Deny collections not explicitly listed
+    // ─────────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
