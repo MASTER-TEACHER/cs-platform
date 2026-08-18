@@ -34,6 +34,76 @@ function normaliseString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+type FirestoreLikeError = {
+  code?: unknown;
+  message?: unknown;
+};
+
+function normaliseErrorCode(error: unknown): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as FirestoreLikeError).code === "string"
+  ) {
+    return ((error as FirestoreLikeError).code as string).toLowerCase();
+  }
+
+  return "";
+}
+
+function normaliseErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.trim();
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof (error as FirestoreLikeError).message === "string"
+  ) {
+    return ((error as FirestoreLikeError).message as string).trim();
+  }
+
+  return "";
+}
+
+function isExpectedUnavailableError(error: unknown): boolean {
+  const code = normaliseErrorCode(error);
+  const message = normaliseErrorMessage(error).toLowerCase();
+
+  return (
+    code === "permission-denied" ||
+    code === "firestore/permission-denied" ||
+    code === "not-found" ||
+    code === "firestore/not-found" ||
+    message.includes("missing or insufficient permissions") ||
+    message.includes("do not have permission") ||
+    message.includes("not found")
+  );
+}
+
+function getMarkbookErrorMessage(error: unknown): string {
+  if (isExpectedUnavailableError(error)) {
+    return "This assignment could not be found or you do not have access to it.";
+  }
+
+  return "The exam markbook could not be loaded. Please try again.";
+}
+
+function reportUnexpectedLoadError(
+  context: string,
+  error: unknown,
+): void {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    !isExpectedUnavailableError(error)
+  ) {
+    console.warn(context, error);
+  }
+}
+
 async function getStudentIdentity(studentId: string): Promise<StudentIdentity> {
   try {
     const snapshot = await getDoc(doc(db, "users", studentId));
@@ -62,7 +132,10 @@ async function getStudentIdentity(studentId: string): Promise<StudentIdentity> {
       email,
     };
   } catch (error) {
-    console.error(`Unable to load student profile ${studentId}:`, error);
+    reportUnexpectedLoadError(
+      `Unable to load student profile ${studentId}:`,
+      error,
+    );
 
     return {
       uid: studentId,
@@ -215,18 +288,16 @@ export default function ExamAssignmentMarkbookPage() {
           ),
         );
       } catch (caughtError) {
-        console.error("Unable to load exam markbook:", caughtError);
+        reportUnexpectedLoadError(
+          "Unable to load exam markbook:",
+          caughtError,
+        );
 
         if (!cancelled) {
           setAssignment(null);
           setSubmissions([]);
           setStudents([]);
-
-          setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "The markbook could not be loaded.",
-          );
+          setError(getMarkbookErrorMessage(caughtError));
         }
       } finally {
         if (!cancelled) {
@@ -297,10 +368,13 @@ export default function ExamAssignmentMarkbookPage() {
     return (
       <Card>
         <h1 className="text-2xl font-black text-slate-950">
-          Assignment not found
+          Assignment unavailable
         </h1>
 
-        {error && <p className="mt-3 text-red-700">{error}</p>}
+        <p className="mt-3 text-slate-600">
+          {error ||
+            "This assignment could not be found or you do not have access to it."}
+        </p>
 
         <Link
           href="/teacher/exam-assignments"

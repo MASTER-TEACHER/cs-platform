@@ -13,6 +13,10 @@ export type QuizAssignmentSource =
   | "built-in"
   | "ai-generated";
 
+export type QuizDeliveryMode =
+  | "practice"
+  | "assessment";
+
 export type CreateAssignmentInput = {
   teacherId: string;
   classId: string;
@@ -21,7 +25,9 @@ export type CreateAssignmentInput = {
   type: "lesson" | "quiz";
   resourceId: string;
   dueDate: string;
+
   quizSource?: QuizAssignmentSource;
+  deliveryMode?: QuizDeliveryMode;
 };
 
 export async function createAssignment({
@@ -33,6 +39,7 @@ export async function createAssignment({
   resourceId,
   dueDate,
   quizSource,
+  deliveryMode,
 }: CreateAssignmentInput) {
   const assignmentRef = await addDoc(
     collection(db, "assignments"),
@@ -44,12 +51,17 @@ export async function createAssignment({
       type,
       resourceId,
       dueDate,
+
       ...(type === "quiz"
         ? {
             quizSource:
               quizSource || "built-in",
+
+            deliveryMode:
+              deliveryMode || "practice",
           }
         : {}),
+
       status: "active",
       createdAt: serverTimestamp(),
     },

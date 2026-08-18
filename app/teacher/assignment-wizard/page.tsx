@@ -25,7 +25,6 @@ import { createProgrammingAssignment } from "@/services/programmingAssignmentSer
 import { createExamAssignment } from "@/services/examAssignmentService";
 import { getExamQuestionSetById } from "@/services/examQuestionService";
 import { createResourceAssignment } from "@/services/resourceAssignmentService";
-import InterventionAssignmentContext from "@/components/teacher/assignment/InterventionAssignmentContext";
 
 import type {
   AssignmentWizardClass,
@@ -39,6 +38,7 @@ const initialWizardData: AssignmentWizardData = {
   selectedClassIds: [],
   dueDate: "",
   instructions: "",
+  deliveryMode: "practice",
 };
 
 export default function AssignmentWizardPage() {
@@ -248,12 +248,19 @@ export default function AssignmentWizardPage() {
   function selectResource(
     resource: AssignmentWizardResource,
   ) {
+    const quizResource =
+      resource.resourceType === "quiz" ||
+      resource.resourceType === "ai-quiz";
+
     setWizardData((current) => ({
       ...current,
       resource,
       instructions:
         current.instructions ||
         resource.description,
+      deliveryMode: quizResource
+        ? current.deliveryMode
+        : "practice",
     }));
   }
 
@@ -558,6 +565,8 @@ export default function AssignmentWizardPage() {
                 quizSource: isAIQuiz
                   ? "ai-generated"
                   : "built-in",
+                deliveryMode:
+                  wizardData.deliveryMode,
               }),
           ),
         );
@@ -660,8 +669,6 @@ export default function AssignmentWizardPage() {
         </div>
       </Card>
 
-      <InterventionAssignmentContext />
-
       <WizardProgress
         currentStep={step}
       />
@@ -698,34 +705,119 @@ export default function AssignmentWizardPage() {
       )}
 
       {step === "details" && (
-        <AssignmentDetailsStep
-          dueDate={wizardData.dueDate}
-          instructions={
-            wizardData.instructions
-          }
-          onDueDateChange={(value) =>
-            setWizardData(
-              (current) => ({
-                ...current,
-                dueDate: value,
-              }),
-            )
-          }
-          onInstructionsChange={(value) =>
-            setWizardData(
-              (current) => ({
-                ...current,
-                instructions: value,
-              }),
-            )
-          }
-          onBack={() =>
-            setStep("classes")
-          }
-          onNext={() =>
-            setStep("review")
-          }
-        />
+        <div className="space-y-6">
+          {(wizardData.resource?.resourceType === "quiz" ||
+            wizardData.resource?.resourceType === "ai-quiz") && (
+            <Card>
+              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+                Quiz delivery mode
+              </p>
+
+              <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                How should students take this quiz?
+              </h2>
+
+              <p className="mt-2 text-slate-600">
+                Practice keeps the normal quiz experience. Assessment marks the
+                assignment for monitored Exam Mode delivery.
+              </p>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWizardData((current) => ({
+                      ...current,
+                      deliveryMode: "practice",
+                    }))
+                  }
+                  className={`rounded-2xl border-2 p-5 text-left transition ${
+                    wizardData.deliveryMode === "practice"
+                      ? "border-teal-500 bg-teal-50"
+                      : "border-slate-200 bg-white hover:border-teal-300"
+                  }`}
+                >
+                  <p className="font-black text-slate-950">
+                    Practice quiz
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Standard quiz player with feedback, XP and normal navigation.
+                  </p>
+
+                  <p className="mt-3 text-xs font-bold uppercase tracking-wide text-teal-700">
+                    Default
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWizardData((current) => ({
+                      ...current,
+                      deliveryMode: "assessment",
+                    }))
+                  }
+                  className={`rounded-2xl border-2 p-5 text-left transition ${
+                    wizardData.deliveryMode === "assessment"
+                      ? "border-indigo-600 bg-indigo-50"
+                      : "border-slate-200 bg-white hover:border-indigo-300"
+                  }`}
+                >
+                  <p className="font-black text-slate-950">
+                    Assessment / test
+                  </p>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Intended for monitored Exam Mode delivery with integrity
+                    monitoring and restricted navigation.
+                  </p>
+
+                  <p className="mt-3 text-xs font-bold uppercase tracking-wide text-indigo-700">
+                    Monitored
+                  </p>
+                </button>
+              </div>
+
+              {wizardData.deliveryMode === "assessment" && (
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                  This assignment will be stored as an assessment quiz. The next
+                  wiring step will route assessment quizzes through the existing
+                  Exam Mode integrity shell; practice quizzes remain unchanged.
+                </div>
+              )}
+            </Card>
+          )}
+
+          <AssignmentDetailsStep
+            dueDate={wizardData.dueDate}
+            instructions={
+              wizardData.instructions
+            }
+            onDueDateChange={(value) =>
+              setWizardData(
+                (current) => ({
+                  ...current,
+                  dueDate: value,
+                }),
+              )
+            }
+            onInstructionsChange={(value) =>
+              setWizardData(
+                (current) => ({
+                  ...current,
+                  instructions: value,
+                }),
+              )
+            }
+            onBack={() =>
+              setStep("classes")
+            }
+            onNext={() =>
+              setStep("review")
+            }
+          />
+        </div>
       )}
 
       {step === "review" && (
@@ -744,6 +836,7 @@ export default function AssignmentWizardPage() {
     </div>
   );
 }
+
 function WizardProgress({
   currentStep,
 }: {

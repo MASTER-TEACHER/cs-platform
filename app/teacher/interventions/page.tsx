@@ -164,35 +164,143 @@ export default function TeacherInterventionsPage() {
       <InterventionActionContext />
 
       <Card>
-        <h2 className="text-2xl font-black">
-          Recommended interventions
-        </h2>
+  <h2 className="text-2xl font-black">
+    Recommended interventions
+  </h2>
 
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full min-w-[1100px]">
-            <thead>
-              <tr className="border-b bg-slate-50 text-left">
-                <th className="p-4">Student</th>
-                <th className="p-4">Performance</th>
-                <th className="p-4">Priority topic</th>
-                <th className="p-4">Priority</th>
-                <th className="p-4">Recommendation</th>
-                <th className="p-4">Action</th>
-              </tr>
-            </thead>
+  {filtered.length === 0 ? (
+    <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+      <p className="font-bold text-slate-700">
+        No matching intervention recommendations
+      </p>
 
-            <tbody>
-              {filtered.map((candidate) => (
-                <InterventionStudentRow
-                  key={candidate.student.uid}
-                  candidate={candidate}
-                  onCreate={setSelected}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <p className="mt-2 text-sm text-slate-500">
+        Try changing the search term or priority filter.
+      </p>
+    </div>
+  ) : (
+    <>
+      {/*
+       * Mobile layout:
+       * show each candidate as a readable card instead of
+       * forcing the desktop table into a 390px viewport.
+       */}
+      <div className="mt-6 grid gap-4 md:hidden">
+        {filtered.map((candidate) => (
+          <article
+            key={candidate.student.uid}
+            className="rounded-2xl border border-slate-200 bg-white p-5"
+          >
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Student
+              </p>
+
+              <h3 className="text-lg font-black text-slate-950">
+                {candidate.student.name}
+              </h3>
+
+              <p className="text-sm text-slate-500">
+                {candidate.student.email}
+              </p>
+
+              <p className="text-sm font-semibold text-slate-600">
+                {candidate.className}
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  Performance
+                </p>
+
+                <p className="mt-1 text-xl font-black text-slate-950">
+  {candidate.priorityTopicScore}%
+</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  Priority
+                </p>
+
+                <span
+                  className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${
+                    candidate.priority === "high"
+                      ? "bg-red-100 text-red-700"
+                      : candidate.priority === "medium"
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  {candidate.priority}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Priority topic
+              </p>
+
+              <p className="mt-1 font-black text-slate-900">
+                {candidate.priorityTopic}
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Recommendation
+              </p>
+
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {candidate.recommendation}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelected(candidate)}
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-600 px-4 text-sm font-black text-white transition hover:bg-teal-700"
+            >
+              Create intervention
+            </button>
+          </article>
+        ))}
+      </div>
+
+      {/*
+       * Desktop / tablet layout:
+       * preserve the existing table.
+       */}
+      <div className="mt-6 hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[1100px]">
+          <thead>
+            <tr className="border-b bg-slate-50 text-left">
+              <th className="p-4">Student</th>
+              <th className="p-4">Performance</th>
+              <th className="p-4">Priority topic</th>
+              <th className="p-4">Priority</th>
+              <th className="p-4">Recommendation</th>
+              <th className="p-4">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {filtered.map((candidate) => (
+              <InterventionStudentRow
+                key={candidate.student.uid}
+                candidate={candidate}
+                onCreate={setSelected}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )}
+</Card>
 
       <InterventionIntelligencePanel />
 

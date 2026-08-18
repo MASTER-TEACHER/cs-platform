@@ -30,11 +30,17 @@ export type TeacherClass = {
   subject: string;
   yearGroup: string;
   academicYear: string;
+
   teacherId: string;
   teacherName?: string;
+
   studentIds: string[];
   students?: ClassStudent[];
+
+  assignmentIds: string[];
+
   status: ClassStatus;
+
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -94,15 +100,29 @@ function convertClassDocument(
 ): TeacherClass {
   return {
     id: documentId,
+
     name: data.name,
     subject: data.subject,
     yearGroup: data.yearGroup,
     academicYear: data.academicYear,
+
     teacherId: data.teacherId,
     teacherName: data.teacherName,
-    studentIds: Array.isArray(data.studentIds) ? data.studentIds : [],
-    students: Array.isArray(data.students) ? data.students : [],
+
+    studentIds: Array.isArray(data.studentIds)
+      ? data.studentIds
+      : [],
+
+    students: Array.isArray(data.students)
+      ? data.students
+      : [],
+
+    assignmentIds: Array.isArray(data.assignmentIds)
+      ? data.assignmentIds
+      : [],
+
     status: data.status ?? "active",
+
     createdAt: convertTimestamp(data.createdAt),
     updatedAt: convertTimestamp(data.updatedAt),
   };
@@ -208,11 +228,17 @@ export async function createTeacherClass(
     subject: input.subject.trim() || "Computer Science",
     yearGroup: input.yearGroup.trim(),
     academicYear: input.academicYear.trim(),
+
     teacherId: input.teacherId.trim(),
     teacherName: input.teacherName?.trim() || "",
+
+    // Every new class starts empty.
     studentIds: [],
     students: [],
+    assignmentIds: [],
+
     status: "active",
+
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

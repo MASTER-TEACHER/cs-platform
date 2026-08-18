@@ -2,37 +2,129 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { createTeacherRequest } from "@/services/teacherRequestService";
 
+type TeacherProfileExtension = {
+  accountIntent?: string | null;
+  teacherAccessStatus?:
+    | "not_submitted"
+    | "pending"
+    | "approved"
+    | "rejected"
+    | null;
+};
+
 export default function TeacherAccessPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
 
-  const [name, setName] = useState("");
-  const [schoolName, setSchoolName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const {
+    user,
+    profile,
+    loading,
+    profileReady,
+    refreshProfile,
+  } = useAuth();
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const extendedProfile =
+    profile as
+      | (typeof profile &
+          TeacherProfileExtension)
+      | null;
+
+  const [name, setName] =
+    useState("");
+
+  const [schoolName, setSchoolName] =
+    useState("");
+
+  const [jobTitle, setJobTitle] =
+    useState("");
+
+  const [message, setMessage] =
+    useState("");
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [submitted, setSubmitted] =
+    useState(false);
+
+  useEffect(() => {
+    if (
+      loading ||
+      (user && !profileReady)
+    ) {
+      return;
+    }
+
+    if (
+      profile?.role === "teacher" ||
+      profile?.role === "admin"
+    ) {
+      router.replace("/teacher");
+      return;
+    }
+
+    if (
+      extendedProfile
+        ?.teacherAccessStatus ===
+      "pending"
+    ) {
+      setSubmitted(true);
+    }
+
+    if (
+      user &&
+      !name
+    ) {
+      setName(
+        profile?.name ||
+          user.displayName ||
+          "",
+      );
+    }
+  }, [
+    loading,
+    user,
+    profileReady,
+    profile,
+    extendedProfile
+      ?.teacherAccessStatus,
+    router,
+    name,
+  ]);
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     if (!user) {
       toast.error(
-        "Create a student account or log in before requesting teacher access.",
+        "Create an account or log in before requesting teacher access.",
       );
+
       router.push("/register");
       return;
     }
 
-    if (!name.trim() || !schoolName.trim() || !jobTitle.trim()) {
-      toast.error("Please complete all required fields.");
+    if (
+      !name.trim() ||
+      !schoolName.trim() ||
+      !jobTitle.trim()
+    ) {
+      toast.error(
+        "Please complete all required fields.",
+      );
       return;
     }
 
@@ -43,15 +135,26 @@ export default function TeacherAccessPage() {
         userId: user.uid,
         name: name.trim(),
         email: user.email || "",
-        schoolName: schoolName.trim(),
-        jobTitle: jobTitle.trim(),
-        message: message.trim(),
+        schoolName:
+          schoolName.trim(),
+        jobTitle:
+          jobTitle.trim(),
+        message:
+          message.trim(),
       });
 
+      await refreshProfile();
+
       setSubmitted(true);
-      toast.success("Teacher access request submitted.");
+
+      toast.success(
+        "Teacher access request submitted.",
+      );
     } catch (error) {
-      console.error("Teacher request error:", error);
+      console.error(
+        "Teacher request error:",
+        error,
+      );
 
       toast.error(
         error instanceof Error
@@ -63,13 +166,19 @@ export default function TeacherAccessPage() {
     }
   }
 
-  if (loading) {
+  if (
+    loading ||
+    (user && !profileReady)
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-100">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
 
-          <p className="mt-4 font-semibold text-slate-600">Loading...</p>
+          <p className="mt-4 font-semibold text-slate-600">
+            Preparing teacher
+            access...
+          </p>
         </div>
       </main>
     );
@@ -85,30 +194,14 @@ export default function TeacherAccessPage() {
             width={130}
             height={130}
             priority
-            className="rounded-2xl"
+            className="h-auto w-auto rounded-2xl"
           />
         </div>
 
-        {submitted ? (
-          <div className="mt-8 text-center">
-            <div className="text-6xl">✅</div>
-
-            <h1 className="mt-5 text-3xl font-bold text-slate-900">
-              Request submitted
-            </h1>
-
-            <p className="mt-3 leading-7 text-slate-600">
-              Your teacher access request is awaiting administrator review. You
-              will remain a student account until it is approved.
-            </p>
-
-            <Link
-              href="/dashboard"
-              className="mt-8 inline-flex rounded-xl bg-indigo-600 px-6 py-3 font-bold text-white transition hover:bg-indigo-700"
-            >
-              Return to Dashboard
-            </Link>
-          </div>
+        {!user ? (
+          <SignedOutState />
+        ) : submitted ? (
+          <PendingState />
         ) : (
           <>
             <h1 className="mt-6 text-center text-3xl font-bold text-slate-900">
@@ -116,30 +209,16 @@ export default function TeacherAccessPage() {
             </h1>
 
             <p className="mt-2 text-center text-slate-600">
-              Teacher accounts require administrator approval.
+              Complete your teacher
+              details. Teacher access
+              requires administrator
+              approval.
             </p>
 
-            {!user && (
-              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <p className="font-semibold text-amber-900">
-                  You need an account first.
-                </p>
-
-                <p className="mt-2 text-sm text-amber-800">
-                  Create a student account, then return here to request teacher
-                  access.
-                </p>
-
-                <Link
-                  href="/register"
-                  className="mt-4 inline-flex font-bold text-amber-800"
-                >
-                  Create an account →
-                </Link>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            <form
+              onSubmit={handleSubmit}
+              className="mt-8 space-y-5"
+            >
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">
                   Full name
@@ -148,7 +227,11 @@ export default function TeacherAccessPage() {
                 <input
                   type="text"
                   value={name}
-                  onChange={(event) => setName(event.target.value)}
+                  onChange={(event) =>
+                    setName(
+                      event.target.value,
+                    )
+                  }
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
                 />
@@ -162,7 +245,11 @@ export default function TeacherAccessPage() {
                 <input
                   type="text"
                   value={schoolName}
-                  onChange={(event) => setSchoolName(event.target.value)}
+                  onChange={(event) =>
+                    setSchoolName(
+                      event.target.value,
+                    )
+                  }
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
                 />
@@ -176,7 +263,11 @@ export default function TeacherAccessPage() {
                 <input
                   type="text"
                   value={jobTitle}
-                  onChange={(event) => setJobTitle(event.target.value)}
+                  onChange={(event) =>
+                    setJobTitle(
+                      event.target.value,
+                    )
+                  }
                   placeholder="Example: Head of Computer Science"
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
@@ -185,12 +276,17 @@ export default function TeacherAccessPage() {
 
               <label className="block">
                 <span className="text-sm font-semibold text-slate-700">
-                  Additional information
+                  Additional
+                  information
                 </span>
 
                 <textarea
                   value={message}
-                  onChange={(event) => setMessage(event.target.value)}
+                  onChange={(event) =>
+                    setMessage(
+                      event.target.value,
+                    )
+                  }
                   rows={4}
                   placeholder="Include any useful information for the administrator."
                   className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
@@ -199,7 +295,7 @@ export default function TeacherAccessPage() {
 
               <button
                 type="submit"
-                disabled={submitting || !user}
+                disabled={submitting}
                 className="w-full rounded-xl bg-indigo-600 px-6 py-4 font-bold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting
@@ -209,7 +305,10 @@ export default function TeacherAccessPage() {
             </form>
 
             <p className="mt-6 text-center text-sm text-slate-600">
-              <Link href="/login" className="font-bold text-indigo-600">
+              <Link
+                href="/login"
+                className="font-bold text-indigo-600"
+              >
                 Return to login
               </Link>
             </p>
@@ -217,5 +316,70 @@ export default function TeacherAccessPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function SignedOutState() {
+  return (
+    <div className="mt-8 text-center">
+      <h1 className="text-3xl font-bold text-slate-900">
+        Request Teacher Access
+      </h1>
+
+      <p className="mt-3 leading-7 text-slate-600">
+        Create a CS Master account
+        or sign in before requesting
+        teacher access.
+      </p>
+
+      <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <Link
+          href="/register"
+          className="rounded-xl bg-indigo-600 px-6 py-3 font-bold text-white"
+        >
+          Create Account
+        </Link>
+
+        <Link
+          href="/login"
+          className="rounded-xl border border-slate-300 px-6 py-3 font-bold text-slate-700"
+        >
+          Sign In
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function PendingState() {
+  return (
+    <div className="mt-8 text-center">
+      <div className="text-6xl">
+        ⏳
+      </div>
+
+      <h1 className="mt-5 text-3xl font-bold text-slate-900">
+        Awaiting approval
+      </h1>
+
+      <p className="mt-3 leading-7 text-slate-600">
+        Your teacher access request
+        has been submitted and is
+        awaiting administrator review.
+      </p>
+
+      <p className="mt-3 text-sm leading-6 text-slate-500">
+        Teacher features will become
+        available after your request
+        has been approved.
+      </p>
+
+      <Link
+        href="/login"
+        className="mt-8 inline-flex rounded-xl border border-slate-300 px-6 py-3 font-bold text-slate-700"
+      >
+        Return to login
+      </Link>
+    </div>
   );
 }

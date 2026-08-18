@@ -1,22 +1,26 @@
 "use client";
 
+import Link from "next/link";
+import { useParams } from "next/navigation";
+import type { ReactNode } from "react";
 import {
-  AlertCircle,
-  ArrowLeft,
-  BarChart3,
-  Brain,
-  CalendarDays,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   Download,
   Search,
-  Trophy,
+  ShieldAlert,
   Users,
   XCircle,
 } from "lucide-react";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
@@ -24,15 +28,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getTeacherQuizAssignmentDetail,
   type TeacherQuizAssignmentDetail,
+  type TeacherQuizIntegrityIncident,
   type TeacherQuizStudentResult,
 } from "@/services/teacherQuizAssignmentService";
 
-type ResultFilter = "all" | "completed" | "not_started";
+type ResultFilter = "all" | "completed" | "not_started" | "integrity";
 
 function formatDate(value: Date | null, includeTime = false): string {
-  if (!value) {
-    return "—";
-  }
+  if (!value) return "—";
 
   return new Intl.DateTimeFormat(
     "en-GB",
@@ -46,68 +49,63 @@ function formatDate(value: Date | null, includeTime = false): string {
         }
       : {
           day: "2-digit",
-          month: "long",
+          month: "short",
           year: "numeric",
         },
   ).format(value);
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds <= 0) {
-    return "—";
-  }
+  if (seconds <= 0) return "—";
 
   const minutes = Math.floor(seconds / 60);
-
   const remainingSeconds = seconds % 60;
 
-  if (minutes === 0) {
-    return `${remainingSeconds}s`;
-  }
-
+  if (minutes === 0) return `${remainingSeconds}s`;
   return `${minutes}m ${remainingSeconds}s`;
 }
 
-function getGrade(percentage: number): string {
-  if (percentage >= 90) return "9";
-  if (percentage >= 80) return "8";
-  if (percentage >= 70) return "7";
-  if (percentage >= 60) return "6";
-  if (percentage >= 50) return "5";
-  if (percentage >= 40) return "4";
-  if (percentage >= 30) return "3";
-  if (percentage >= 20) return "2";
-
-  return "1";
+function formatIncidentType(type: TeacherQuizIntegrityIncident["type"]): string {
+  switch (type) {
+    case "fullscreen_exit":
+      return "Fullscreen exited";
+    case "fullscreen_restored":
+      return "Fullscreen restored";
+    case "page_hidden":
+      return "Page hidden";
+    case "page_visible":
+      return "Page visible";
+    case "auto_submit":
+      return "Auto-submit";
+    default:
+      return "Integrity event";
+  }
 }
 
-function escapeCsvValue(value: string): string {
-  return `"${value.replace(/"/g, '""')}"`;
+function escapeCsvValue(value: string | number): string {
+  const stringValue = String(value ?? "");
+  return `"${stringValue.replace(/"/g, '""')}"`;
 }
 
 export default function TeacherQuizMarkbookPage() {
-  const params = useParams<{
-    assignmentId: string;
-  }>();
-
+  const params = useParams<{ assignmentId: string }>();
   const assignmentId = params.assignmentId;
 
-  const { user } = useAuth();
+  const { user, loading: authLoading, profileReady } = useAuth();
 
-  const [detail, setDetail] = useState<TeacherQuizAssignmentDetail | null>(
-    null,
-  );
-
+  const [detail, setDetail] = useState<TeacherQuizAssignmentDetail | null>(null);
   const [loading, setLoading] = useState(true);
-
   const [error, setError] = useState("");
-
   const [searchTerm, setSearchTerm] = useState("");
-
   const [filter, setFilter] = useState<ResultFilter>("all");
+  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
   const loadMarkbook = useCallback(async () => {
+    if (authLoading || !profileReady) return;
+
     if (!assignmentId || !user?.uid) {
+      setDetail(null);
+      setLoading(false);
       return;
     }
 
@@ -122,20 +120,14 @@ export default function TeacherQuizMarkbookPage() {
 
       if (!loadedDetail) {
         setDetail(null);
-
-        setError(
-          "This quiz assignment could not be found or you do not have permission to view it.",
-        );
-
+        setError("This quiz assignment could not be found or you do not have permission to view it.");
         return;
       }
 
       setDetail(loadedDetail);
     } catch (caughtError) {
-      console.error("Failed to load quiz markbook:", caughtError);
-
+      console.error("Quiz markbook load error:", caughtError);
       setDetail(null);
-
       setError(
         caughtError instanceof Error
           ? caughtError.message
@@ -144,157 +136,124 @@ export default function TeacherQuizMarkbookPage() {
     } finally {
       setLoading(false);
     }
-  }, [assignmentId, user?.uid]);
+  }, [assignmentId, authLoading, profileReady, user?.uid]);
 
   useEffect(() => {
     void loadMarkbook();
   }, [loadMarkbook]);
 
   const completedStudents = useMemo(
-    () =>
-      detail?.students.filter((student) => student.status === "completed") ??
-      [],
+    () => detail?.students.filter((student) => student.status === "completed") ?? [],
     [detail],
   );
 
   const notStartedStudents = useMemo(
-    () =>
-      detail?.students.filter((student) => student.status === "not_started") ??
-      [],
+    () => detail?.students.filter((student) => student.status === "not_started") ?? [],
+    [detail],
+  );
+
+  const integrityStudents = useMemo(
+    () => detail?.students.filter((student) => student.integrityTerminated) ?? [],
     [detail],
   );
 
   const highestPercentage = useMemo(() => {
-    if (completedStudents.length === 0) {
-      return 0;
-    }
-
+    if (completedStudents.length === 0) return 0;
     return Math.max(...completedStudents.map((student) => student.percentage));
   }, [completedStudents]);
 
   const lowestPercentage = useMemo(() => {
-    if (completedStudents.length === 0) {
-      return 0;
-    }
-
+    if (completedStudents.length === 0) return 0;
     return Math.min(...completedStudents.map((student) => student.percentage));
   }, [completedStudents]);
 
   const filteredStudents = useMemo(() => {
-    if (!detail) {
-      return [];
-    }
+    if (!detail) return [];
 
-    const search = searchTerm.trim().toLowerCase();
+    const normalisedSearch = searchTerm.trim().toLowerCase();
 
     return detail.students.filter((student) => {
-      const matchesFilter = filter === "all" || student.status === filter;
-
       const matchesSearch =
-        !search ||
-        student.studentName.toLowerCase().includes(search) ||
-        student.studentEmail.toLowerCase().includes(search);
+        !normalisedSearch ||
+        student.studentName.toLowerCase().includes(normalisedSearch) ||
+        student.studentEmail.toLowerCase().includes(normalisedSearch);
 
-      return matchesFilter && matchesSearch;
+      if (!matchesSearch) return false;
+
+      if (filter === "completed") return student.status === "completed";
+      if (filter === "not_started") return student.status === "not_started";
+      if (filter === "integrity") return student.integrityTerminated;
+      return true;
     });
   }, [detail, filter, searchTerm]);
 
   function exportCsv() {
-    if (!detail) {
-      return;
-    }
+    if (!detail) return;
 
     const headings = [
-      "Student Name",
+      "Student",
       "Email",
       "Status",
       "Score",
-      "Total Questions",
+      "Questions",
       "Percentage",
-      "Grade",
       "XP",
       "Time Taken",
       "Completed At",
+      "Delivery Mode",
+      "Integrity Terminated",
+      "Integrity Reason",
+      "Integrity Incident Count",
     ];
 
-    const records = detail.students.map((student) => [
+    const rows = detail.students.map((student) => [
       student.studentName,
       student.studentEmail,
-      student.status === "completed" ? "Completed" : "Not Started",
-      student.status === "completed" ? `${student.score}` : "",
-      student.status === "completed" ? `${student.totalQuestions}` : "",
-      student.status === "completed" ? `${student.percentage}%` : "",
-      student.status === "completed" ? getGrade(student.percentage) : "",
-      student.status === "completed" ? `${student.earnedXP}` : "",
-      student.status === "completed"
-        ? formatDuration(student.timeTakenSeconds)
-        : "",
+      student.status,
+      student.score,
+      student.totalQuestions,
+      student.percentage,
+      student.earnedXP,
+      formatDuration(student.timeTakenSeconds),
       formatDate(student.completedAt, true),
+      student.deliveryMode,
+      student.integrityTerminated ? "Yes" : "No",
+      student.integrityTerminationReason,
+      student.integrityIncidents.length,
     ]);
 
-    const csvContent = [
+    const csv = [
       headings.map(escapeCsvValue).join(","),
-
-      ...records.map((record) => record.map(escapeCsvValue).join(",")),
+      ...rows.map((row) => row.map(escapeCsvValue).join(",")),
     ].join("\n");
 
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
     const anchor = document.createElement("a");
-
-    const safeTitle = detail.assignment.title
-      .replace(/[^a-z0-9]+/gi, "-")
-      .replace(/^-|-$/g, "")
-      .toLowerCase();
+    const safeTitle = detail.assignment.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
 
     anchor.href = url;
     anchor.download = `${safeTitle || "quiz"}-markbook.csv`;
-
     document.body.appendChild(anchor);
-
     anchor.click();
     anchor.remove();
-
     URL.revokeObjectURL(url);
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-8">
-        <Skeleton className="h-72 w-full rounded-3xl" />
-
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-32 rounded-3xl" />
-          <Skeleton className="h-32 rounded-3xl" />
-          <Skeleton className="h-32 rounded-3xl" />
-          <Skeleton className="h-32 rounded-3xl" />
-        </div>
-
-        <Skeleton className="h-96 rounded-3xl" />
-      </div>
-    );
+  if (authLoading || !profileReady || loading) {
+    return <Skeleton className="h-96 w-full" />;
   }
 
-  if (!detail || error) {
+  if (!detail) {
     return (
-      <Card className="rounded-3xl border border-red-200 bg-red-50 p-8 text-center">
-        <AlertCircle className="mx-auto h-10 w-10 text-red-600" />
-
-        <h1 className="mt-5 text-2xl font-black text-red-950">
-          Markbook unavailable
-        </h1>
-
-        <p className="mx-auto mt-3 max-w-xl text-sm text-red-800">
-          {error || "The quiz markbook could not be loaded."}
+      <Card>
+        <h1 className="text-2xl font-black text-slate-950">Quiz markbook unavailable</h1>
+        <p className="mt-3 text-red-700">
+          {error || "The requested quiz assignment could not be loaded."}
         </p>
-
         <Link
           href="/teacher/quiz-assignments"
-          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-xl bg-red-600 px-5 py-3 text-sm font-bold text-white"
+          className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-3 text-sm font-black text-white"
         >
           Back to quiz markbooks
         </Link>
@@ -305,88 +264,66 @@ export default function TeacherQuizMarkbookPage() {
   const { assignment } = detail;
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-3xl bg-gradient-to-br from-violet-700 via-indigo-700 to-blue-700 p-7 text-white shadow-xl sm:p-9">
-        <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-          <div className="max-w-4xl">
+    <div className="space-y-6">
+      <section className="rounded-3xl bg-gradient-to-r from-violet-700 via-purple-700 to-blue-700 p-6 text-white shadow-sm sm:p-8">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+          <div>
             <Link
               href="/teacher/quiz-assignments"
-              className="inline-flex items-center gap-2 text-sm font-bold text-violet-100 transition hover:text-white"
+              className="text-sm font-bold text-violet-100 hover:text-white"
             >
-              <ArrowLeft className="h-4 w-4" />
-              All quiz markbooks
+              ← All quiz markbooks
             </Link>
 
-            <div className="mt-6 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold">
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black uppercase">
                 Quiz
               </span>
-
-              <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold">
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black">
                 {assignment.className}
               </span>
-
-              <span className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold capitalize">
-                {assignment.status}
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-black capitalize">
+                {assignment.deliveryMode === "assessment" ? "Monitored assessment" : "Practice"}
               </span>
             </div>
 
-            <p className="mt-5 text-sm font-bold uppercase tracking-[0.18em] text-violet-100">
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-violet-100">
               Quiz markbook
             </p>
-
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
-              {assignment.title}
-            </h1>
-
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">{assignment.title}</h1>
             {assignment.description && (
-              <p className="mt-4 max-w-3xl text-sm leading-7 text-violet-100">
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-violet-100">
                 {assignment.description}
               </p>
             )}
 
-            <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 text-sm text-violet-100">
-              <span className="inline-flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                {assignment.studentCount} students
-              </span>
-
-              <span className="inline-flex items-center gap-2">
-                <CalendarDays className="h-4 w-4" />
-                Due {formatDate(assignment.dueDate)}
-              </span>
-
-              <span className="inline-flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                {assignment.completedCount} completed
-              </span>
+            <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-violet-100">
+              <span>{assignment.studentCount} students</span>
+              <span>Due {formatDate(assignment.dueDate)}</span>
+              <span>{assignment.completedCount} completed</span>
+              {assignment.integrityTerminatedCount > 0 && (
+                <span className="font-black text-amber-200">
+                  {assignment.integrityTerminatedCount} integrity auto-submit{assignment.integrityTerminatedCount === 1 ? "" : "s"}
+                </span>
+              )}
             </div>
           </div>
 
-          <div className="w-full rounded-3xl border border-white/20 bg-white/10 p-6 xl:w-80">
-            <p className="text-sm font-bold text-violet-100">Class average</p>
-
-            <p className="mt-1 text-4xl font-black">
-              {assignment.averagePercentage}%
+          <div className="w-full rounded-2xl border border-white/20 bg-white/10 p-5 xl:w-72">
+            <p className="text-xs font-black uppercase tracking-wide text-violet-100">Class average</p>
+            <p className="mt-2 text-4xl font-black">
+              {completedStudents.length > 0 ? `${assignment.averagePercentage}%` : "—"}
             </p>
-
-            <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/20">
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-white"
-                style={{
-                  width: `${assignment.averagePercentage}%`,
-                }}
+                style={{ width: `${completedStudents.length > 0 ? assignment.averagePercentage : 0}%` }}
               />
             </div>
-
-            <p className="mt-3 text-sm text-violet-100">
-              {assignment.completionPercentage}% submission rate
-            </p>
-
             <button
               type="button"
               onClick={exportCsv}
-              className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-indigo-700 transition hover:bg-violet-50"
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-violet-700"
             >
               <Download className="h-4 w-4" />
               Export CSV
@@ -395,136 +332,89 @@ export default function TeacherQuizMarkbookPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Completed"
-          value={completedStudents.length}
-          description={`${assignment.completionPercentage}% submitted`}
-          icon={<CheckCircle2 className="h-6 w-6" />}
-          iconClassName="bg-emerald-50 text-emerald-600"
-        />
-
-        <SummaryCard
-          label="Not Started"
-          value={notStartedStudents.length}
-          description="Awaiting submission"
-          icon={<XCircle className="h-6 w-6" />}
-          iconClassName="bg-slate-100 text-slate-600"
-        />
-
-        <SummaryCard
-          label="Highest Score"
-          value={`${highestPercentage}%`}
-          description={
-            completedStudents.length
-              ? `Grade ${getGrade(highestPercentage)}`
-              : "No submissions"
-          }
-          icon={<Trophy className="h-6 w-6" />}
-          iconClassName="bg-amber-50 text-amber-600"
-        />
-
-        <SummaryCard
-          label="Lowest Score"
-          value={`${lowestPercentage}%`}
-          description={
-            completedStudents.length
-              ? `Grade ${getGrade(lowestPercentage)}`
-              : "No submissions"
-          }
-          icon={<BarChart3 className="h-6 w-6" />}
-          iconClassName="bg-blue-50 text-blue-600"
-        />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <SummaryCard label="Completed" value={completedStudents.length} detail={`${assignment.completionPercentage}% submitted`} icon={<CheckCircle2 className="h-5 w-5" />} />
+        <SummaryCard label="Not started" value={notStartedStudents.length} detail="Awaiting submission" icon={<XCircle className="h-5 w-5" />} />
+        <SummaryCard label="Highest score" value={completedStudents.length ? `${highestPercentage}%` : "—"} detail="Completed attempts" icon={<Users className="h-5 w-5" />} />
+        <SummaryCard label="Lowest score" value={completedStudents.length ? `${lowestPercentage}%` : "—"} detail="Completed attempts" icon={<Clock3 className="h-5 w-5" />} />
+        <SummaryCard label="Integrity events" value={integrityStudents.length} detail="Auto-submitted attempts" icon={<ShieldAlert className="h-5 w-5" />} danger={integrityStudents.length > 0} />
       </section>
 
-      <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
-        <div className="border-b border-slate-200 p-6 sm:p-7">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <Card className="overflow-hidden rounded-3xl p-0">
+        <div className="border-b border-slate-200 p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-indigo-600">
-                Student results
-              </p>
-
-              <h2 className="mt-2 text-2xl font-black text-slate-950">
-                Class markbook
-              </h2>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-600">Student results</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-950">Class markbook</h2>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <label className="relative block">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   placeholder="Search students..."
-                  className="min-h-11 w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 sm:w-72"
+                  className="min-h-11 rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm outline-none focus:border-violet-500"
                 />
               </label>
 
               <select
                 value={filter}
-                onChange={(event) =>
-                  setFilter(event.target.value as ResultFilter)
-                }
-                className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold"
+                onChange={(event) => setFilter(event.target.value as ResultFilter)}
+                className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700"
               >
                 <option value="all">All students</option>
-
                 <option value="completed">Completed</option>
-
                 <option value="not_started">Not started</option>
+                <option value="integrity">Integrity auto-submit</option>
               </select>
             </div>
           </div>
         </div>
 
-        {filteredStudents.length === 0 ? (
-          <div className="p-12 text-center">
-            <Users className="mx-auto h-10 w-10 text-slate-400" />
+        <div className="overflow-x-auto">
+          <table className="min-w-full border-collapse text-left">
+            <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-4">Student</th>
+                <th className="px-5 py-4">Status</th>
+                <th className="px-5 py-4">Score</th>
+                <th className="px-5 py-4">Percentage</th>
+                <th className="px-5 py-4">XP</th>
+                <th className="px-5 py-4">Time</th>
+                <th className="px-5 py-4">Completed</th>
+                <th className="px-5 py-4">Integrity</th>
+              </tr>
+            </thead>
 
-            <h3 className="mt-4 text-xl font-black text-slate-950">
-              No matching students
-            </h3>
+            <tbody className="divide-y divide-slate-100">
+              {filteredStudents.map((student) => {
+                const expanded = expandedStudentId === student.studentId;
 
-            <p className="mt-2 text-sm text-slate-500">
-              Try changing the search or filter.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-                  <th className="px-6 py-4">Student</th>
+                return (
+                  <ResultRows
+                    key={student.studentId}
+                    student={student}
+                    expanded={expanded}
+                    onToggle={() =>
+                      setExpandedStudentId(expanded ? null : student.studentId)
+                    }
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-                  <th className="px-6 py-4">Status</th>
-
-                  <th className="px-6 py-4">Score</th>
-
-                  <th className="px-6 py-4">Percentage</th>
-
-                  <th className="px-6 py-4">Grade</th>
-
-                  <th className="px-6 py-4">XP</th>
-
-                  <th className="px-6 py-4">Time</th>
-
-                  <th className="px-6 py-4">Completed</th>
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-100">
-                {filteredStudents.map((student) => (
-                  <StudentRow key={student.studentId} student={student} />
-                ))}
-              </tbody>
-            </table>
+        {filteredStudents.length === 0 && (
+          <div className="p-10 text-center text-sm font-semibold text-slate-500">
+            No students match the current search or filter.
           </div>
         )}
 
-        <div className="border-t border-slate-200 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-500">
+        <div className="border-t border-slate-100 bg-slate-50 px-5 py-4 text-xs font-semibold text-slate-500">
           Showing {filteredStudents.length} of {detail.students.length} students
         </div>
       </Card>
@@ -532,109 +422,162 @@ export default function TeacherQuizMarkbookPage() {
   );
 }
 
-function StudentRow({ student }: { student: TeacherQuizStudentResult }) {
-  const completed = student.status === "completed";
-
-  const initials = student.studentName
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
-
+function ResultRows({
+  student,
+  expanded,
+  onToggle,
+}: {
+  student: TeacherQuizStudentResult;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <tr className="transition hover:bg-slate-50">
-      <td className="px-6 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-sm font-black text-violet-700">
-            {initials || "ST"}
-          </div>
+    <>
+      <tr className={student.integrityTerminated ? "bg-red-50/50" : "bg-white"}>
+        <td className="px-5 py-4">
+          <p className="font-black text-slate-950">{student.studentName}</p>
+          <p className="mt-1 text-xs text-slate-500">{student.studentEmail}</p>
+        </td>
 
-          <div>
-            <p className="font-bold text-slate-950">{student.studentName}</p>
+        <td className="px-5 py-4">
+          {student.status === "completed" ? (
+            <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">
+              Completed
+            </span>
+          ) : (
+            <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+              Not started
+            </span>
+          )}
+        </td>
 
-            <p className="mt-1 text-sm text-slate-500">
-              {student.studentEmail}
-            </p>
-          </div>
-        </div>
-      </td>
+        <td className="px-5 py-4 font-bold text-slate-900">
+          {student.status === "completed" ? `${student.score}/${student.totalQuestions}` : "—"}
+        </td>
 
-      <td className="px-6 py-5">
-        {completed ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-700">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Completed
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
-            <Clock3 className="h-3.5 w-3.5" />
-            Not Started
-          </span>
-        )}
-      </td>
+        <td className="px-5 py-4 font-black text-slate-950">
+          {student.status === "completed" ? `${student.percentage}%` : "—"}
+        </td>
 
-      <td className="px-6 py-5 font-semibold text-slate-700">
-        {completed ? `${student.score}/${student.totalQuestions}` : "—"}
-      </td>
+        <td className="px-5 py-4 font-bold text-slate-700">
+          {student.status === "completed" ? student.earnedXP : "—"}
+        </td>
 
-      <td className="px-6 py-5 font-semibold text-slate-700">
-        {completed ? `${student.percentage}%` : "—"}
-      </td>
+        <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+          {student.status === "completed" ? formatDuration(student.timeTakenSeconds) : "—"}
+        </td>
 
-      <td className="px-6 py-5">
-        {completed ? (
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 font-black text-indigo-700">
-            {getGrade(student.percentage)}
-          </span>
-        ) : (
-          "—"
-        )}
-      </td>
+        <td className="px-5 py-4 text-sm font-semibold text-slate-600">
+          {formatDate(student.completedAt, true)}
+        </td>
 
-      <td className="px-6 py-5 font-semibold text-slate-700">
-        {completed ? `⭐ ${student.earnedXP}` : "—"}
-      </td>
+        <td className="px-5 py-4">
+          {student.integrityTerminated ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-black text-red-800"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Auto-submitted
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          ) : student.integrityIncidents.length > 0 ? (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800"
+            >
+              {student.integrityIncidents.length} event{student.integrityIncidents.length === 1 ? "" : "s"}
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          ) : (
+            <span className="text-xs font-bold text-slate-400">None</span>
+          )}
+        </td>
+      </tr>
 
-      <td className="px-6 py-5 font-semibold text-slate-700">
-        {completed ? formatDuration(student.timeTakenSeconds) : "—"}
-      </td>
+      {expanded && (
+        <tr>
+          <td colSpan={8} className="bg-slate-50 px-5 py-5">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-5 w-5 text-red-600" />
+                <div>
+                  <h3 className="font-black text-slate-950">Integrity record</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {student.integrityTerminated
+                      ? student.integrityTerminationReason || "This assessment was automatically submitted by the integrity rules."
+                      : "Integrity activity was recorded during this assessment."}
+                  </p>
+                  <p className="mt-2 text-xs font-semibold text-slate-500">
+                    Session started: {formatDate(student.integritySessionStartedAt, true)}
+                  </p>
+                </div>
+              </div>
 
-      <td className="px-6 py-5 text-sm font-medium text-slate-600">
-        {completed ? formatDate(student.completedAt, true) : "—"}
-      </td>
-    </tr>
+              {student.integrityIncidents.length > 0 ? (
+                <div className="mt-5 space-y-3">
+                  {student.integrityIncidents.map((incident, index) => (
+                    <div
+                      key={`${incident.id}-${index}`}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm font-black text-slate-900">
+                          {formatIncidentType(incident.type)}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-500">
+                          {formatDate(incident.occurredAt, true)}
+                        </p>
+                      </div>
+
+                      <p className="mt-2 text-xs font-bold text-slate-500">
+                        Question {incident.questionNumber ?? "—"}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">
+                        {incident.detail}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-5 text-sm font-semibold text-slate-500">
+                  No individual integrity incidents were stored for this attempt.
+                </p>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
 function SummaryCard({
   label,
   value,
-  description,
+  detail,
   icon,
-  iconClassName,
+  danger = false,
 }: {
   label: string;
-  value: number | string;
-  description: string;
-  icon: React.ReactNode;
-  iconClassName: string;
+  value: string | number;
+  detail: string;
+  icon: ReactNode;
+  danger?: boolean;
 }) {
   return (
-    <Card className="rounded-3xl border border-slate-200 p-6">
-      <div className="flex items-center justify-between gap-4">
+    <Card className={danger ? "border-red-200 bg-red-50" : ""}>
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-slate-500">{label}</p>
-
-          <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
-
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          <p className="text-xs font-bold text-slate-500">{label}</p>
+          <p className={`mt-2 text-3xl font-black ${danger ? "text-red-900" : "text-slate-950"}`}>
+            {value}
+          </p>
+          <p className="mt-2 text-xs font-semibold text-slate-500">{detail}</p>
         </div>
-
-        <div
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${iconClassName}`}
-        >
+        <div className={`rounded-xl p-3 ${danger ? "bg-red-100 text-red-700" : "bg-slate-100 text-slate-700"}`}>
           {icon}
         </div>
       </div>

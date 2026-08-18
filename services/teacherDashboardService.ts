@@ -1,8 +1,8 @@
 import {
   collection,
-  collectionGroup,
+  doc,
+  getDoc,
   getDocs,
-  orderBy,
   query,
   Timestamp,
   where,
@@ -64,7 +64,6 @@ type UserRecord = {
   id: string;
   name: string;
   role: string;
-  classIds: string[];
   xp: number;
   streak: number;
   badges: string[];
@@ -86,11 +85,27 @@ type AssignmentRecord = {
   status: string;
 };
 
+type ResourceAssignmentRecord = {
+  id: string;
+  status: string;
+  studentIds: string[];
+  studentCount: number;
+  completedCount: number;
+};
+
 type AssignmentResultRecord = {
   id: string;
   studentId: string;
   assignmentId: string;
   percentage: number;
+  status: string;
+  completedAt?: Timestamp;
+};
+
+type ResourceAssignmentProgressRecord = {
+  id: string;
+  assignmentId: string;
+  studentId: string;
   status: string;
   completedAt?: Timestamp;
 };
@@ -212,16 +227,13 @@ export async function getTeacherDashboardData(
   }
 
   const [
-    usersSnapshot,
     classesSnapshot,
     assignmentsSnapshot,
     assignmentResultsSnapshot,
-    quizResultsSnapshot,
+    resourceAssignmentsSnapshot,
     examAssignmentsSnapshot,
     examSubmissionsSnapshot,
   ] = await Promise.all([
-    getDocs(collection(db, "users")),
-
     getDocs(
       query(
         collection(db, "classes"),
@@ -244,7 +256,10 @@ export async function getTeacherDashboardData(
     ),
 
     getDocs(
-      query(collectionGroup(db, "quizResults"), orderBy("createdAt", "desc")),
+      query(
+        collection(db, "classAssignments"),
+        where("teacherId", "==", cleanedTeacherId),
+      ),
     ),
 
     getDocs(
@@ -262,19 +277,40 @@ export async function getTeacherDashboardData(
     ),
   ]);
 
-  const teacherClassIds = new Set(
-    classesSnapshot.docs.map((classDocument) => classDocument.id),
+  /*
+   * DATA ISOLATION:
+   *
+   * A teacher's dashboard must be built only from students explicitly
+   * enrolled in classes owned by that teacher.
+   *
+   * Never fall back to every platform student when a teacher has no classes.
+   * That would expose another teacher's learners and evidence.
+   */
+  const teacherStudentIds = new Set<string>();
+
+  classesSnapshot.docs.forEach((classDocument) => {
+    const data = classDocument.data();
+
+    safeStringArray(data.studentIds).forEach((studentId) => {
+      teacherStudentIds.add(studentId);
+    });
+  });
+
+  const studentSnapshots = await Promise.all(
+    Array.from(teacherStudentIds).map((studentId) =>
+      getDoc(doc(db, "users", studentId)),
+    ),
   );
 
-  const students: UserRecord[] = usersSnapshot.docs
-    .map((userDocument) => {
-      const data = userDocument.data();
+  const relevantStudents: UserRecord[] = studentSnapshots
+    .filter((studentSnapshot) => studentSnapshot.exists())
+    .map((studentSnapshot) => {
+      const data = studentSnapshot.data();
 
       return {
-        id: userDocument.id,
+        id: studentSnapshot.id,
         name: safeString(data.name, "Student"),
         role: safeString(data.role, "student"),
-        classIds: safeStringArray(data.classIds),
         xp: safeNumber(data.xp),
         streak: safeNumber(data.streak),
         badges: safeStringArray(data.badges),
@@ -283,21 +319,23 @@ export async function getTeacherDashboardData(
     })
     .filter((student) => student.role === "student");
 
-  const teacherStudentIds = new Set<string>();
-
-  students.forEach((student) => {
-    if (student.classIds.some((classId) => teacherClassIds.has(classId))) {
-      teacherStudentIds.add(student.id);
-    }
-  });
-
-  const relevantStudents =
-    teacherStudentIds.size > 0
-      ? students.filter((student) => teacherStudentIds.has(student.id))
-      : students;
-
   const relevantStudentIds = new Set(
     relevantStudents.map((student) => student.id),
+  );
+
+  /*
+   * Fetch quiz evidence only from students who belong to this teacher's
+   * classes. This avoids downloading platform-wide quiz results and then
+   * filtering them in the browser.
+   */
+  const quizResultSnapshots = await Promise.all(
+    Array.from(relevantStudentIds).map((studentId) =>
+      getDocs(collection(db, "users", studentId, "quizResults")),
+    ),
+  );
+
+  const quizResultDocuments = quizResultSnapshots.flatMap(
+    (snapshot) => snapshot.docs,
   );
 
   const assignments: AssignmentRecord[] = assignmentsSnapshot.docs.map(
@@ -310,6 +348,76 @@ export async function getTeacherDashboardData(
       };
     },
   );
+
+  const resourceAssignments: ResourceAssignmentRecord[] =
+    resourceAssignmentsSnapshot.docs.map((assignmentDocument) => {
+      const data = assignmentDocument.data();
+      const studentIds = safeStringArray(data.studentIds).filter((studentId) =>
+        relevantStudentIds.has(studentId),
+      );
+
+      const storedStudentCount = safeNumber(data.studentCount);
+      const storedCompletedCount = safeNumber(data.completedCount);
+
+      return {
+        id: assignmentDocument.id,
+        status: safeString(data.status, "active"),
+        studentIds,
+        studentCount:
+          storedStudentCount > 0 ? storedStudentCount : studentIds.length,
+        completedCount: Math.min(
+          storedCompletedCount,
+          storedStudentCount > 0 ? storedStudentCount : studentIds.length,
+        ),
+      };
+    });
+
+  /*
+   * Resource/lesson assignments store per-student completion in
+   * assignmentProgress/{assignmentId}_{studentId}.
+   *
+   * Read only the expected progress documents for this teacher's own
+   * assignments and currently enrolled learners. This keeps the dashboard
+   * isolated and lets Completed Today include lesson/resource completions.
+   */
+  const resourceProgressSnapshots = await Promise.all(
+    resourceAssignments.flatMap((assignment) =>
+      assignment.studentIds.map((studentId) =>
+        getDoc(
+          doc(
+            db,
+            "assignmentProgress",
+            `${assignment.id}_${studentId}`,
+          ),
+        ),
+      ),
+    ),
+  );
+
+  const resourceAssignmentProgress: ResourceAssignmentProgressRecord[] =
+    resourceProgressSnapshots
+      .filter((progressSnapshot) => progressSnapshot.exists())
+      .map((progressSnapshot) => {
+        const data = progressSnapshot.data();
+
+        return {
+          id: progressSnapshot.id,
+          assignmentId: safeString(data.assignmentId),
+          studentId: safeString(data.studentId),
+          status: safeString(data.status, "not_started"),
+          completedAt:
+            data.completedAt instanceof Timestamp
+              ? data.completedAt
+              : undefined,
+        };
+      })
+      .filter(
+        (progress) =>
+          relevantStudentIds.has(progress.studentId) &&
+          resourceAssignments.some(
+            (assignment) => assignment.id === progress.assignmentId,
+          ),
+      );
 
   const assignmentResults: AssignmentResultRecord[] =
     assignmentResultsSnapshot.docs
@@ -330,7 +438,7 @@ export async function getTeacherDashboardData(
       })
       .filter((result) => relevantStudentIds.has(result.studentId));
 
-  const quizResults: QuizResultRecord[] = quizResultsSnapshot.docs
+  const quizResults: QuizResultRecord[] = quizResultDocuments
     .map((resultDocument) => {
       const data = resultDocument.data();
 
@@ -345,7 +453,11 @@ export async function getTeacherDashboardData(
           data.createdAt instanceof Timestamp ? data.createdAt : undefined,
       };
     })
-    .filter((result) => !result.uid || relevantStudentIds.has(result.uid));
+    .filter(
+      (result) =>
+        Boolean(result.uid) &&
+        relevantStudentIds.has(result.uid),
+    );
 
   const examAssignments: ExamAssignmentRecord[] =
     examAssignmentsSnapshot.docs.map((assignmentDocument) => {
@@ -414,6 +526,16 @@ export async function getTeacherDashboardData(
 
   const expectedQuizSubmissions = assignments.length * relevantStudents.length;
 
+  const expectedResourceCompletions = resourceAssignments.reduce(
+    (total, assignment) => total + assignment.studentCount,
+    0,
+  );
+
+  const completedResourceCompletions = resourceAssignments.reduce(
+    (total, assignment) => total + assignment.completedCount,
+    0,
+  );
+
   const expectedExamSubmissions = examAssignments.reduce(
     (total, assignment) =>
       total +
@@ -431,10 +553,15 @@ export async function getTeacherDashboardData(
     (submission) => submission.status === "marked",
   );
 
-  const expectedSubmissions = expectedQuizSubmissions + expectedExamSubmissions;
+  const expectedSubmissions =
+    expectedQuizSubmissions +
+    expectedResourceCompletions +
+    expectedExamSubmissions;
 
   const completedSubmissions =
-    completedAssignmentResults.length + completedExamSubmissions.length;
+    completedAssignmentResults.length +
+    completedResourceCompletions +
+    completedExamSubmissions.length;
 
   const completionRate =
     expectedSubmissions > 0
@@ -444,9 +571,16 @@ export async function getTeacherDashboardData(
         )
       : 0;
 
+  const completedResourceProgressToday = resourceAssignmentProgress.filter(
+    (progress) =>
+      progress.status === "completed" &&
+      isToday(progress.completedAt),
+  ).length;
+
   const completedToday =
     completedAssignmentResults.filter((result) => isToday(result.completedAt))
       .length +
+    completedResourceProgressToday +
     completedExamSubmissions.filter((submission) =>
       isToday(submission.markedAt),
     ).length;
@@ -573,9 +707,12 @@ export async function getTeacherDashboardData(
   return {
     studentCount: relevantStudents.length,
     classCount: classesSnapshot.size,
-    assignmentCount: assignments.length + examAssignments.length,
+    assignmentCount:
+      assignments.length + resourceAssignments.length + examAssignments.length,
     activeAssignmentCount:
       assignments.filter((assignment) => assignment.status === "active")
+        .length +
+      resourceAssignments.filter((assignment) => assignment.status === "active")
         .length +
       examAssignments.filter((assignment) => assignment.status === "active")
         .length,

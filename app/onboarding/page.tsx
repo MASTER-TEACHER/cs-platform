@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { updateUserCourseSelection } from "@/services/userService";
 import { useAuth } from "@/contexts/AuthContext";
 
-import type { ExamBoard, Qualification } from "@/types/user";
+import type {
+  ExamBoard,
+  Qualification,
+} from "@/types/user";
 
 const qualificationOptions: Array<{
   value: Qualification;
@@ -35,30 +42,59 @@ const examBoardOptions: Array<{
   {
     value: "AQA",
     title: "AQA",
-    description: "AQA Computer Science curriculum",
+    description:
+      "AQA Computer Science curriculum",
   },
   {
     value: "OCR",
     title: "OCR",
-    description: "OCR Computer Science curriculum",
+    description:
+      "OCR Computer Science curriculum",
   },
   {
     value: "EDEXCEL",
     title: "Pearson Edexcel",
-    description: "Pearson Edexcel Computer Science curriculum",
+    description:
+      "Pearson Edexcel Computer Science curriculum",
   },
 ];
+
+type ExtendedUserProfile = {
+  accountIntent?: string | null;
+  teacherAccessStatus?:
+    | string
+    | null;
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
 
-  const { user, profile, loading, profileReady, profileError, refreshProfile } =
-    useAuth();
+  const {
+    user,
+    profile,
+    loading,
+    profileReady,
+    profileError,
+    refreshProfile,
+  } = useAuth();
 
-  const [qualification, setQualification] = useState<Qualification>("GCSE");
-  const [examBoard, setExamBoard] = useState<ExamBoard>("AQA");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const extendedProfile =
+    profile as
+      | (typeof profile &
+          ExtendedUserProfile)
+      | null;
+
+  const [qualification, setQualification] =
+    useState<Qualification>("GCSE");
+
+  const [examBoard, setExamBoard] =
+    useState<ExamBoard>("AQA");
+
+  const [submitting, setSubmitting] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
 
   useEffect(() => {
     if (!loading && !user) {
@@ -66,8 +102,28 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (!loading && profileReady && profile?.role !== "student") {
+    if (
+      !loading &&
+      profileReady &&
+      profile?.role !== "student"
+    ) {
       router.replace("/teacher");
+      return;
+    }
+
+    /*
+     * Teacher applicants must never be sent through
+     * student curriculum onboarding.
+     */
+    if (
+      !loading &&
+      profileReady &&
+      extendedProfile?.accountIntent ===
+        "teacher"
+    ) {
+      router.replace(
+        "/teacher-access",
+      );
       return;
     }
 
@@ -78,15 +134,28 @@ export default function OnboardingPage() {
       profile.qualification &&
       profile.examBoard
     ) {
-      router.replace("/dashboard");
+      router.replace(
+        "/dashboard",
+      );
     }
-  }, [loading, user, profileReady, profile, router]);
+  }, [
+    loading,
+    user,
+    profileReady,
+    profile,
+    extendedProfile?.accountIntent,
+    router,
+  ]);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     if (!user) {
-      setError("You must be signed in to complete your profile.");
+      setError(
+        "You must be signed in to complete your profile.",
+      );
       return;
     }
 
@@ -94,17 +163,23 @@ export default function OnboardingPage() {
     setError("");
 
     try {
-      await updateUserCourseSelection(user.uid, {
-        qualification,
-        examBoard,
-      });
+      await updateUserCourseSelection(
+        user.uid,
+        {
+          qualification,
+          examBoard,
+        },
+      );
 
-      const refreshedProfile = await refreshProfile();
+      const refreshedProfile =
+        await refreshProfile();
 
       if (
         !refreshedProfile ||
-        refreshedProfile.onboardingComplete !== true ||
-        !refreshedProfile.qualification ||
+        refreshedProfile
+          .onboardingComplete !== true ||
+        !refreshedProfile
+          .qualification ||
         !refreshedProfile.examBoard
       ) {
         throw new Error(
@@ -112,13 +187,14 @@ export default function OnboardingPage() {
         );
       }
 
-      router.replace("/dashboard");
-
-      await refreshProfile();
-
-      router.replace("/dashboard");
+      router.replace(
+        "/dashboard",
+      );
     } catch (caughtError) {
-      console.error("Unable to save curriculum selection:", caughtError);
+      console.error(
+        "Unable to save curriculum selection:",
+        caughtError,
+      );
 
       setError(
         caughtError instanceof Error
@@ -130,14 +206,20 @@ export default function OnboardingPage() {
     }
   }
 
-  if (loading || (user && !profileReady && !profileError)) {
+  if (
+    loading ||
+    (user &&
+      !profileReady &&
+      !profileError)
+  ) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
         <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
 
           <p className="mt-4 font-bold text-slate-700">
-            Preparing your curriculum...
+            Preparing your
+            curriculum...
           </p>
         </div>
       </main>
@@ -153,12 +235,15 @@ export default function OnboardingPage() {
           </p>
 
           <h1 className="mt-3 text-4xl font-black text-slate-950">
-            Choose your Computer Science course
+            Choose your Computer
+            Science course
           </h1>
 
           <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-600">
-            Your selection controls the units, lessons, quizzes and exam
-            questions shown throughout CS Master.
+            Your selection controls
+            the units, lessons, quizzes
+            and exam questions shown
+            throughout CS Master.
           </p>
 
           {error && (
@@ -179,111 +264,162 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-10 space-y-10">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-10 space-y-10"
+          >
             <fieldset>
               <legend className="text-xl font-black text-slate-950">
-                1. Select your qualification
+                1. Select your
+                qualification
               </legend>
 
               <div className="mt-5 grid gap-4 md:grid-cols-2">
-                {qualificationOptions.map((option) => {
-                  const selected = qualification === option.value;
+                {qualificationOptions.map(
+                  (option) => {
+                    const selected =
+                      qualification ===
+                      option.value;
 
-                  return (
-                    <label
-                      key={option.value}
-                      className={`cursor-pointer rounded-2xl border-2 p-6 transition ${
-                        selected
-                          ? "border-blue-600 bg-blue-50"
-                          : "border-slate-200 bg-white hover:border-blue-300"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="qualification"
-                        value={option.value}
-                        checked={selected}
-                        onChange={() => setQualification(option.value)}
-                        className="sr-only"
-                      />
-
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xl font-black text-slate-950">
-                            {option.title}
-                          </p>
-
-                          <p className="mt-2 leading-7 text-slate-600">
-                            {option.description}
-                          </p>
-                        </div>
-
-                        <span
-                          className={`mt-1 h-6 w-6 shrink-0 rounded-full border-2 ${
+                    return (
+                      <label
+                        key={
+                          option.value
+                        }
+                        className={`cursor-pointer rounded-2xl border-2 p-6 transition ${
+                          selected
+                            ? "border-blue-600 bg-blue-50"
+                            : "border-slate-200 bg-white hover:border-blue-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="qualification"
+                          value={
+                            option.value
+                          }
+                          checked={
                             selected
-                              ? "border-blue-600 bg-blue-600 ring-4 ring-blue-100"
-                              : "border-slate-300"
-                          }`}
+                          }
+                          onChange={() =>
+                            setQualification(
+                              option.value,
+                            )
+                          }
+                          className="sr-only"
                         />
-                      </div>
-                    </label>
-                  );
-                })}
+
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="text-xl font-black text-slate-950">
+                              {
+                                option.title
+                              }
+                            </p>
+
+                            <p className="mt-2 leading-7 text-slate-600">
+                              {
+                                option.description
+                              }
+                            </p>
+                          </div>
+
+                          <span
+                            className={`mt-1 h-6 w-6 shrink-0 rounded-full border-2 ${
+                              selected
+                                ? "border-blue-600 bg-blue-600 ring-4 ring-blue-100"
+                                : "border-slate-300"
+                            }`}
+                          />
+                        </div>
+                      </label>
+                    );
+                  },
+                )}
               </div>
             </fieldset>
 
             <fieldset>
               <legend className="text-xl font-black text-slate-950">
-                2. Select your exam board
+                2. Select your exam
+                board
               </legend>
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {examBoardOptions.map((option) => {
-                  const selected = examBoard === option.value;
+                {examBoardOptions.map(
+                  (option) => {
+                    const selected =
+                      examBoard ===
+                      option.value;
 
-                  return (
-                    <label
-                      key={option.value}
-                      className={`cursor-pointer rounded-2xl border-2 p-6 transition ${
-                        selected
-                          ? "border-indigo-600 bg-indigo-50"
-                          : "border-slate-200 bg-white hover:border-indigo-300"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="examBoard"
-                        value={option.value}
-                        checked={selected}
-                        onChange={() => setExamBoard(option.value)}
-                        className="sr-only"
-                      />
+                    return (
+                      <label
+                        key={
+                          option.value
+                        }
+                        className={`cursor-pointer rounded-2xl border-2 p-6 transition ${
+                          selected
+                            ? "border-indigo-600 bg-indigo-50"
+                            : "border-slate-200 bg-white hover:border-indigo-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="examBoard"
+                          value={
+                            option.value
+                          }
+                          checked={
+                            selected
+                          }
+                          onChange={() =>
+                            setExamBoard(
+                              option.value,
+                            )
+                          }
+                          className="sr-only"
+                        />
 
-                      <p className="text-xl font-black text-slate-950">
-                        {option.title}
-                      </p>
+                        <p className="text-xl font-black text-slate-950">
+                          {
+                            option.title
+                          }
+                        </p>
 
-                      <p className="mt-2 leading-7 text-slate-600">
-                        {option.description}
-                      </p>
-                    </label>
-                  );
-                })}
+                        <p className="mt-2 leading-7 text-slate-600">
+                          {
+                            option.description
+                          }
+                        </p>
+                      </label>
+                    );
+                  },
+                )}
               </div>
             </fieldset>
 
-            {qualification === "A_LEVEL" && examBoard === "EDEXCEL" && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-                Pearson Edexcel A-level content is not yet available. Select AQA
-                or OCR for the current A-level curriculum.
-              </div>
-            )}
+            {qualification ===
+              "A_LEVEL" &&
+              examBoard ===
+                "EDEXCEL" && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+                  Pearson Edexcel
+                  A-level content is
+                  not yet available.
+                  Select AQA or OCR for
+                  the current A-level
+                  curriculum.
+                </div>
+              )}
 
             <button
               type="submit"
               disabled={
                 submitting ||
-                (qualification === "A_LEVEL" && examBoard === "EDEXCEL")
+                (qualification ===
+                  "A_LEVEL" &&
+                  examBoard ===
+                    "EDEXCEL")
               }
               className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >

@@ -2,21 +2,38 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import {
+  useState,
+  type FormEvent,
+} from "react";
+
 import { useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+
+import {
+  doc,
+  getDoc,
+} from "firebase/firestore";
 
 import { loginUser } from "@/services/authService";
 import { db } from "@/lib/firebase";
+
 import type { UserProfile } from "@/types/database";
 
-function getLoginMessage(error: unknown): string {
-  if (!error || typeof error !== "object") {
+function getLoginMessage(
+  error: unknown,
+): string {
+  if (
+    !error ||
+    typeof error !== "object"
+  ) {
     return "Login failed. Check your email and password.";
   }
 
   const code =
-    "code" in error && typeof error.code === "string" ? error.code : "";
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code
+      : "";
 
   switch (code) {
     case "auth/invalid-credential":
@@ -43,42 +60,95 @@ function getLoginMessage(error: unknown): string {
 export default function LoginPage() {
   const router = useRouter();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+  const [password, setPassword] =
+    useState("");
+
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  async function handleLogin(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setSubmitting(true);
     setError("");
 
     try {
-      const cleanedEmail = email.trim().toLowerCase();
+      const cleanedEmail =
+        email
+          .trim()
+          .toLowerCase();
 
-      const userCredential = await loginUser(cleanedEmail, password);
-      const uid = userCredential.user.uid;
+      const userCredential =
+        await loginUser(
+          cleanedEmail,
+          password,
+        );
 
-      const profileReference = doc(db, "users", uid);
-      const profileSnapshot = await getDoc(profileReference);
+      const uid =
+        userCredential.user.uid;
 
-      if (!profileSnapshot.exists()) {
-        throw new Error("Your user profile could not be found.");
+      const profileSnapshot =
+        await getDoc(
+          doc(
+            db,
+            "users",
+            uid,
+          ),
+        );
+
+      if (
+        !profileSnapshot.exists()
+      ) {
+        throw new Error(
+          "Your user profile could not be found.",
+        );
       }
 
+      /*
+       * Use the raw Firestore profile here because login routing
+       * happens before AuthContext has necessarily refreshed.
+       */
       const profile = {
         uid,
         ...profileSnapshot.data(),
       } as UserProfile;
 
-      if (profile.role === "admin") {
+      if (
+        profile.role === "admin"
+      ) {
         router.replace("/admin");
         return;
       }
 
-      if (profile.role === "teacher") {
+      if (
+        profile.role === "teacher"
+      ) {
         router.replace("/teacher");
+        return;
+      }
+
+      /*
+       * IMPORTANT:
+       * Teacher applicants remain role="student" until approved,
+       * so accountIntent must be checked before student onboarding.
+       */
+      if (
+        profile.accountIntent ===
+        "teacher"
+      ) {
+        router.replace(
+          "/teacher-access",
+        );
         return;
       }
 
@@ -87,34 +157,53 @@ export default function LoginPage() {
         !profile.qualification ||
         !profile.examBoard
       ) {
-        router.replace("/onboarding");
+        router.replace(
+          "/onboarding",
+        );
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace(
+        "/dashboard",
+      );
     } catch (caughtError) {
-      const message = getLoginMessage(caughtError);
+      const message =
+        getLoginMessage(
+          caughtError,
+        );
 
       setError(message);
 
       const code =
         caughtError &&
-        typeof caughtError === "object" &&
-        "code" in caughtError &&
-        typeof caughtError.code === "string"
+        typeof caughtError ===
+          "object" &&
+        "code" in
+          caughtError &&
+        typeof caughtError.code ===
+          "string"
           ? caughtError.code
           : "";
 
-      const expectedAuthenticationErrors = new Set([
-        "auth/invalid-credential",
-        "auth/user-not-found",
-        "auth/wrong-password",
-        "auth/invalid-email",
-        "auth/too-many-requests",
-      ]);
+      const expectedAuthenticationErrors =
+        new Set([
+          "auth/invalid-credential",
+          "auth/user-not-found",
+          "auth/wrong-password",
+          "auth/invalid-email",
+          "auth/too-many-requests",
+        ]);
 
-      if (code && !expectedAuthenticationErrors.has(code)) {
-        console.error("Unexpected login error:", caughtError);
+      if (
+        code &&
+        !expectedAuthenticationErrors.has(
+          code,
+        )
+      ) {
+        console.error(
+          "Unexpected login error:",
+          caughtError,
+        );
       }
     } finally {
       setSubmitting(false);
@@ -140,7 +229,8 @@ export default function LoginPage() {
         </h1>
 
         <p className="mt-2 text-center text-slate-600">
-          Sign in to access your CS Master portal.
+          Sign in to access your
+          CS Master portal.
         </p>
 
         {error && (
@@ -152,13 +242,20 @@ export default function LoginPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="mt-8 space-y-4">
+        <form
+          onSubmit={handleLogin}
+          className="mt-8 space-y-4"
+        >
           <input
             className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
             type="email"
             placeholder="Email address"
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) =>
+              setEmail(
+                event.target.value,
+              )
+            }
             required
             autoComplete="email"
             disabled={submitting}
@@ -169,7 +266,11 @@ export default function LoginPage() {
             type="password"
             placeholder="Password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) =>
+              setPassword(
+                event.target.value,
+              )
+            }
             required
             autoComplete="current-password"
             disabled={submitting}
@@ -180,7 +281,9 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? "Signing in..." : "Login"}
+            {submitting
+              ? "Signing in..."
+              : "Login"}
           </button>
         </form>
 
@@ -194,8 +297,12 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-sm text-slate-600">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-bold text-blue-600">
+          Don&apos;t have an
+          account?{" "}
+          <Link
+            href="/register"
+            className="font-bold text-blue-600"
+          >
             Create one
           </Link>
         </p>
