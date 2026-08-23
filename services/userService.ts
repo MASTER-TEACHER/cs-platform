@@ -19,7 +19,10 @@ import type {
 } from "@/types/database";
 
 import type {
+  AccountPlan,
+  AccountType,
   ExamBoard,
+  PersonalPlan,
   Qualification,
 } from "@/types/user";
 
@@ -31,12 +34,21 @@ type FirestoreUserProfile = Omit<
   | "examBoard"
   | "accountIntent"
   | "teacherAccessStatus"
+  | "accountType"
+  | "plan"
+  | "personalPlan"
+  | "schoolId"
 > & {
   qualification?: string | null;
   examBoard?: string | null;
 
   accountIntent?: string | null;
   teacherAccessStatus?: string | null;
+
+  accountType?: string | null;
+  plan?: string | null;
+  personalPlan?: string | null;
+  schoolId?: string | null;
 
   onboardingComplete?: boolean;
 
@@ -100,6 +112,51 @@ function normaliseExamBoard(
   }
 
   return "";
+}
+
+function normaliseAccountType(
+  value: unknown,
+  schoolId: string,
+): AccountType {
+  if (
+    value === "individual" ||
+    value === "school"
+  ) {
+    if (value === "school" && !schoolId) {
+      return "individual";
+    }
+
+    return value;
+  }
+
+  return schoolId ? "school" : "individual";
+}
+
+function normalisePersonalPlan(
+  value: unknown,
+): PersonalPlan {
+  return value === "premium"
+    ? "premium"
+    : "free";
+}
+
+function normalisePlan(
+  value: unknown,
+  accountType: AccountType,
+  personalPlan: PersonalPlan,
+): AccountPlan {
+  if (accountType === "school") {
+    return "school";
+  }
+
+  if (
+    value === "premium" ||
+    value === "free"
+  ) {
+    return value;
+  }
+
+  return personalPlan;
 }
 
 function normaliseStringArray(
@@ -242,6 +299,29 @@ function convertUserProfile(
       accountIntent,
     );
 
+  const schoolId =
+    normaliseString(
+      data.schoolId,
+    );
+
+  const accountType =
+    normaliseAccountType(
+      data.accountType,
+      schoolId,
+    );
+
+  const personalPlan =
+    normalisePersonalPlan(
+      data.personalPlan,
+    );
+
+  const plan =
+    normalisePlan(
+      data.plan,
+      accountType,
+      personalPlan,
+    );
+
   return {
     uid:
       normaliseString(
@@ -261,6 +341,14 @@ function convertUserProfile(
     accountIntent,
 
     teacherAccessStatus,
+
+    accountType,
+
+    plan,
+
+    personalPlan,
+
+    schoolId,
 
     classIds:
       normaliseStringArray(
@@ -398,6 +486,11 @@ export async function createUserProfile({
               "teacher"
             ? "not_submitted"
             : null,
+
+      accountType: "individual",
+      plan: "free",
+      personalPlan: "free",
+      schoolId: null,
 
       classIds: [],
 
@@ -710,6 +803,61 @@ export async function ensureUserProfile(
       existingStatus || null;
   }
 
+  const existingSchoolId =
+    normaliseString(
+      existing.schoolId,
+    );
+
+  const resolvedAccountType =
+    normaliseAccountType(
+      existing.accountType,
+      existingSchoolId,
+    );
+
+  const resolvedPersonalPlan =
+    normalisePersonalPlan(
+      existing.personalPlan,
+    );
+
+  const resolvedPlan =
+    normalisePlan(
+      existing.plan,
+      resolvedAccountType,
+      resolvedPersonalPlan,
+    );
+
+  if (
+    existing.schoolId ===
+    undefined
+  ) {
+    repairData.schoolId = null;
+  }
+
+  if (
+    existing.accountType !== "individual" &&
+    existing.accountType !== "school"
+  ) {
+    repairData.accountType =
+      resolvedAccountType;
+  }
+
+  if (
+    existing.personalPlan !== "free" &&
+    existing.personalPlan !== "premium"
+  ) {
+    repairData.personalPlan =
+      resolvedPersonalPlan;
+  }
+
+  if (
+    existing.plan !== "free" &&
+    existing.plan !== "premium" &&
+    existing.plan !== "school"
+  ) {
+    repairData.plan =
+      resolvedPlan;
+  }
+
   if (
     !Array.isArray(
       existing.classIds,
@@ -846,6 +994,35 @@ export async function ensureUserProfile(
     {
       ...existing,
       ...repairData,
+    },
+  );
+}
+
+export async function updatePersonalPlan(
+  uid: string,
+  personalPlan: PersonalPlan,
+): Promise<void> {
+  const cleanedUid = uid.trim();
+
+  if (!cleanedUid) {
+    throw new Error("A valid user account is required.");
+  }
+
+  const profile = await getUserProfile(cleanedUid);
+
+  if (!profile) {
+    throw new Error("The user profile could not be found.");
+  }
+
+  await updateDoc(
+    doc(db, "users", cleanedUid),
+    {
+      personalPlan,
+      plan:
+        profile.accountType === "school"
+          ? "school"
+          : personalPlan,
+      updatedAt: serverTimestamp(),
     },
   );
 }

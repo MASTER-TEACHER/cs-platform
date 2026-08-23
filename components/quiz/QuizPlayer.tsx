@@ -32,8 +32,42 @@ type LinkedAssignment = {
   deliveryMode: QuizDeliveryMode;
 };
 
-const QUIZ_DURATION_SECONDS = 8 * 60;
+const DEFAULT_QUIZ_DURATION_SECONDS = 8 * 60;
 const FULLSCREEN_EXIT_COUNTDOWN_SECONDS = 5;
+
+function parseQuizDurationSeconds(value: string): number {
+  const normalised = value.trim().toLowerCase();
+
+  if (!normalised) {
+    return DEFAULT_QUIZ_DURATION_SECONDS;
+  }
+
+  const hoursMatch = normalised.match(
+    /(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|hr|h)\b/,
+  );
+
+  const minutesMatch = normalised.match(
+    /(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|min|m)\b/,
+  );
+
+  const secondsMatch = normalised.match(
+    /(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|sec|s)\b/,
+  );
+
+  const hours = hoursMatch ? Number(hoursMatch[1]) : 0;
+  const minutes = minutesMatch ? Number(minutesMatch[1]) : 0;
+  const seconds = secondsMatch ? Number(secondsMatch[1]) : 0;
+
+  const totalSeconds = Math.round(
+    hours * 60 * 60 +
+      minutes * 60 +
+      seconds,
+  );
+
+  return totalSeconds > 0
+    ? totalSeconds
+    : DEFAULT_QUIZ_DURATION_SECONDS;
+}
 
 function getGrade(scorePercent: number) {
   if (scorePercent >= 90) return "Grade 9";
@@ -75,6 +109,11 @@ export default function QuizPlayer({ quiz }: Props) {
 
   const assignmentId = searchParams.get("assignment");
 
+  const quizDurationSeconds = useMemo(
+    () => parseQuizDurationSeconds(quiz.estimatedTime),
+    [quiz.estimatedTime],
+  );
+
   const assessmentRootRef = useRef<HTMLDivElement | null>(null);
   const quizSaveInProgress = useRef(false);
   const assignmentSaveInProgress = useRef(false);
@@ -95,7 +134,7 @@ export default function QuizPlayer({ quiz }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(QUIZ_DURATION_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(() => quizDurationSeconds);
   const [resultSaved, setResultSaved] = useState(false);
   const [assignmentResultSaved, setAssignmentResultSaved] = useState(false);
 
@@ -246,6 +285,10 @@ export default function QuizPlayer({ quiz }: Props) {
       cancelled = true;
     };
   }, [assignmentId, quiz.topicId]);
+
+  useEffect(() => {
+    setTimeLeft(quizDurationSeconds);
+  }, [quiz.id, quizDurationSeconds]);
 
   useEffect(() => {
     return () => {
@@ -626,7 +669,7 @@ export default function QuizPlayer({ quiz }: Props) {
             integrityTerminatedRef.current
               ? 0
               : awardedXP,
-          timeTakenSeconds: QUIZ_DURATION_SECONDS - timeLeft,
+          timeTakenSeconds: Math.max(0, quizDurationSeconds - timeLeft),
 
           ...(assessmentMode
             ? {
@@ -674,6 +717,7 @@ export default function QuizPlayer({ quiz }: Props) {
     scorePercent,
     awardedXP,
     timeLeft,
+    quizDurationSeconds,
     assessmentMode,
     integritySessionStartedAt,
     integrityTerminated,

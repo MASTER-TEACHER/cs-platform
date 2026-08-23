@@ -17,7 +17,7 @@ import {
   updateTeacherResourceStatus,
 } from "@/services/teacherResourceService";
 
-type ResourceStatus = "draft" | "published";
+type ResourceStatus = "draft" | "published" | "archived";
 
 type ResourcePublishControlsProps = {
   resourceId: string;
@@ -220,7 +220,11 @@ export default function ResourcePublishControls({
   return (
     <>
       <div className="space-y-3">
-        {status === "draft" ? (
+        {status === "archived" ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-bold text-slate-600">
+            Archived · restore this resource from the Content Hub
+          </div>
+        ) : status === "draft" ? (
           <button
             type="button"
             onClick={openPublishConfirmation}

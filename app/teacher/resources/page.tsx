@@ -29,7 +29,7 @@ import {
   SavedTeacherResource,
 } from "@/services/teacherResourceService";
 
-type StatusFilter = "all" | "draft" | "published";
+type StatusFilter = "all" | "draft" | "published" | "archived";
 
 function formatResourceType(value: string): string {
   return value
@@ -211,7 +211,8 @@ function ResourceCard({
           <button
             type="button"
             onClick={() => onDelete(resource)}
-            disabled={isDeleting}
+            disabled={isDeleting || resource.status !== "archived"}
+            title={resource.status === "archived" ? "Delete archived resource" : "Archive this resource in Content Hub before deleting it"}
             aria-label={`Delete ${resource.title}`}
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -348,8 +349,13 @@ export default function TeacherResourcesPage() {
   }
 
   async function handleDelete(resource: SavedTeacherResource) {
+    if (resource.status !== "archived") {
+      setError("Archive a resource in Content Hub before deleting it permanently.");
+      return;
+    }
+
     const confirmed = window.confirm(
-      `Delete "${resource.title}" from your resource library? This action cannot be undone.`,
+      `Permanently delete archived resource "${resource.title}"? This action cannot be undone.`,
     );
 
     if (!confirmed) {
@@ -409,13 +415,22 @@ export default function TeacherResourcesPage() {
             </p>
           </div>
 
-          <Link
-            href="/teacher/assistant"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
-          >
-            <Plus className="h-5 w-5" />
-            Create resource
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/content"
+              className="inline-flex shrink-0 items-center justify-center rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-sm font-bold text-white"
+            >
+              Content Hub
+            </Link>
+
+            <Link
+              href="/teacher/assistant"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+            >
+              <Plus className="h-5 w-5" />
+              Create resource
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -556,6 +571,7 @@ export default function TeacherResourcesPage() {
             <option value="all">All statuses</option>
             <option value="draft">Draft</option>
             <option value="published">Published</option>
+            <option value="archived">Archived</option>
           </select>
         </div>
 

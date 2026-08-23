@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ClassStudentsManager from "@/components/teacher/classes/ClassStudentsManager";
+import ClassSettingsPanel from "@/components/teacher/classes/ClassSettingsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ClassStudent,
@@ -10,11 +11,11 @@ import {
   TeacherClass,
 } from "@/services/classService";
 import {
-  getTeacherAssignments,
-  ResourceAssignment,
-} from "@/services/resourceAssignmentService";
+  getUnifiedTeacherAssignments,
+  type UnifiedTeacherAssignment,
+} from "@/services/unifiedTeacherAssignmentService";
 
-type ClassTab = "overview" | "students" | "assignments" | "analytics";
+type ClassTab = "overview" | "students" | "assignments" | "analytics" | "settings";
 
 function formatDate(date: Date | null): string {
   if (!date) {
@@ -26,6 +27,15 @@ function formatDate(date: Date | null): string {
     month: "short",
     year: "numeric",
   }).format(date);
+}
+
+
+function qualificationLabel(value: string): string {
+  if (value === "A_LEVEL") {
+    return "A Level";
+  }
+
+  return value || "Not set";
 }
 
 function getDueDateStatus(dueDate: Date | null): {
@@ -78,14 +88,10 @@ function getDueDateStatus(dueDate: Date | null): {
   };
 }
 
-function calculateCompletionPercentage(assignment: ResourceAssignment): number {
-  if (assignment.studentCount <= 0) {
-    return 0;
-  }
-
-  return Math.round(
-    (assignment.completedCount / assignment.studentCount) * 100,
-  );
+function calculateCompletionPercentage(
+  assignment: UnifiedTeacherAssignment,
+): number {
+  return assignment.completionPercentage;
 }
 
 export default function ClassDetailsPage() {
@@ -100,7 +106,7 @@ export default function ClassDetailsPage() {
 
   const [teacherClass, setTeacherClass] = useState<TeacherClass | null>(null);
 
-  const [assignments, setAssignments] = useState<ResourceAssignment[]>([]);
+  const [assignments, setAssignments] = useState<UnifiedTeacherAssignment[]>([]);
 
   const [activeTab, setActiveTab] = useState<ClassTab>("overview");
 
@@ -118,31 +124,44 @@ export default function ClassDetailsPage() {
         setIsLoading(true);
         setError("");
 
-        const [classRecord, teacherAssignments] = await Promise.all([
-          getTeacherClassById(classId),
-          getTeacherAssignments(user.uid),
-        ]);
+        const classRecord = await getTeacherClassById(classId);
 
         if (!classRecord) {
           setError("This class could not be found.");
-
           return;
         }
 
         if (classRecord.teacherId !== user.uid) {
           setError("You do not have permission to view this class.");
-
           return;
         }
 
-        const matchingAssignments = teacherAssignments.filter(
-          (assignment) => assignment.classId === classId,
-        );
+        const assignmentSummary =
+          await getUnifiedTeacherAssignments(user.uid);
+
+        const matchingAssignments =
+          assignmentSummary.assignments.filter(
+            (assignment) => assignment.classId === classId,
+          );
 
         setTeacherClass(classRecord);
         setAssignments(matchingAssignments);
-      } catch (loadError) {
-        console.error("Unable to load class details:", loadError);
+      } catch (loadError: unknown) {
+        const firebaseCode =
+          typeof loadError === "object" &&
+          loadError !== null &&
+          "code" in loadError &&
+          typeof (loadError as { code?: unknown }).code === "string"
+            ? (loadError as { code: string }).code
+            : "";
+
+        if (
+          firebaseCode === "permission-denied" ||
+          firebaseCode === "firestore/permission-denied"
+        ) {
+          setError("You do not have permission to view this class.");
+          return;
+        }
 
         setError(
           loadError instanceof Error
@@ -252,6 +271,10 @@ export default function ClassDetailsPage() {
       id: "analytics",
       label: "Analytics",
     },
+    {
+      id: "settings",
+      label: "Settings",
+    },
   ];
 
   return (
@@ -283,6 +306,14 @@ export default function ClassDetailsPage() {
                 {teacherClass.academicYear && (
                   <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
                     {teacherClass.academicYear}
+                  </span>
+                )}
+
+
+                {(teacherClass.examBoard || teacherClass.qualification) && (
+                  <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                    {teacherClass.examBoard || "Board"}{" "}
+                    {qualificationLabel(teacherClass.qualification)}
                   </span>
                 )}
               </div>
@@ -414,6 +445,19 @@ export default function ClassDetailsPage() {
                 totalPossibleCompletions={totalPossibleCompletions}
               />
             )}
+
+
+            {activeTab === "settings" && (
+              <ClassSettingsPanel
+                teacherClass={teacherClass}
+                onUpdated={(updatedClass) => {
+                  setTeacherClass(updatedClass);
+                }}
+                onDeleted={() => {
+                  router.push("/teacher/classes");
+                }}
+              />
+            )}
           </div>
         </section>
       </div>
@@ -449,7 +493,7 @@ function OverviewTab({
   onOpenAssignments,
 }: {
   teacherClass: TeacherClass;
-  assignments: ResourceAssignment[];
+  assignments: UnifiedTeacherAssignment[];
   students: ClassStudent[];
   onOpenStudents: () => void;
   onOpenAssignments: () => void;
@@ -483,7 +527,7 @@ function OverviewTab({
           {recentAssignments.length === 0 ? (
             <EmptyState
               title="No assignments yet"
-              description="Published resources assigned to this class will appear here."
+              description="Recent resources, programming work, quizzes and exams assigned to this class will appear here."
             />
           ) : (
             <div className="mt-5 space-y-3">
@@ -553,6 +597,16 @@ function OverviewTab({
             <InformationRow
               label="Academic year"
               value={teacherClass.academicYear || "Not specified"}
+            />
+
+            <InformationRow
+              label="Qualification"
+              value={qualificationLabel(teacherClass.qualification)}
+            />
+
+            <InformationRow
+              label="Exam board"
+              value={teacherClass.examBoard || "Not specified"}
             />
 
             <InformationRow
@@ -647,7 +701,7 @@ function AssignmentsTab({
   assignments,
   onAssignResource,
 }: {
-  assignments: ResourceAssignment[];
+  assignments: UnifiedTeacherAssignment[];
   onAssignResource: () => void;
 }) {
   return (
@@ -659,7 +713,7 @@ function AssignmentsTab({
           </h2>
 
           <p className="mt-1 text-sm text-slate-500">
-            Resources assigned to students in this class.
+            All resource, programming, quiz and exam assignments for this class.
           </p>
         </div>
 
@@ -697,7 +751,7 @@ function AnalyticsTab({
   totalCompletions,
   totalPossibleCompletions,
 }: {
-  assignments: ResourceAssignment[];
+  assignments: UnifiedTeacherAssignment[];
   overallCompletionPercentage: number;
   totalCompletions: number;
   totalPossibleCompletions: number;
@@ -730,13 +784,13 @@ function AnalyticsTab({
         </h2>
 
         <p className="mt-1 text-sm text-slate-500">
-          Completion rates for resources assigned to this class.
+          Completion rates across lessons/resources, programming, quizzes and exams assigned to this class.
         </p>
 
         {assignments.length === 0 ? (
           <EmptyState
             title="No analytics available"
-            description="Analytics will appear after resources have been assigned."
+            description="Analytics will appear after assignments have been created for this class."
           />
         ) : (
           <div className="mt-6 space-y-5">
@@ -748,7 +802,7 @@ function AnalyticsTab({
                   <div className="mb-2 flex items-center justify-between gap-4">
                     <div>
                       <p className="font-semibold text-slate-900">
-                        {assignment.resourceTitle}
+                        {assignment.title}
                       </p>
 
                       <p className="text-sm text-slate-500">
@@ -783,7 +837,7 @@ function AnalyticsTab({
 function AssignmentSummaryCard({
   assignment,
 }: {
-  assignment: ResourceAssignment;
+  assignment: UnifiedTeacherAssignment;
 }) {
   const dueDateStatus = getDueDateStatus(assignment.dueDate);
 
@@ -794,12 +848,12 @@ function AssignmentSummaryCard({
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <h3 className="font-semibold text-slate-900">
-            {assignment.resourceTitle}
+            {assignment.title}
           </h3>
 
           <p className="mt-1 text-sm text-slate-500">
-            {assignment.resourceTopic ||
-              assignment.resourceType ||
+            {assignment.topic ||
+              assignment.kind ||
               "Teaching resource"}
           </p>
         </div>
@@ -827,7 +881,7 @@ function AssignmentSummaryCard({
 function AssignmentDetailedCard({
   assignment,
 }: {
-  assignment: ResourceAssignment;
+  assignment: UnifiedTeacherAssignment;
 }) {
   const dueDateStatus = getDueDateStatus(assignment.dueDate);
 
@@ -839,7 +893,7 @@ function AssignmentDetailedCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-bold text-slate-900">
-              {assignment.resourceTitle}
+              {assignment.title}
             </h3>
 
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold capitalize text-slate-700">
@@ -848,14 +902,14 @@ function AssignmentDetailedCard({
           </div>
 
           <p className="mt-2 text-sm text-slate-500">
-            {assignment.resourceTopic ||
-              assignment.resourceType ||
+            {assignment.topic ||
+              assignment.kind ||
               "Teaching resource"}
           </p>
 
-          {assignment.instructions && (
+          {assignment.description && (
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-              {assignment.instructions}
+              {assignment.description}
             </p>
           )}
         </div>

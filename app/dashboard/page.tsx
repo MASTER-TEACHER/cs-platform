@@ -9,13 +9,11 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import DashboardLearning from "@/components/dashboard/DashboardLearning";
 import DashboardQuiz from "@/components/dashboard/DashboardQuiz";
 import DashboardActivity from "@/components/dashboard/DashboardActivity";
-import AssessmentInsights from "@/components/dashboard/AssessmentInsights";
 import AdaptiveLearningCard from "@/components/dashboard/AdaptiveLearningCard";
 import StudentAnalyticsSnapshot from "@/components/dashboard/StudentAnalyticsSnapshot";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRecentQuiz } from "@/hooks/useRecentQuiz";
-import { useStudentAdaptiveAnalytics } from "@/hooks/useStudentAdaptiveAnalytics";
 import { useAdaptiveLearning } from "@/hooks/useAdaptiveLearning";
 
 import { getDailyMission } from "@/lib/missionEngine";
@@ -36,12 +34,6 @@ export default function DashboardPage() {
     quiz: recentQuiz,
     loading: recentQuizLoading,
   } = useRecentQuiz();
-
-  const {
-    analytics,
-    loading: analyticsLoading,
-    error: analyticsError,
-  } = useStudentAdaptiveAnalytics();
 
   const {
     plan: adaptivePlan,
@@ -185,18 +177,23 @@ export default function DashboardPage() {
         badges={badges.length}
       />
 
-      {/* NEW RICH ATTAINMENT ANALYTICS */}
+      {/*
+       * Canonical attainment / grade intelligence.
+       *
+       * This uses the rich analytics pipeline rather than
+       * the older raw-average student analytics service.
+       */}
       <StudentAnalyticsSnapshot />
 
+      {/*
+       * Canonical adaptive-learning intelligence.
+       *
+       * This owns mastery, priority topics and next-action
+       * recommendations.
+       */}
       <AdaptiveLearningCard
         plan={adaptivePlan}
         loading={adaptiveLoading}
-      />
-
-      <AssessmentInsights
-        analytics={analytics}
-        loading={analyticsLoading}
-        error={analyticsError}
       />
 
       <DashboardLearning

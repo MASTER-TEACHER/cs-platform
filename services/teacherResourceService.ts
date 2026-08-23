@@ -3,8 +3,8 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
-  setDoc,
   orderBy,
   query,
   serverTimestamp,
@@ -13,7 +13,10 @@ import {
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
+import {
+  auth,
+  db,
+} from "@/lib/firebase";
 
 export type ResourceSection = {
   title: string;
@@ -64,19 +67,31 @@ export type GeneratedTeachingResource = {
   createdAt: string;
 };
 
+export type TeacherResourceStatus =
+  | "draft"
+  | "published"
+  | "archived";
+
 export type SavedTeacherResource = {
   id: string;
+
   teacherId: string;
   sourceResourceId: string;
+
   title: string;
   topic: string;
   resourceType: string;
+
   yearGroup: string;
   examBoard: string;
+
   duration: string;
   difficulty: string;
+
   content: GeneratedTeachingResource;
-  status: "draft" | "published";
+
+  status: TeacherResourceStatus;
+
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -89,123 +104,507 @@ type FirestoreTeacherResource = Omit<
   updatedAt?: Timestamp;
 };
 
-const COLLECTION_NAME = "teacherResources";
+const COLLECTION_NAME =
+  "teacherResources";
 
-function timestampToDate(value: unknown): Date | null {
-  if (value instanceof Timestamp) {
+function timestampToDate(
+  value: unknown,
+): Date | null {
+  if (
+    value instanceof Timestamp
+  ) {
     return value.toDate();
   }
 
   return null;
 }
 
+function requireSignedInTeacherId(): string {
+  const teacherId =
+    auth.currentUser?.uid;
+
+  if (!teacherId) {
+    throw new Error(
+      "A signed-in teacher account is required.",
+    );
+  }
+
+  return teacherId;
+}
+
+async function requireOwnedTeacherResource(
+  resourceDocumentId: string,
+): Promise<{
+  teacherId: string;
+  reference: ReturnType<typeof doc>;
+  data: FirestoreTeacherResource;
+}> {
+  const cleanedResourceId =
+    resourceDocumentId.trim();
+
+  if (!cleanedResourceId) {
+    throw new Error(
+      "A valid teaching resource is required.",
+    );
+  }
+
+  const teacherId =
+    requireSignedInTeacherId();
+
+  const reference = doc(
+    db,
+    COLLECTION_NAME,
+    cleanedResourceId,
+  );
+
+  const snapshot =
+    await getDoc(reference);
+
+  if (!snapshot.exists()) {
+    throw new Error(
+      "The teaching resource could not be found.",
+    );
+  }
+
+  const data =
+    snapshot.data() as
+      FirestoreTeacherResource;
+
+  if (
+    !data.teacherId ||
+    data.teacherId !== teacherId
+  ) {
+    throw new Error(
+      "You do not have permission to modify this teaching resource.",
+    );
+  }
+
+  return {
+    teacherId,
+    reference,
+    data,
+  };
+}
+
 export async function saveTeacherResource(
   teacherId: string,
-  resource: GeneratedTeachingResource,
+  resource:
+    GeneratedTeachingResource,
 ): Promise<string> {
-  if (!teacherId.trim()) {
-    throw new Error("A signed-in teacher is required to save this resource.");
+  const signedInTeacherId =
+    requireSignedInTeacherId();
+
+  const cleanedTeacherId =
+    teacherId.trim();
+
+  if (!cleanedTeacherId) {
+    throw new Error(
+      "A signed-in teacher is required to save this resource.",
+    );
+  }
+
+  /*
+   * Prevent a caller from saving a resource under
+   * another teacher's UID.
+   */
+  if (
+    cleanedTeacherId !==
+    signedInTeacherId
+  ) {
+    throw new Error(
+      "You cannot save a resource for another teacher account.",
+    );
   }
 
   const existingQuery = query(
-    collection(db, COLLECTION_NAME),
-    where("teacherId", "==", teacherId),
-    where("sourceResourceId", "==", resource.id),
+    collection(
+      db,
+      COLLECTION_NAME,
+    ),
+    where(
+      "teacherId",
+      "==",
+      signedInTeacherId,
+    ),
+    where(
+      "sourceResourceId",
+      "==",
+      resource.id,
+    ),
   );
 
-  const existingSnapshot = await getDocs(existingQuery);
+  const existingSnapshot =
+    await getDocs(
+      existingQuery,
+    );
 
-  if (!existingSnapshot.empty) {
-    throw new Error("This resource has already been saved to your library.");
+  if (
+    !existingSnapshot.empty
+  ) {
+    throw new Error(
+      "This resource has already been saved to your library.",
+    );
   }
 
-  const documentReference = await addDoc(collection(db, COLLECTION_NAME), {
-    teacherId,
-    sourceResourceId: resource.id,
-    title: resource.title,
-    topic: resource.topic,
-    resourceType: resource.resourceType,
-    yearGroup: resource.yearGroup,
-    examBoard: resource.examBoard,
-    duration: resource.duration,
-    difficulty: resource.difficulty,
-    content: resource,
-    status: "draft",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const documentReference =
+    await addDoc(
+      collection(
+        db,
+        COLLECTION_NAME,
+      ),
+      {
+        teacherId:
+          signedInTeacherId,
+
+        sourceResourceId:
+          resource.id,
+
+        title:
+          resource.title,
+
+        topic:
+          resource.topic,
+
+        resourceType:
+          resource.resourceType,
+
+        yearGroup:
+          resource.yearGroup,
+
+        examBoard:
+          resource.examBoard,
+
+        duration:
+          resource.duration,
+
+        difficulty:
+          resource.difficulty,
+
+        content:
+          resource,
+
+        status:
+          "draft",
+
+        createdAt:
+          serverTimestamp(),
+
+        updatedAt:
+          serverTimestamp(),
+      },
+    );
 
   return documentReference.id;
 }
 
 export async function getTeacherResources(
   teacherId: string,
-): Promise<SavedTeacherResource[]> {
-  if (!teacherId.trim()) {
+): Promise<
+  SavedTeacherResource[]
+> {
+  const signedInTeacherId =
+    requireSignedInTeacherId();
+
+  const cleanedTeacherId =
+    teacherId.trim();
+
+  if (!cleanedTeacherId) {
     return [];
   }
 
-  const resourcesQuery = query(
-    collection(db, COLLECTION_NAME),
-    where("teacherId", "==", teacherId),
-    orderBy("createdAt", "desc"),
+  /*
+   * Do not allow this client-side service to become
+   * a directory for another teacher's private content.
+   */
+  if (
+    cleanedTeacherId !==
+    signedInTeacherId
+  ) {
+    throw new Error(
+      "You cannot access another teacher's resource library.",
+    );
+  }
+
+  const resourcesQuery =
+    query(
+      collection(
+        db,
+        COLLECTION_NAME,
+      ),
+      where(
+        "teacherId",
+        "==",
+        signedInTeacherId,
+      ),
+      orderBy(
+        "createdAt",
+        "desc",
+      ),
+    );
+
+  const snapshot =
+    await getDocs(
+      resourcesQuery,
+    );
+
+  return snapshot.docs.map(
+    (
+      resourceDocument,
+    ) => {
+      const data =
+        resourceDocument.data() as
+          FirestoreTeacherResource;
+
+      /*
+       * Defensive validation.
+       *
+       * The Firestore query should already guarantee
+       * this, but we do not return a malformed record
+       * whose owner does not match the current user.
+       */
+      if (
+        data.teacherId !==
+        signedInTeacherId
+      ) {
+        throw new Error(
+          "A resource ownership mismatch was detected.",
+        );
+      }
+
+      return {
+        id:
+          resourceDocument.id,
+
+        teacherId:
+          data.teacherId,
+
+        sourceResourceId:
+          data.sourceResourceId,
+
+        title:
+          data.title,
+
+        topic:
+          data.topic,
+
+        resourceType:
+          data.resourceType,
+
+        yearGroup:
+          data.yearGroup,
+
+        examBoard:
+          data.examBoard,
+
+        duration:
+          data.duration,
+
+        difficulty:
+          data.difficulty,
+
+        content:
+          data.content,
+
+        status:
+          data.status,
+
+        createdAt:
+          timestampToDate(
+            data.createdAt,
+          ),
+
+        updatedAt:
+          timestampToDate(
+            data.updatedAt,
+          ),
+      };
+    },
   );
-
-  const snapshot = await getDocs(resourcesQuery);
-
-  return snapshot.docs.map((resourceDocument) => {
-    const data = resourceDocument.data() as FirestoreTeacherResource;
-
-    return {
-      id: resourceDocument.id,
-      teacherId: data.teacherId,
-      sourceResourceId: data.sourceResourceId,
-      title: data.title,
-      topic: data.topic,
-      resourceType: data.resourceType,
-      yearGroup: data.yearGroup,
-      examBoard: data.examBoard,
-      duration: data.duration,
-      difficulty: data.difficulty,
-      content: data.content,
-      status: data.status,
-      createdAt: timestampToDate(data.createdAt),
-      updatedAt: timestampToDate(data.updatedAt),
-    };
-  });
 }
 
 export async function updateTeacherResourceStatus(
-  resourceId: string,
-  status: "draft" | "published",
+  resourceDocumentId: string,
+  status:
+    TeacherResourceStatus,
 ): Promise<void> {
-  const resourceReference = doc(db, "teacherResources", resourceId);
+  const {
+    reference,
+  } =
+    await requireOwnedTeacherResource(
+      resourceDocumentId,
+    );
 
-  await updateDoc(resourceReference, {
-    status,
-    updatedAt: serverTimestamp(),
-  });
+  await updateDoc(
+    reference,
+    {
+      status,
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
 }
 
 export async function updateTeacherResourceContent(
   resourceDocumentId: string,
-  resource: GeneratedTeachingResource,
+  resource:
+    GeneratedTeachingResource,
 ): Promise<void> {
-  await updateDoc(doc(db, COLLECTION_NAME, resourceDocumentId), {
-    title: resource.title,
-    topic: resource.topic,
-    resourceType: resource.resourceType,
-    yearGroup: resource.yearGroup,
-    examBoard: resource.examBoard,
-    duration: resource.duration,
-    difficulty: resource.difficulty,
-    content: resource,
-    updatedAt: serverTimestamp(),
-  });
+  const {
+    reference,
+  } =
+    await requireOwnedTeacherResource(
+      resourceDocumentId,
+    );
+
+  await updateDoc(
+    reference,
+    {
+      title:
+        resource.title,
+
+      topic:
+        resource.topic,
+
+      resourceType:
+        resource.resourceType,
+
+      yearGroup:
+        resource.yearGroup,
+
+      examBoard:
+        resource.examBoard,
+
+      duration:
+        resource.duration,
+
+      difficulty:
+        resource.difficulty,
+
+      content:
+        resource,
+
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+}
+
+export async function duplicateTeacherResource(
+  resourceDocumentId: string,
+  teacherId: string,
+): Promise<string> {
+  const signedInTeacherId =
+    requireSignedInTeacherId();
+
+  const cleanedTeacherId =
+    teacherId.trim();
+
+  if (
+    !cleanedTeacherId ||
+    cleanedTeacherId !==
+      signedInTeacherId
+  ) {
+    throw new Error(
+      "You cannot duplicate content into another teacher's library.",
+    );
+  }
+
+  const {
+    data: source,
+  } =
+    await requireOwnedTeacherResource(
+      resourceDocumentId,
+    );
+
+  const stamp =
+    Date.now();
+
+  const duplicatedTitle =
+    `${source.title} (Copy)`;
+
+  const reference =
+    await addDoc(
+      collection(
+        db,
+        COLLECTION_NAME,
+      ),
+      {
+        teacherId:
+          signedInTeacherId,
+
+        sourceResourceId:
+          `${source.sourceResourceId}-copy-${stamp}`,
+
+        title:
+          duplicatedTitle,
+
+        topic:
+          source.topic,
+
+        resourceType:
+          source.resourceType,
+
+        yearGroup:
+          source.yearGroup,
+
+        examBoard:
+          source.examBoard,
+
+        duration:
+          source.duration,
+
+        difficulty:
+          source.difficulty,
+
+        content: {
+          ...source.content,
+
+          id:
+            `${source.content.id}-copy-${stamp}`,
+
+          title:
+            duplicatedTitle,
+        },
+
+        status:
+          "draft",
+
+        createdAt:
+          serverTimestamp(),
+
+        updatedAt:
+          serverTimestamp(),
+      },
+    );
+
+  return reference.id;
 }
 
 export async function deleteTeacherResource(
   resourceDocumentId: string,
 ): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION_NAME, resourceDocumentId));
+  const {
+    reference,
+    data,
+  } =
+    await requireOwnedTeacherResource(
+      resourceDocumentId,
+    );
+
+  /*
+   * Permanent deletion is intentionally restricted
+   * to archived resources.
+   */
+  if (
+    data.status !==
+    "archived"
+  ) {
+    throw new Error(
+      "Archive this resource before deleting it permanently.",
+    );
+  }
+
+  await deleteDoc(
+    reference,
+  );
 }

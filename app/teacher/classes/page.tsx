@@ -1,162 +1,430 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import {
-  collection,
-  onSnapshot,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
+
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
-import { db } from "@/lib/firebase";
-import { createTeacherClass } from "@/services/classService";
 
-type ClassRecord = {
-  id: string;
-  teacherId: string;
-  name: string;
-  yearGroup: string;
-  subject: string;
-  studentIds: string[];
-  assignmentIds: string[];
-  createdAt?: Timestamp;
-};
+import {
+  createTeacherClass,
+  getTeacherClasses,
+  type TeacherClass,
+} from "@/services/classService";
+
+import type {
+  ExamBoard,
+  Qualification,
+} from "@/types/user";
+
+import {
+  getUnifiedTeacherAssignments,
+  type UnifiedTeacherAssignment,
+} from "@/services/unifiedTeacherAssignmentService";
+
+type StatusFilter =
+  | "active"
+  | "archived"
+  | "all";
+
+function defaultAcademicYear(): string {
+  const now = new Date();
+
+  const year =
+    now.getFullYear();
+
+  /*
+   * Treat August onward as preparation for the new UK academic year.
+   */
+  const startYear =
+    now.getMonth() >= 7
+      ? year
+      : year - 1;
+
+  return `${startYear}/${startYear + 1}`;
+}
+
+function qualificationLabel(
+  qualification:
+    Qualification | "",
+): string {
+  if (
+    qualification ===
+    "A_LEVEL"
+  ) {
+    return "A Level";
+  }
+
+  return qualification || "Not set";
+}
 
 export default function TeacherClassesPage() {
-  const { user, loading: authLoading } = useAuth();
+  const {
+    user,
+    profile,
+    loading: authLoading,
+    profileReady,
+  } = useAuth();
 
-  const [classes, setClasses] = useState<ClassRecord[]>([]);
-  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [classes, setClasses] =
+    useState<
+      TeacherClass[]
+    >([]);
 
-  const [showForm, setShowForm] = useState(false);
-  const [className, setClassName] = useState("");
-  const [yearGroup, setYearGroup] = useState("");
-  const [subject, setSubject] = useState("Computer Science");
-  const [submitting, setSubmitting] = useState(false);
+  const [
+    unifiedAssignments,
+    setUnifiedAssignments,
+  ] = useState<
+    UnifiedTeacherAssignment[]
+  >([]);
 
-  useEffect(() => {
-    if (authLoading) {
-      return;
-    }
+  const [
+    loadingClasses,
+    setLoadingClasses,
+  ] = useState(true);
 
-    if (!user) {
+  const [
+    showForm,
+    setShowForm,
+  ] = useState(false);
+
+  const [
+    className,
+    setClassName,
+  ] = useState("");
+
+  const [
+    yearGroup,
+    setYearGroup,
+  ] = useState("");
+
+  const [subject, setSubject] =
+    useState(
+      "Computer Science",
+    );
+
+  const [
+    academicYear,
+    setAcademicYear,
+  ] = useState(
+    defaultAcademicYear(),
+  );
+
+  const [
+    qualification,
+    setQualification,
+  ] =
+    useState<
+      Qualification | ""
+    >("GCSE");
+
+  const [
+    examBoard,
+    setExamBoard,
+  ] =
+    useState<
+      ExamBoard | ""
+    >("OCR");
+
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
+
+  const [
+    searchTerm,
+    setSearchTerm,
+  ] = useState("");
+
+  const [
+    statusFilter,
+    setStatusFilter,
+  ] =
+    useState<StatusFilter>(
+      "active",
+    );
+
+  async function loadClasses() {
+    if (!user?.uid) {
       setClasses([]);
-      setLoadingClasses(false);
+      setLoadingClasses(
+        false,
+      );
+
       return;
     }
-
-    const classesQuery = query(
-      collection(db, "classes"),
-      where("teacherId", "==", user.uid),
-    );
-
-    const unsubscribe = onSnapshot(
-      classesQuery,
-      (snapshot) => {
-        const loadedClasses: ClassRecord[] = snapshot.docs.map(
-          (classDocument) => {
-            const data = classDocument.data();
-
-            return {
-              id: classDocument.id,
-              teacherId: data.teacherId || "",
-              name: data.name || "Untitled Class",
-              yearGroup: data.yearGroup || "Not specified",
-              subject: data.subject || "Computer Science",
-              studentIds: Array.isArray(data.studentIds) ? data.studentIds : [],
-              assignmentIds: Array.isArray(data.assignmentIds)
-                ? data.assignmentIds
-                : [],
-              createdAt: data.createdAt,
-            };
-          },
-        );
-
-        loadedClasses.sort((a, b) => {
-          const aTime = a.createdAt?.toMillis() || 0;
-          const bTime = b.createdAt?.toMillis() || 0;
-
-          return bTime - aTime;
-        });
-
-        setClasses(loadedClasses);
-        setLoadingClasses(false);
-      },
-      (error) => {
-        console.error("Failed to load classes:", error);
-        toast.error("Could not load your classes.");
-        setLoadingClasses(false);
-      },
-    );
-
-    return unsubscribe;
-  }, [authLoading, user]);
-
-  const totalStudents = useMemo(
-    () =>
-      classes.reduce(
-        (total, classItem) => total + classItem.studentIds.length,
-        0,
-      ),
-    [classes],
-  );
-
-  const totalAssignments = useMemo(
-    () =>
-      classes.reduce(
-        (total, classItem) => total + classItem.assignmentIds.length,
-        0,
-      ),
-    [classes],
-  );
-
-  async function handleCreateClass(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!user) {
-      toast.error("You must be logged in as a teacher.");
-      return;
-    }
-
-    if (!className.trim() || !yearGroup.trim() || !subject.trim()) {
-      toast.error("Please complete every class field.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    const academicYear = "2024/2025";
 
     try {
+      setLoadingClasses(
+        true,
+      );
+
+      const [
+        loaded,
+        assignmentSummary,
+      ] = await Promise.all([
+        getTeacherClasses(
+          user.uid,
+        ),
+        getUnifiedTeacherAssignments(
+          user.uid,
+        ),
+      ]);
+
+      setClasses(
+        loaded,
+      );
+
+      setUnifiedAssignments(
+        assignmentSummary.assignments,
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load classes:",
+        error,
+      );
+
+      toast.error(
+        "Could not load your classes.",
+      );
+    } finally {
+      setLoadingClasses(
+        false,
+      );
+    }
+  }
+
+  useEffect(() => {
+    if (
+      authLoading ||
+      !profileReady
+    ) {
+      return;
+    }
+
+    void loadClasses();
+  }, [
+    authLoading,
+    profileReady,
+    user?.uid,
+  ]);
+
+  const visibleClasses =
+    useMemo(() => {
+      const search =
+        searchTerm
+          .trim()
+          .toLowerCase();
+
+      return classes.filter(
+        (item) => {
+          const matchesStatus =
+            statusFilter ===
+              "all" ||
+            item.status ===
+              statusFilter;
+
+          if (
+            !matchesStatus
+          ) {
+            return false;
+          }
+
+          if (!search) {
+            return true;
+          }
+
+          return [
+            item.name,
+            item.subject,
+            item.yearGroup,
+            item.academicYear,
+            item.qualification,
+            item.examBoard,
+          ].some(
+            (value) =>
+              value
+                .toLowerCase()
+                .includes(
+                  search,
+                ),
+          );
+        },
+      );
+    }, [
+      classes,
+      searchTerm,
+      statusFilter,
+    ]);
+
+  const activeClasses =
+    classes.filter(
+      (item) =>
+        item.status ===
+        "active",
+    );
+
+  const totalStudents =
+    activeClasses.reduce(
+      (
+        total,
+        item,
+      ) =>
+        total +
+        item.studentIds.length,
+      0,
+    );
+
+  const activeClassIds =
+    new Set(
+      activeClasses.map(
+        (item) => item.id,
+      ),
+    );
+
+  const totalAssignments =
+    unifiedAssignments.filter(
+      (assignment) =>
+        activeClassIds.has(
+          assignment.classId,
+        ),
+    ).length;
+
+  const assignmentCountByClass =
+    useMemo(() => {
+      const counts =
+        new Map<string, number>();
+
+      unifiedAssignments.forEach(
+        (assignment) => {
+          counts.set(
+            assignment.classId,
+            (counts.get(
+              assignment.classId,
+            ) || 0) + 1,
+          );
+        },
+      );
+
+      return counts;
+    }, [
+      unifiedAssignments,
+    ]);
+
+  async function handleCreateClass(
+    event:
+      FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!user?.uid) {
+      toast.error(
+        "You must be logged in as a teacher.",
+      );
+      return;
+    }
+
+    if (
+      !profile?.schoolId
+    ) {
+      toast.error(
+        "Create or join your school organisation before creating classes.",
+      );
+      return;
+    }
+
+    if (
+      !className.trim() ||
+      !yearGroup.trim() ||
+      !academicYear.trim() ||
+      !qualification ||
+      !examBoard
+    ) {
+      toast.error(
+        "Complete every required class field.",
+      );
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+
       await createTeacherClass({
-        name: className,
+        name:
+          className,
+
         subject,
+
         yearGroup,
+
         academicYear,
-        teacherId: user.uid,
-        teacherName: user.displayName ?? user.email ?? "Teacher",
+
+        qualification,
+
+        examBoard,
+
+        teacherId:
+          user.uid,
+
+        teacherName:
+          profile?.name ||
+          user.displayName ||
+          user.email ||
+          "Teacher",
+
+        schoolId:
+          profile.schoolId,
       });
 
-      toast.success("Class created successfully.");
+      toast.success(
+        "Class created successfully.",
+      );
 
       setClassName("");
       setYearGroup("");
-      setSubject("Computer Science");
+      setSubject(
+        "Computer Science",
+      );
+      setAcademicYear(
+        defaultAcademicYear(),
+      );
+      setQualification(
+        "GCSE",
+      );
+      setExamBoard(
+        "OCR",
+      );
       setShowForm(false);
+
+      await loadClasses();
     } catch (error) {
-      console.error("Create class error:", error);
-      toast.error("Could not create the class.");
+      console.error(
+        "Create class error:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not create the class.",
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (authLoading || loadingClasses) {
+  if (
+    authLoading ||
+    !profileReady ||
+    loadingClasses
+  ) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-52 w-full" />
@@ -181,135 +449,216 @@ export default function TeacherClassesPage() {
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">Manage Classes</h1>
+            <h1 className="mt-3 text-4xl font-extrabold">
+              Manage Classes
+            </h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
-              Create teaching groups, organise students and prepare class
-              assignments.
+              Create school-scoped teaching groups, manage curriculum settings,
+              organise students and monitor assignments.
             </p>
           </div>
 
-          <Link
-            href="/teacher"
-            className="rounded-xl bg-white px-5 py-3 text-center font-bold text-teal-700 transition hover:bg-emerald-50"
-          >
-            ← Teacher Dashboard
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/school"
+              className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+            >
+              School
+            </Link>
+
+            <button
+              type="button"
+              onClick={() =>
+                setShowForm(
+                  (current) =>
+                    !current,
+                )
+              }
+              className="rounded-xl bg-white px-5 py-3 text-sm font-bold text-teal-800 shadow-sm transition hover:bg-emerald-50"
+            >
+              {showForm
+                ? "Close form"
+                : "+ Create class"}
+            </button>
+          </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <SummaryCard
-          label="Total Classes"
-          value={classes.length.toString()}
-          icon="🏫"
+      {!profile?.schoolId && (
+        <Card className="border border-amber-200 bg-amber-50">
+          <h2 className="font-black text-amber-950">
+            School setup required
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-amber-800">
+            New classes must belong to a school organisation so students remain
+            isolated from other schools.
+          </p>
+        </Card>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Metric
+          label="Active classes"
+          value={
+            activeClasses.length
+          }
         />
 
-        <SummaryCard
-          label="Total Students"
-          value={totalStudents.toString()}
-          icon="👨‍🎓"
+        <Metric
+          label="Students"
+          value={
+            totalStudents
+          }
         />
 
-        <SummaryCard
-          label="Active Assignments"
-          value={totalAssignments.toString()}
-          icon="📋"
+        <Metric
+          label="Assignments"
+          value={
+            totalAssignments
+          }
         />
       </div>
 
       {showForm && (
-        <Card>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-                New Teaching Group
-              </p>
+        <Card className="border border-teal-200">
+          <p className="text-sm font-black uppercase tracking-wide text-teal-600">
+            New teaching group
+          </p>
 
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                Create a Class
-              </h2>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowForm(false)}
-              className="rounded-lg px-3 py-2 font-bold text-slate-500 transition hover:bg-slate-100"
-            >
-              ✕
-            </button>
-          </div>
+          <h2 className="mt-2 text-2xl font-black text-slate-950">
+            Create a class
+          </h2>
 
           <form
-            onSubmit={handleCreateClass}
-            className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2"
+            onSubmit={
+              handleCreateClass
+            }
+            className="mt-6 grid gap-5 md:grid-cols-2"
           >
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Class name
-              </span>
+            <Field
+              label="Class name"
+              value={
+                className
+              }
+              onChange={
+                setClassName
+              }
+              placeholder="e.g. Year 11 CS Group"
+            />
 
-              <input
-                type="text"
-                value={className}
-                onChange={(event) => setClassName(event.target.value)}
-                placeholder="Example: Year 10 Set 1"
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
-            </label>
+            <Field
+              label="Year group"
+              value={
+                yearGroup
+              }
+              onChange={
+                setYearGroup
+              }
+              placeholder="e.g. Year 11"
+            />
 
-            <label className="block">
-              <span className="text-sm font-semibold text-slate-700">
-                Year group
+            <Field
+              label="Subject"
+              value={
+                subject
+              }
+              onChange={
+                setSubject
+              }
+              placeholder="Computer Science"
+            />
+
+            <Field
+              label="Academic year"
+              value={
+                academicYear
+              }
+              onChange={
+                setAcademicYear
+              }
+              placeholder="2026/2027"
+            />
+
+            <label>
+              <span className="text-sm font-bold text-slate-700">
+                Qualification
               </span>
 
               <select
-                value={yearGroup}
-                onChange={(event) => setYearGroup(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
+                value={
+                  qualification
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setQualification(
+                    event.target
+                      .value as
+                      | Qualification
+                      | "",
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"
               >
-                <option value="">Select year group</option>
-                <option value="Year 7">Year 7</option>
-                <option value="Year 8">Year 8</option>
-                <option value="Year 9">Year 9</option>
-                <option value="Year 10">Year 10</option>
-                <option value="Year 11">Year 11</option>
-                <option value="Year 12">Year 12</option>
-                <option value="Year 13">Year 13</option>
+                <option value="GCSE">
+                  GCSE
+                </option>
+
+                <option value="A_LEVEL">
+                  A Level
+                </option>
               </select>
             </label>
 
-            <label className="block md:col-span-2">
-              <span className="text-sm font-semibold text-slate-700">
-                Subject
+            <label>
+              <span className="text-sm font-bold text-slate-700">
+                Exam board
               </span>
 
-              <input
-                type="text"
-                value={subject}
-                onChange={(event) => setSubject(event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-                required
-              />
+              <select
+                value={
+                  examBoard
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setExamBoard(
+                    event.target
+                      .value as
+                      | ExamBoard
+                      | "",
+                  )
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"
+              >
+                <option value="AQA">
+                  AQA
+                </option>
+
+                <option value="OCR">
+                  OCR
+                </option>
+
+                <option value="EDEXCEL">
+                  Pearson Edexcel
+                </option>
+              </select>
             </label>
 
-            <div className="flex flex-col gap-3 md:col-span-2 sm:flex-row">
+            <div className="md:col-span-2">
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={
+                  submitting ||
+                  !profile?.schoolId
+                }
                 className="rounded-xl bg-teal-600 px-6 py-3 font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {submitting ? "Creating Class..." : "Create Class"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="rounded-xl border border-slate-300 px-6 py-3 font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                Cancel
+                {submitting
+                  ? "Creating..."
+                  : "Create class"}
               </button>
             </div>
           </form>
@@ -317,90 +666,155 @@ export default function TeacherClassesPage() {
       )}
 
       <Card>
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-end">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-              Class Directory
+            <p className="text-sm font-black uppercase tracking-wide text-slate-500">
+              Class directory
             </p>
 
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
-              Your Classes
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Your classes
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowForm((current) => !current)}
-            className="rounded-xl bg-teal-600 px-5 py-3 font-bold text-white transition hover:bg-teal-700"
-          >
-            {showForm ? "Close Form" : "+ Create Class"}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="search"
+              value={
+                searchTerm
+              }
+              onChange={(
+                event,
+              ) =>
+                setSearchTerm(
+                  event.target
+                    .value,
+                )
+              }
+              placeholder="Search classes..."
+              className="min-w-[240px] rounded-xl border border-slate-300 px-4 py-3"
+            />
+
+            <select
+              value={
+                statusFilter
+              }
+              onChange={(
+                event,
+              ) =>
+                setStatusFilter(
+                  event.target
+                    .value as
+                    StatusFilter,
+                )
+              }
+              className="rounded-xl border border-slate-300 px-4 py-3"
+            >
+              <option value="active">
+                Active
+              </option>
+
+              <option value="archived">
+                Archived
+              </option>
+
+              <option value="all">
+                All classes
+              </option>
+            </select>
+          </div>
         </div>
 
-        {classes.length === 0 ? (
-          <div className="mt-8 rounded-2xl bg-slate-50 p-10 text-center">
-            <div className="text-5xl">🏫</div>
-
-            <h3 className="mt-4 text-2xl font-bold text-slate-900">
-              No classes created yet
+        {visibleClasses.length ===
+        0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+            <h3 className="font-black text-slate-900">
+              No classes found
             </h3>
 
-            <p className="mt-2 text-slate-600">
-              Create your first class to begin organising students and
-              assignments.
+            <p className="mt-2 text-sm text-slate-500">
+              Create a class or adjust the current search/filter.
             </p>
-
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              className="mt-6 rounded-xl bg-teal-600 px-6 py-3 font-bold text-white transition hover:bg-teal-700"
-            >
-              Create First Class
-            </button>
           </div>
         ) : (
-          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {classes.map((classItem) => (
-              <div
-                key={classItem.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-6"
-              >
-                <p className="text-sm font-semibold uppercase tracking-wide text-teal-600">
-                  {classItem.yearGroup}
-                </p>
-
-                <h3 className="mt-2 text-xl font-bold text-slate-900">
-                  {classItem.name}
-                </h3>
-
-                <p className="mt-2 text-sm text-slate-600">
-                  {classItem.subject}
-                </p>
-
-                <div className="mt-5 space-y-3 text-sm text-slate-600">
-                  <p>
-                    👨‍🎓 Students:{" "}
-                    <span className="font-bold text-slate-900">
-                      {classItem.studentIds.length}
-                    </span>
-                  </p>
-
-                  <p>
-                    📋 Assignments:{" "}
-                    <span className="font-bold text-slate-900">
-                      {classItem.assignmentIds.length}
-                    </span>
-                  </p>
-                </div>
-
-                <Link
-                  href={`/teacher/classes/${classItem.id}`}
-                  className="mt-6 block w-full rounded-xl bg-white px-4 py-3 text-center font-bold text-teal-700 shadow-sm transition hover:bg-teal-50"
+          <div className="mt-6 grid gap-5 xl:grid-cols-2">
+            {visibleClasses.map(
+              (
+                classItem,
+              ) => (
+                <article
+                  key={
+                    classItem.id
+                  }
+                  className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
-                  View Class
-                </Link>
-              </div>
-            ))}
+                  <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-start">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-black uppercase text-teal-700">
+                          {classItem.yearGroup ||
+                            "Year group"}
+                        </span>
+
+                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+                          {classItem.examBoard ||
+                            "Board"}{" "}
+                          {qualificationLabel(
+                            classItem.qualification,
+                          )}
+                        </span>
+
+                        {classItem.status ===
+                          "archived" && (
+                          <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-black text-amber-700">
+                            Archived
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="mt-3 text-xl font-black text-slate-950">
+                        {classItem.name}
+                      </h3>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        {classItem.subject ||
+                          "Computer Science"}{" "}
+                        ·{" "}
+                        {classItem.academicYear ||
+                          "Academic year not set"}
+                      </p>
+                    </div>
+
+                    <Link
+                      href={`/teacher/classes/${classItem.id}`}
+                      className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
+                    >
+                      Open class
+                    </Link>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <MiniMetric
+                      label="Students"
+                      value={
+                        classItem
+                          .studentIds
+                          .length
+                      }
+                    />
+
+                    <MiniMetric
+                      label="Assignments"
+                      value={
+                        assignmentCountByClass.get(
+                          classItem.id,
+                        ) || 0
+                      }
+                    />
+                  </div>
+                </article>
+              ),
+            )}
           </div>
         )}
       </Card>
@@ -408,25 +822,80 @@ export default function TeacherClassesPage() {
   );
 }
 
-function SummaryCard({
+function Metric({
   label,
   value,
-  icon,
 }: {
   label: string;
-  value: string;
-  icon: string;
+  value: number;
 }) {
   return (
     <Card>
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
-        </div>
+      <p className="text-sm font-semibold text-slate-500">
+        {label}
+      </p>
 
-        <div className="text-3xl">{icon}</div>
-      </div>
+      <p className="mt-2 text-3xl font-black text-slate-950">
+        {value}
+      </p>
     </Card>
+  );
+}
+
+function MiniMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xl font-black text-slate-900">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (
+    value: string,
+  ) => void;
+  placeholder: string;
+}) {
+  return (
+    <label>
+      <span className="text-sm font-bold text-slate-700">
+        {label}
+      </span>
+
+      <input
+        type="text"
+        value={value}
+        onChange={(
+          event,
+        ) =>
+          onChange(
+            event.target.value,
+          )
+        }
+        placeholder={
+          placeholder
+        }
+        className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"
+      />
+    </label>
   );
 }

@@ -167,12 +167,17 @@ export default function TeacherQuizLibraryPage() {
             </p>
           </div>
 
-          <Link
-            href="/teacher/quiz-generator"
-            className="rounded-xl bg-white px-5 py-3 text-center font-bold text-indigo-700 transition hover:bg-violet-50"
-          >
-            ✨ Generate Quiz
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/teacher/content" className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-center font-bold text-white">
+              Content Hub
+            </Link>
+            <Link
+              href="/teacher/quiz-generator"
+              className="rounded-xl bg-white px-5 py-3 text-center font-bold text-indigo-700 transition hover:bg-violet-50"
+            >
+              ✨ Generate Quiz
+            </Link>
+          </div>
         </div>
       </Card>
 

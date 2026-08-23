@@ -1,0 +1,65 @@
+CS MASTER — T1H TEMPORARY FIRESTORE RULE CLEANUP
+=================================================
+
+WHY THIS STEP IS CAREFUL
+------------------------
+The T1H legacy migration existed only to move pre-tenancy development learners
+into their correct school. It must not remain as a permanent production escape
+path.
+
+However, DO NOT replace your complete firestore.rules file with an old snapshot.
+Your rules now contain later production work (school invitations, exam mode,
+teacher/student tenancy, assignments, etc.).
+
+FIRST CHECK
+-----------
+Run:
+
+  powershell -ExecutionPolicy Bypass -File .\verify-t1-cleanup.ps1
+
+The verifier searches local firestore.rules for these temporary T1H markers:
+
+  legacy_roster
+  migrationClassId
+  migratedBy
+  T1H LEGACY ROSTER
+  LEGACY ROSTER -> SCHOOL TENANCY
+
+CASE A — NO MARKERS FOUND
+-------------------------
+Do NOT edit firestore.rules.
+Do NOT deploy rules just for cleanup.
+
+This means the temporary block is already absent from the current local rules
+(for example because a later synced rules replacement superseded it).
+
+CASE B — MARKERS FOUND
+-----------------------
+Open firestore.rules and locate the ONE temporary allow-update block inside:
+
+  match /users/{userId} {
+
+It is the block associated with the T1H legacy roster migration and references
+migrationClassId / migrationType "legacy_roster" / migratedBy.
+
+DELETE ONLY THAT TEMPORARY allow-update block.
+
+DO NOT DELETE:
+- normal self-update user rules;
+- teacher classIds update rule;
+- schools/{schoolId}/members rules;
+- schoolInvites rules;
+- class/assignment/analytics/intervention rules;
+- exam mode rules;
+- any permanent school tenancy helpers.
+
+After deleting only the temporary block, save firestore.rules and run:
+
+  npx firebase-tools deploy --only firestore:rules --project computer-science-platform
+
+Then run:
+
+  powershell -ExecutionPolicy Bypass -File .\verify-t1-cleanup.ps1
+
+If you are uncertain which rule block is temporary, STOP and send the current
+match /users/{userId} section before deleting anything.

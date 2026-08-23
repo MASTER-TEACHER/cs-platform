@@ -3,7 +3,8 @@ export type AssignmentResourceType =
   | "quiz"
   | "ai-quiz"
   | "exam-paper"
-  | "programming-challenge";
+  | "programming-challenge"
+  | "teaching-resource";
 
 export type QuizDeliveryMode =
   | "practice"

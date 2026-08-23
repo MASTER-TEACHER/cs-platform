@@ -27,7 +27,7 @@ export type SavedExamQuestionSet = {
   questionCount: number;
   totalMarks: number;
   content: GeneratedExamQuestionSet;
-  status: "draft" | "published";
+  status: "draft" | "published" | "archived";
   createdAt: Date | null;
   updatedAt: Date | null;
 };
@@ -142,12 +142,44 @@ export async function getExamQuestionSetById(
 
 export async function updateExamQuestionSetStatus(
   questionSetId: string,
-  status: "draft" | "published",
+  status: "draft" | "published" | "archived",
 ): Promise<void> {
   await updateDoc(doc(db, COLLECTION_NAME, questionSetId), {
     status,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function duplicateExamQuestionSet(
+  questionSetId: string,
+  teacherId: string,
+): Promise<string> {
+  const source = await getExamQuestionSetById(questionSetId);
+
+  if (!source) {
+    throw new Error("The question set could not be found.");
+  }
+
+  if (source.teacherId !== teacherId.trim()) {
+    throw new Error("You cannot duplicate another teacher's question set.");
+  }
+
+  const reference = await addDoc(collection(db, COLLECTION_NAME), {
+    teacherId: source.teacherId,
+    title: `${source.title} (Copy)`,
+    topic: source.topic,
+    qualification: source.qualification,
+    examBoard: source.examBoard,
+    difficulty: source.difficulty,
+    questionCount: source.questionCount,
+    totalMarks: source.totalMarks,
+    content: { ...source.content, title: `${source.title} (Copy)` },
+    status: "draft",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return reference.id;
 }
 
 export async function deleteExamQuestionSet(

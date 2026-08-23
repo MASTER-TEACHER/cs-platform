@@ -1,5 +1,8 @@
 import type {
+  AccountPlan,
+  AccountType,
   ExamBoard,
+  PersonalPlan,
   Qualification,
 } from "@/types/user";
 
@@ -25,16 +28,13 @@ export interface UserProfile {
   email: string;
 
   role: UserRole;
-
-  /*
-   * accountIntent describes why the account was created.
-   *
-   * A teacher applicant keeps role="student" until an administrator
-   * approves the teacher request.
-   */
   accountIntent: AccountIntent;
-
   teacherAccessStatus: TeacherAccessStatus;
+
+  accountType: AccountType;
+  plan: AccountPlan;
+  personalPlan: PersonalPlan;
+  schoolId: string;
 
   onboardingComplete: boolean;
 

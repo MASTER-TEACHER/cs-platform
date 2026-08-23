@@ -12,13 +12,17 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import { UserProfile } from "@/types/database";
+import type { UserProfile } from "@/types/database";
 
 export type StudentDirectoryRecord = {
   uid: string;
   name: string;
   email: string;
   role: "student";
+
+  schoolId: string;
+  accountType: "individual" | "school";
+  plan: "free" | "premium" | "school";
 
   qualification: string;
   examBoard: string;
@@ -43,75 +47,94 @@ function normaliseStringArray(value: unknown): string[] {
     return [];
   }
 
-  return value.filter((item): item is string => typeof item === "string");
+  return value.filter(
+    (item): item is string => typeof item === "string",
+  );
 }
 
 function convertToStudentRecord(
   profile: Partial<UserProfile>,
   fallbackUid: string,
 ): StudentDirectoryRecord {
+  const schoolId = normaliseString(profile.schoolId);
+
   return {
     uid: normaliseString(profile.uid) || fallbackUid,
-
     name: normaliseString(profile.name) || "Unnamed Student",
-
     email: normaliseString(profile.email).toLowerCase(),
-
     role: "student",
 
+    schoolId,
+
+    accountType: schoolId ? "school" : "individual",
+
+    plan: schoolId
+      ? "school"
+      : profile.plan === "premium"
+        ? "premium"
+        : "free",
+
     qualification: normaliseString(profile.qualification),
-
     examBoard: normaliseString(profile.examBoard),
-
     currentCourse: normaliseString(profile.currentCourse),
 
     xp: typeof profile.xp === "number" ? profile.xp : 0,
-
     streak: typeof profile.streak === "number" ? profile.streak : 0,
 
     classIds: normaliseStringArray(profile.classIds),
 
     completedLessons: normaliseStringArray(profile.completedLessons),
-
     completedTopics: normaliseStringArray(profile.completedTopics),
-
     completedUnits: normaliseStringArray(profile.completedUnits),
   };
 }
 
 /**
- * Returns every registered student account.
+ * Returns only students belonging to one school.
  *
- * Search and filtering can be performed in the UI so that
- * no additional Firestore search service is required.
+ * A missing schoolId deliberately returns [].
+ * There is no global student-directory fallback.
  */
-export async function getAllStudents(): Promise<StudentDirectoryRecord[]> {
+export async function getAllStudents(
+  schoolId?: string,
+): Promise<StudentDirectoryRecord[]> {
+  const cleanedSchoolId = schoolId?.trim() || "";
+
+  if (!cleanedSchoolId) {
+    return [];
+  }
+
   const studentsQuery = query(
     collection(db, "users"),
     where("role", "==", "student"),
+    where("schoolId", "==", cleanedSchoolId),
   );
 
   const snapshot = await getDocs(studentsQuery);
 
-  const students = snapshot.docs.map((studentDocument) =>
-    convertToStudentRecord(
-      studentDocument.data() as Partial<UserProfile>,
-      studentDocument.id,
-    ),
-  );
-
-  return students.sort((studentA, studentB) =>
-    studentA.name.localeCompare(studentB.name, "en-GB", {
-      sensitivity: "base",
-    }),
-  );
+  return snapshot.docs
+    .map((studentDocument) =>
+      convertToStudentRecord(
+        studentDocument.data() as Partial<UserProfile>,
+        studentDocument.id,
+      ),
+    )
+    .sort((studentA, studentB) =>
+      studentA.name.localeCompare(studentB.name, "en-GB", {
+        sensitivity: "base",
+      }),
+    );
 }
 
-/**
- * Returns a single registered student.
- */
+export async function getStudentsForSchool(
+  schoolId: string,
+): Promise<StudentDirectoryRecord[]> {
+  return getAllStudents(schoolId);
+}
+
 export async function getStudentById(
   studentId: string,
+  expectedSchoolId?: string,
 ): Promise<StudentDirectoryRecord | null> {
   const cleanedStudentId = studentId.trim();
 
@@ -119,9 +142,9 @@ export async function getStudentById(
     return null;
   }
 
-  const studentReference = doc(db, "users", cleanedStudentId);
-
-  const snapshot = await getDoc(studentReference);
+  const snapshot = await getDoc(
+    doc(db, "users", cleanedStudentId),
+  );
 
   if (!snapshot.exists()) {
     return null;
@@ -133,12 +156,24 @@ export async function getStudentById(
     return null;
   }
 
-  return convertToStudentRecord(profile, snapshot.id);
+  const student = convertToStudentRecord(
+    profile,
+    snapshot.id,
+  );
+
+  const cleanedExpectedSchoolId =
+    expectedSchoolId?.trim() || "";
+
+  if (
+    cleanedExpectedSchoolId &&
+    student.schoolId !== cleanedExpectedSchoolId
+  ) {
+    return null;
+  }
+
+  return student;
 }
 
-/**
- * Returns the student accounts linked to a specific class.
- */
 export async function getStudentsForClass(
   classId: string,
 ): Promise<StudentDirectoryRecord[]> {
@@ -156,26 +191,20 @@ export async function getStudentsForClass(
 
   const snapshot = await getDocs(studentsQuery);
 
-  const students = snapshot.docs.map((studentDocument) =>
-    convertToStudentRecord(
-      studentDocument.data() as Partial<UserProfile>,
-      studentDocument.id,
-    ),
-  );
-
-  return students.sort((studentA, studentB) =>
-    studentA.name.localeCompare(studentB.name, "en-GB", {
-      sensitivity: "base",
-    }),
-  );
+  return snapshot.docs
+    .map((studentDocument) =>
+      convertToStudentRecord(
+        studentDocument.data() as Partial<UserProfile>,
+        studentDocument.id,
+      ),
+    )
+    .sort((studentA, studentB) =>
+      studentA.name.localeCompare(studentB.name, "en-GB", {
+        sensitivity: "base",
+      }),
+    );
 }
 
-/**
- * Filters a loaded student list by name or email.
- *
- * This is intentionally performed locally because Firestore does not
- * provide native case-insensitive contains searches.
- */
 export function searchStudents(
   students: StudentDirectoryRecord[],
   searchTerm: string,
@@ -187,25 +216,25 @@ export function searchStudents(
   }
 
   return students.filter((student) => {
-    const name = student.name.toLowerCase();
+    const values = [
+      student.name,
+      student.email,
+      student.qualification,
+      student.examBoard,
+      student.currentCourse,
+    ].map((value) => value.toLowerCase());
 
-    const email = student.email.toLowerCase();
-
-    return (
-      name.includes(cleanedSearchTerm) || email.includes(cleanedSearchTerm)
+    return values.some((value) =>
+      value.includes(cleanedSearchTerm),
     );
   });
 }
 
-/**
- * Adds a class ID to a student's profile.
- */
 export async function addClassToStudent(
   studentId: string,
   classId: string,
 ): Promise<void> {
   const cleanedStudentId = studentId.trim();
-
   const cleanedClassId = classId.trim();
 
   if (!cleanedStudentId) {
@@ -217,17 +246,20 @@ export async function addClassToStudent(
   }
 
   const studentReference = doc(db, "users", cleanedStudentId);
-
   const snapshot = await getDoc(studentReference);
 
   if (!snapshot.exists()) {
-    throw new Error("The selected student account could not be found.");
+    throw new Error(
+      "The selected student account could not be found.",
+    );
   }
 
   const profile = snapshot.data() as Partial<UserProfile>;
 
   if (profile.role !== "student") {
-    throw new Error("Only student accounts can be enrolled in a class.");
+    throw new Error(
+      "Only student accounts can be enrolled in a class.",
+    );
   }
 
   await updateDoc(studentReference, {
@@ -236,30 +268,28 @@ export async function addClassToStudent(
   });
 }
 
-/**
- * Removes a class ID from a student's profile.
- */
 export async function removeClassFromStudent(
   studentId: string,
   classId: string,
 ): Promise<void> {
   const cleanedStudentId = studentId.trim();
-
   const cleanedClassId = classId.trim();
 
   if (!cleanedStudentId || !cleanedClassId) {
-    throw new Error("A valid student and class are required.");
+    throw new Error(
+      "A valid student and class are required.",
+    );
   }
 
-  await updateDoc(doc(db, "users", cleanedStudentId), {
-    classIds: arrayRemove(cleanedClassId),
-    updatedAt: serverTimestamp(),
-  });
+  await updateDoc(
+    doc(db, "users", cleanedStudentId),
+    {
+      classIds: arrayRemove(cleanedClassId),
+      updatedAt: serverTimestamp(),
+    },
+  );
 }
 
-/**
- * Returns true when the student already belongs to the class.
- */
 export function isStudentInClass(
   student: StudentDirectoryRecord,
   classId: string,

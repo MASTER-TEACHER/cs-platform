@@ -37,7 +37,9 @@ export default function TeacherKnowledgeMapPage() {
         setLoading(true);
         setError("");
 
-        const result = await getClassKnowledgeMap(user.uid);
+        const result = await getClassKnowledgeMap(
+          user.uid,
+        );
 
         if (!cancelled) {
           setMap(result);
@@ -50,6 +52,7 @@ export default function TeacherKnowledgeMapPage() {
 
         if (!cancelled) {
           setMap(null);
+
           setError(
             caughtError instanceof Error
               ? caughtError.message
@@ -82,8 +85,15 @@ export default function TeacherKnowledgeMapPage() {
 
   const weakest = map
     ? [...map.topics]
-        .filter((topic) => topic.assessedStudents > 0)
-        .sort((a, b) => a.classAverage - b.classAverage)[0]
+        .filter(
+          (topic) =>
+            topic.assessedStudents > 0,
+        )
+        .sort(
+          (a, b) =>
+            a.classAverage -
+            b.classAverage,
+        )[0]
     : null;
 
   return (
@@ -100,8 +110,8 @@ export default function TeacherKnowledgeMapPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-teal-100">
-              See which curriculum topics are secure, developing or in need of
-              reteaching.
+              See which curriculum topics are secure,
+              developing or in need of reteaching.
             </p>
           </div>
 
@@ -114,11 +124,6 @@ export default function TeacherKnowledgeMapPage() {
         </div>
       </Card>
 
-      {/*
-       * Keep the attainment-backed intelligence visible even if the legacy
-       * heat-map representation cannot be produced. This prevents one
-       * visualisation failure from hiding the entire page.
-       */}
       <ClassKnowledgeIntelligencePanel />
 
       {error && (
@@ -132,7 +137,8 @@ export default function TeacherKnowledgeMapPage() {
           </p>
 
           <p className="mt-2 text-xs text-amber-700">
-            The attainment-backed class intelligence above remains available.
+            The attainment-backed class intelligence
+            above remains available.
           </p>
         </Card>
       )}
@@ -152,7 +158,10 @@ export default function TeacherKnowledgeMapPage() {
 
             <Metric
               label="Weakest topic"
-              value={weakest?.topicTitle || "No evidence"}
+              value={
+                weakest?.topicTitle ||
+                "No evidence"
+              }
             />
           </section>
 

@@ -32,15 +32,31 @@ export function useTeacherIntelligence() {
       const result = await getTeacherAnalyticsPortfolio(user.uid);
 
       setPortfolio(result);
-    } catch (caughtError) {
-      console.error("Unable to load teacher intelligence:", caughtError);
+    } catch (caughtError: unknown) {
+      const firebaseCode =
+        typeof caughtError === "object" &&
+        caughtError !== null &&
+        "code" in caughtError &&
+        typeof (caughtError as { code?: unknown }).code === "string"
+          ? (caughtError as { code: string }).code
+          : "";
 
       setPortfolio(null);
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Teacher intelligence could not be loaded.",
-      );
+
+      if (
+        firebaseCode === "permission-denied" ||
+        firebaseCode === "firestore/permission-denied"
+      ) {
+        setError(
+          "Teacher intelligence is unavailable for this account.",
+        );
+      } else {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Teacher intelligence could not be loaded.",
+        );
+      }
     } finally {
       setLoading(false);
     }

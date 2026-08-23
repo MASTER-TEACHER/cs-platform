@@ -1,72 +1,157 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import toast from "react-hot-toast";
-import StudentsIntelligencePanel from "@/components/teacher/intelligence/StudentsIntelligencePanel";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  GraduationCap,
+  Pin,
+  School,
+  Search,
+  Sparkles,
+  Star,
+} from "lucide-react";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
+import { useAuth } from "@/contexts/AuthContext";
+
 import {
-  getAllStudents,
-  searchStudents,
-  StudentDirectoryRecord,
-} from "@/services/studentProfileService";
+  getSchoolMembers,
+  type SchoolMemberRecord,
+} from "@/services/schoolMemberService";
 
-type CourseFilter = "all" | "gcse" | "a-level" | "other";
+import {
+  getUserProfile,
+} from "@/services/userService";
 
-type MembershipFilter = "all" | "enrolled" | "unassigned";
+import {
+  getTeacherAnalyticsPortfolio,
+} from "@/services/analytics/teacherAnalyticsService";
 
-function formatQualification(qualification: string): string {
-  const cleanedQualification = qualification.trim().toLowerCase();
+import type {
+  UserProfile,
+} from "@/types/database";
 
-  if (!cleanedQualification) {
-    return "Course not selected";
-  }
+import type {
+  TeacherAnalyticsPortfolio,
+  TeacherStudentAnalyticsRow,
+} from "@/types/teacherAnalytics";
+
+type CourseFilter =
+  | "all"
+  | "gcse"
+  | "a-level"
+  | "other";
+
+type MembershipFilter =
+  | "all"
+  | "enrolled"
+  | "unassigned";
+
+type DirectoryStudent = {
+  uid: string;
+  name: string;
+  email: string;
+
+  profile:
+    UserProfile | null;
+
+  classContexts:
+    StudentClassContext[];
+};
+
+type StudentClassContext = {
+  classId: string;
+  className: string;
+
+  workingGrade: string;
+  targetGrade: string;
+
+  completionRate: number;
+
+  trend: string;
+  confidence: string;
+
+  priority:
+    TeacherStudentAnalyticsRow[
+      "interventionPriority"
+    ];
+};
+
+function formatQualification(
+  value: string,
+): string {
+  const cleaned =
+    value
+      .trim()
+      .toUpperCase();
 
   if (
-    cleanedQualification === "gcse" ||
-    cleanedQualification.includes("gcse")
-  ) {
-    return "GCSE";
-  }
-
-  if (
-    cleanedQualification === "a-level" ||
-    cleanedQualification === "alevel" ||
-    cleanedQualification.includes("a level")
+    cleaned ===
+    "A_LEVEL"
   ) {
     return "A Level";
   }
 
-  return qualification
-    .split(" ")
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatExamBoard(examBoard: string): string {
-  const cleanedExamBoard = examBoard.trim();
-
-  if (!cleanedExamBoard) {
-    return "Exam board not selected";
+  if (
+    cleaned ===
+    "GCSE"
+  ) {
+    return "GCSE";
   }
 
-  return cleanedExamBoard.toUpperCase();
+  return value.trim() ||
+    "Course not selected";
 }
 
-function getCourseCategory(student: StudentDirectoryRecord): CourseFilter {
-  const qualification = student.qualification.trim().toLowerCase();
+function formatExamBoard(
+  value: string,
+): string {
+  return value.trim()
+    ? value.trim().toUpperCase()
+    : "Board not selected";
+}
 
-  if (qualification.includes("gcse")) {
+function courseCategory(
+  profile:
+    UserProfile | null,
+): CourseFilter {
+  const qualification =
+    String(
+      profile?.qualification ??
+        "",
+    )
+      .trim()
+      .toLowerCase();
+
+  if (
+    qualification.includes(
+      "gcse",
+    )
+  ) {
     return "gcse";
   }
 
   if (
-    qualification.includes("a-level") ||
-    qualification.includes("a level") ||
-    qualification.includes("alevel")
+    qualification.includes(
+      "a_level",
+    ) ||
+    qualification.includes(
+      "a level",
+    ) ||
+    qualification.includes(
+      "alevel",
+    ) ||
+    qualification.includes(
+      "a-level",
+    )
   ) {
     return "a-level";
   }
@@ -74,533 +159,1420 @@ function getCourseCategory(student: StudentDirectoryRecord): CourseFilter {
   return "other";
 }
 
-function getInitials(name: string): string {
-  const initials = name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "S";
+function getInitials(
+  name: string,
+): string {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(
+        (part) =>
+          part.charAt(0)
+            .toUpperCase(),
+      )
+      .join("") || "ST"
+  );
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("en-GB").format(value);
+function priorityRank(
+  priority:
+    TeacherStudentAnalyticsRow[
+      "interventionPriority"
+    ],
+): number {
+  if (
+    priority === "high"
+  ) {
+    return 4;
+  }
+
+  if (
+    priority === "medium"
+  ) {
+    return 3;
+  }
+
+  if (
+    priority === "monitor"
+  ) {
+    return 2;
+  }
+
+  return 1;
+}
+
+function priorityLabel(
+  priority:
+    TeacherStudentAnalyticsRow[
+      "interventionPriority"
+    ],
+): string {
+  if (
+    priority === "high"
+  ) {
+    return "High";
+  }
+
+  if (
+    priority === "medium"
+  ) {
+    return "Medium";
+  }
+
+  if (
+    priority === "monitor"
+  ) {
+    return "Monitor";
+  }
+
+  return "No current flag";
+}
+
+function priorityTone(
+  priority:
+    TeacherStudentAnalyticsRow[
+      "interventionPriority"
+    ],
+): string {
+  if (
+    priority === "high"
+  ) {
+    return "bg-red-100 text-red-700";
+  }
+
+  if (
+    priority === "medium"
+  ) {
+    return "bg-amber-100 text-amber-800";
+  }
+
+  if (
+    priority === "monitor"
+  ) {
+    return "bg-blue-100 text-blue-700";
+  }
+
+  return "bg-emerald-100 text-emerald-700";
+}
+
+function highestPriority(
+  contexts:
+    StudentClassContext[],
+): TeacherStudentAnalyticsRow[
+  "interventionPriority"
+] {
+  return (
+    [...contexts]
+      .sort(
+        (
+          first,
+          second,
+        ) =>
+          priorityRank(
+            second.priority,
+          ) -
+          priorityRank(
+            first.priority,
+          ),
+      )[0]?.priority ??
+    "none"
+  );
+}
+
+function averageCompletion(
+  contexts:
+    StudentClassContext[],
+): number {
+  if (
+    contexts.length === 0
+  ) {
+    return 0;
+  }
+
+  return Math.round(
+    contexts.reduce(
+      (
+        total,
+        context,
+      ) =>
+        total +
+        context.completionRate,
+      0,
+    ) /
+      contexts.length,
+  );
+}
+
+function buildClassContextMap(
+  portfolio:
+    TeacherAnalyticsPortfolio | null,
+): Map<
+  string,
+  StudentClassContext[]
+> {
+  const map =
+    new Map<
+      string,
+      StudentClassContext[]
+    >();
+
+  if (!portfolio) {
+    return map;
+  }
+
+  portfolio.classes.forEach(
+    (classItem) => {
+      classItem.students.forEach(
+        (student) => {
+          const existing =
+            map.get(
+              student.studentId,
+            ) ?? [];
+
+          existing.push({
+            classId:
+              classItem.classId,
+
+            className:
+              classItem.className,
+
+            workingGrade:
+              student.workingGrade ??
+              "—",
+
+            targetGrade:
+              student.targetGrade ??
+              "Not set",
+
+            completionRate:
+              student.completionRate,
+
+            trend:
+              student.trend,
+
+            confidence:
+              String(
+                student.confidence,
+              ),
+
+            priority:
+              student.interventionPriority,
+          });
+
+          map.set(
+            student.studentId,
+            existing,
+          );
+        },
+      );
+    },
+  );
+
+  return map;
 }
 
 export default function TeacherStudentsPage() {
-  const [students, setStudents] = useState<StudentDirectoryRecord[]>([]);
+  const {
+    user,
+    profile,
+    loading:
+      authLoading,
+    profileReady,
+  } = useAuth();
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [
+    members,
+    setMembers,
+  ] =
+    useState<
+      SchoolMemberRecord[]
+    >([]);
 
-  const [courseFilter, setCourseFilter] = useState<CourseFilter>("all");
+  const [
+    profiles,
+    setProfiles,
+  ] =
+    useState<
+      Map<
+        string,
+        UserProfile | null
+      >
+    >(new Map());
 
-  const [membershipFilter, setMembershipFilter] =
-    useState<MembershipFilter>("all");
+  const [
+    portfolio,
+    setPortfolio,
+  ] =
+    useState<TeacherAnalyticsPortfolio | null>(
+      null,
+    );
 
-  const [loading, setLoading] = useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [error, setError] = useState("");
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  const [
+    searchTerm,
+    setSearchTerm,
+  ] = useState("");
+
+  const [
+    courseFilter,
+    setCourseFilter,
+  ] =
+    useState<CourseFilter>(
+      "all",
+    );
+
+  const [
+    membershipFilter,
+    setMembershipFilter,
+  ] =
+    useState<MembershipFilter>(
+      "all",
+    );
+
+  const schoolId =
+    profile?.schoolId?.trim() ??
+    "";
 
   useEffect(() => {
-    async function loadStudents() {
+    if (
+      authLoading ||
+      !profileReady
+    ) {
+      return;
+    }
+
+    if (
+      !user?.uid ||
+      !schoolId
+    ) {
+      setMembers([]);
+      setProfiles(
+        new Map(),
+      );
+      setPortfolio(
+        null,
+      );
+      setLoading(false);
+      return;
+    }
+
+    const teacherId:
+      string = user.uid;
+
+    let cancelled =
+      false;
+
+    async function load() {
       try {
         setLoading(true);
         setError("");
 
-        const loadedStudents = await getAllStudents();
+        const [
+          schoolMembers,
+          teacherPortfolio,
+        ] =
+          await Promise.all([
+            getSchoolMembers(
+              schoolId,
+            ),
 
-        setStudents(loadedStudents);
-      } catch (loadError) {
-        console.error("Failed to load student directory:", loadError);
+            getTeacherAnalyticsPortfolio(
+              teacherId,
+            ),
+          ]);
 
-        const message =
-          loadError instanceof Error
-            ? loadError.message
-            : "Could not load the student directory.";
+        if (cancelled) {
+          return;
+        }
 
-        setError(message);
-        toast.error("Could not load student accounts.");
+        const activeStudentMembers =
+          schoolMembers.filter(
+            (member) =>
+              member.status ===
+                "active" &&
+              member.membershipRole ===
+                "student",
+          );
+
+        const loadedProfiles =
+          await Promise.all(
+            activeStudentMembers.map(
+              async (
+                member,
+              ) => {
+                try {
+                  return [
+                    member.uid,
+                    await getUserProfile(
+                      member.uid,
+                    ),
+                  ] as const;
+                } catch (
+                  profileError
+                ) {
+                  console.warn(
+                    `Unable to load profile for ${member.uid}:`,
+                    profileError,
+                  );
+
+                  return [
+                    member.uid,
+                    null,
+                  ] as const;
+                }
+              },
+            ),
+          );
+
+        if (
+          !cancelled
+        ) {
+          setMembers(
+            schoolMembers,
+          );
+
+          setProfiles(
+            new Map(
+              loadedProfiles,
+            ),
+          );
+
+          setPortfolio(
+            teacherPortfolio,
+          );
+        }
+      } catch (
+        caughtError
+      ) {
+        console.error(
+          "Unable to load teacher student directory:",
+          caughtError,
+        );
+
+        if (
+          !cancelled
+        ) {
+          setError(
+            caughtError instanceof
+              Error
+              ? caughtError.message
+              : "The student directory could not be loaded.",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (
+          !cancelled
+        ) {
+          setLoading(false);
+        }
       }
     }
 
-    void loadStudents();
-  }, []);
+    void load();
 
-  const filteredStudents = useMemo(() => {
-    let result = searchStudents(students, searchTerm);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authLoading,
+    profileReady,
+    user?.uid,
+    schoolId,
+  ]);
 
-    if (courseFilter !== "all") {
-      result = result.filter(
-        (student) => getCourseCategory(student) === courseFilter,
-      );
-    }
-
-    if (membershipFilter === "enrolled") {
-      result = result.filter((student) => student.classIds.length > 0);
-    }
-
-    if (membershipFilter === "unassigned") {
-      result = result.filter((student) => student.classIds.length === 0);
-    }
-
-    return result;
-  }, [courseFilter, membershipFilter, searchTerm, students]);
-
-  const totalStudents = students.length;
-
-  const enrolledStudents = useMemo(
-    () => students.filter((student) => student.classIds.length > 0).length,
-    [students],
-  );
-
-  const unassignedStudents = totalStudents - enrolledStudents;
-
-  const averageXp = useMemo(() => {
-    if (students.length === 0) {
-      return 0;
-    }
-
-    const totalXp = students.reduce((total, student) => total + student.xp, 0);
-
-    return Math.round(totalXp / students.length);
-  }, [students]);
-
-  const averageStreak = useMemo(() => {
-    if (students.length === 0) {
-      return 0;
-    }
-
-    const totalStreak = students.reduce(
-      (total, student) => total + student.streak,
-      0,
+  const classContextMap =
+    useMemo(
+      () =>
+        buildClassContextMap(
+          portfolio,
+        ),
+      [portfolio],
     );
 
-    return Math.round(totalStreak / students.length);
-  }, [students]);
+  /*
+   * This is the key T1D polish:
+   *
+   * School directory identity is unique by user UID.
+   * Class-specific analytics are nested under that single learner.
+   *
+   * One student -> one directory row -> many class contexts.
+   */
+  const students =
+    useMemo<
+      DirectoryStudent[]
+    >(
+      () =>
+        members
+          .filter(
+            (member) =>
+              member.status ===
+                "active" &&
+              member.membershipRole ===
+                "student",
+          )
+          .map(
+            (member) => ({
+              uid:
+                member.uid,
+
+              name:
+                member.name ||
+                profiles.get(
+                  member.uid,
+                )?.name ||
+                "Student",
+
+              email:
+                member.email ||
+                profiles.get(
+                  member.uid,
+                )?.email ||
+                "",
+
+              profile:
+                profiles.get(
+                  member.uid,
+                ) ??
+                null,
+
+              classContexts:
+                classContextMap.get(
+                  member.uid,
+                ) ?? [],
+            }),
+          )
+          .sort(
+            (
+              first,
+              second,
+            ) =>
+              first.name.localeCompare(
+                second.name,
+                "en-GB",
+                {
+                  sensitivity:
+                    "base",
+                },
+              ),
+          ),
+      [
+        members,
+        profiles,
+        classContextMap,
+      ],
+    );
+
+  const filteredStudents =
+    useMemo(() => {
+      const search =
+        searchTerm
+          .trim()
+          .toLowerCase();
+
+      return students.filter(
+        (student) => {
+          const matchesSearch =
+            !search ||
+            [
+              student.name,
+              student.email,
+              ...student.classContexts.map(
+                (context) =>
+                  context.className,
+              ),
+              String(
+                student.profile
+                  ?.qualification ??
+                  "",
+              ),
+              String(
+                student.profile
+                  ?.examBoard ??
+                  "",
+              ),
+            ].some(
+              (value) =>
+                value
+                  .toLowerCase()
+                  .includes(
+                    search,
+                  ),
+            );
+
+          const matchesCourse =
+            courseFilter ===
+              "all" ||
+            courseCategory(
+              student.profile,
+            ) ===
+              courseFilter;
+
+          const isEnrolled =
+            student.classContexts
+              .length > 0 ||
+            (student.profile
+              ?.classIds
+              ?.length ??
+              0) > 0;
+
+          const matchesMembership =
+            membershipFilter ===
+              "all" ||
+            (membershipFilter ===
+              "enrolled"
+              ? isEnrolled
+              : !isEnrolled);
+
+          return (
+            matchesSearch &&
+            matchesCourse &&
+            matchesMembership
+          );
+        },
+      );
+    }, [
+      students,
+      searchTerm,
+      courseFilter,
+      membershipFilter,
+    ]);
+
+  const enrolledCount =
+    students.filter(
+      (student) =>
+        student.classContexts
+          .length > 0 ||
+        (student.profile
+          ?.classIds
+          ?.length ??
+          0) > 0,
+    ).length;
+
+  const unassignedCount =
+    Math.max(
+      0,
+      students.length -
+        enrolledCount,
+    );
+
+  const averageXp =
+    students.length > 0
+      ? Math.round(
+          students.reduce(
+            (
+              total,
+              student,
+            ) =>
+              total +
+              (student.profile
+                ?.xp ??
+                0),
+            0,
+          ) /
+            students.length,
+        )
+      : 0;
+
+  const averageStreak =
+    students.length > 0
+      ? Math.round(
+          students.reduce(
+            (
+              total,
+              student,
+            ) =>
+              total +
+              (student.profile
+                ?.streak ??
+                0),
+            0,
+          ) /
+            students.length,
+        )
+      : 0;
 
   function clearFilters() {
     setSearchTerm("");
-    setCourseFilter("all");
-    setMembershipFilter("all");
+    setCourseFilter(
+      "all",
+    );
+    setMembershipFilter(
+      "all",
+    );
   }
 
-  if (loading) {
+  if (
+    authLoading ||
+    !profileReady ||
+    loading
+  ) {
     return (
-      <div className="space-y-8">
-        <Skeleton className="h-52 w-full" />
+      <div className="space-y-6">
+        <Skeleton className="h-44 rounded-3xl" />
 
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
-          <Skeleton className="h-28" />
+        <div className="grid gap-5 md:grid-cols-4">
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
+          <Skeleton className="h-28 rounded-3xl" />
         </div>
 
-        <Skeleton className="h-32 w-full" />
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({
-            length: 6,
-          }).map((_, index) => (
-            <Skeleton key={index} className="h-72" />
-          ))}
-        </div>
+        <Skeleton className="h-72 rounded-3xl" />
+        <Skeleton className="h-72 rounded-3xl" />
       </div>
     );
   }
 
+  if (
+    profile?.role !==
+      "teacher" &&
+    profile?.role !==
+      "admin"
+  ) {
+    return (
+      <Card className="border border-red-200 bg-red-50">
+        <h1 className="text-2xl font-black text-red-950">
+          Teacher access required
+        </h1>
+      </Card>
+    );
+  }
+
+  if (
+    !schoolId
+  ) {
+    return (
+      <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-8">
+        <h1 className="text-2xl font-black text-amber-950">
+          School membership required
+        </h1>
+
+        <p className="mt-3 text-amber-800">
+          Set up or join your school organisation before opening the school student directory.
+        </p>
+
+        <Link
+          href="/teacher/school"
+          className="mt-5 inline-flex rounded-xl bg-amber-700 px-5 py-3 font-black text-white"
+        >
+          Open School
+        </Link>
+      </Card>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      <Card className="border-0 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-6">
+      <section className="rounded-3xl bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 p-7 text-white shadow-xl">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-blue-100">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-100">
               Teacher Portal
             </p>
 
-            <h1 className="mt-3 text-4xl font-extrabold">Student Directory</h1>
+            <h1 className="mt-2 text-3xl font-black">
+              Student Directory
+            </h1>
 
-            <p className="mt-3 max-w-2xl leading-7 text-blue-100">
-              Browse registered student accounts, review course information and
-              prepare students for class enrolment.
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-blue-100">
+              One school learner record with every teaching-group membership kept visible underneath it.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-wrap gap-3">
             <Link
               href="/teacher/classes"
-              className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-center font-bold text-white transition hover:bg-white/20"
+              className="rounded-xl border border-white/25 bg-white/10 px-4 py-3 text-sm font-black text-white"
             >
               View Classes
             </Link>
 
             <Link
               href="/teacher"
-              className="rounded-xl bg-white px-5 py-3 text-center font-bold text-indigo-700 transition hover:bg-blue-50"
+              className="rounded-xl bg-white px-4 py-3 text-sm font-black text-indigo-800"
             >
               ← Teacher Dashboard
             </Link>
           </div>
         </div>
-      </Card>
+      </section>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          label="Total Students"
-          value={formatNumber(totalStudents)}
-          description="Registered student accounts"
-          icon="👨‍🎓"
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Total students"
+          value={
+            students.length
+          }
+          description="Unique active school learners"
+          icon={
+            <GraduationCap className="h-5 w-5" />
+          }
         />
 
-        <SummaryCard
+        <MetricCard
           label="Enrolled"
-          value={formatNumber(enrolledStudents)}
-          description="Students linked to classes"
-          icon="🏫"
+          value={
+            enrolledCount
+          }
+          description="Learners linked to one or more classes"
+          icon={
+            <School className="h-5 w-5" />
+          }
         />
 
-        <SummaryCard
+        <MetricCard
           label="Unassigned"
-          value={formatNumber(unassignedStudents)}
+          value={
+            unassignedCount
+          }
           description="Not currently in a class"
-          icon="📌"
+          icon={
+            <Pin className="h-5 w-5" />
+          }
         />
 
-        <SummaryCard
+        <MetricCard
           label="Average XP"
-          value={formatNumber(averageXp)}
+          value={
+            averageXp
+          }
           description={`${averageStreak}-day average streak`}
-          icon="⭐"
+          icon={
+            <Star className="h-5 w-5" />
+          }
         />
       </div>
-<StudentsIntelligencePanel />
-      <Card>
-        <div className="flex flex-col gap-5">
+
+      <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
+        <div className="border-b border-slate-200 px-6 py-5">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-teal-600">
+            Student intelligence
+          </p>
+
+          <h2 className="mt-1 text-2xl font-black text-slate-950">
+            Attainment overview
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-500">
+            Each learner appears once. Class-specific attainment remains visible inside the learner row.
+          </p>
+        </div>
+
+        {students.length ===
+        0 ? (
+          <EmptyState
+            title="No school students yet"
+            description="Students will appear after joining this school organisation."
+          />
+        ) : (
+          <div className="divide-y divide-slate-200">
+            {students.map(
+              (student) => {
+                const overallPriority =
+                  highestPriority(
+                    student.classContexts,
+                  );
+
+                const completion =
+                  averageCompletion(
+                    student.classContexts,
+                  );
+
+                return (
+                  <div
+                    key={
+                      student.uid
+                    }
+                    className="px-6 py-5"
+                  >
+                    <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-black text-blue-700">
+                            {getInitials(
+                              student.name,
+                            )}
+                          </div>
+
+                          <div className="min-w-0">
+                            <p className="truncate font-black text-slate-950">
+                              {
+                                student.name
+                              }
+                            </p>
+
+                            <p className="truncate text-sm text-slate-500">
+                              {student.email ||
+                                "No email address"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {student.classContexts.length >
+                          0 ? (
+                            student.classContexts.map(
+                              (
+                                context,
+                              ) => (
+                                <Link
+                                  key={
+                                    context.classId
+                                  }
+                                  href={`/teacher/classes/${context.classId}`}
+                                  className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700 transition hover:bg-blue-100"
+                                >
+                                  {
+                                    context.className
+                                  }
+                                </Link>
+                              ),
+                            )
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                              No class
+                            </span>
+                          )}
+
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-black ${priorityTone(
+                              overallPriority,
+                            )}`}
+                          >
+                            {priorityLabel(
+                              overallPriority,
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-3 xl:max-w-3xl">
+                        <MiniMetric
+                          label="Classes"
+                          value={
+                            student
+                              .classContexts
+                              .length
+                          }
+                        />
+
+                        <MiniMetric
+                          label="Avg completion"
+                          value={`${completion}%`}
+                        />
+
+                        <MiniMetric
+                          label="Course"
+                          value={`${formatExamBoard(
+                            String(
+                              student.profile
+                                ?.examBoard ??
+                                "",
+                            ),
+                          )} · ${formatQualification(
+                            String(
+                              student.profile
+                                ?.qualification ??
+                                "",
+                            ),
+                          )}`}
+                        />
+                      </div>
+
+                      <Link
+                        href={`/teacher/analytics/${student.uid}`}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white"
+                      >
+                        Intelligence
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
+
+                    {student.classContexts.length >
+                      0 && (
+                      <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="min-w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+                            <tr>
+                              <th className="px-4 py-3">
+                                Class
+                              </th>
+
+                              <th className="px-4 py-3">
+                                Working
+                              </th>
+
+                              <th className="px-4 py-3">
+                                Target
+                              </th>
+
+                              <th className="px-4 py-3">
+                                Trend
+                              </th>
+
+                              <th className="px-4 py-3">
+                                Completion
+                              </th>
+
+                              <th className="px-4 py-3">
+                                Priority
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {student.classContexts.map(
+                              (
+                                context,
+                              ) => (
+                                <tr
+                                  key={
+                                    context.classId
+                                  }
+                                >
+                                  <td className="px-4 py-3 font-bold text-slate-900">
+                                    {
+                                      context.className
+                                    }
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    {
+                                      context.workingGrade
+                                    }
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    {
+                                      context.targetGrade
+                                    }
+                                  </td>
+
+                                  <td className="px-4 py-3 capitalize">
+                                    {
+                                      context.trend
+                                    }
+                                  </td>
+
+                                  <td className="px-4 py-3 font-bold">
+                                    {
+                                      context.completionRate
+                                    }
+                                    %
+                                  </td>
+
+                                  <td className="px-4 py-3">
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-xs font-black ${priorityTone(
+                                        context.priority,
+                                      )}`}
+                                    >
+                                      {priorityLabel(
+                                        context.priority,
+                                      )}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ),
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              },
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card className="rounded-3xl border border-slate-200 p-6">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-              Search and Filter
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-600">
+              Search and filter
             </p>
 
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">
+            <h2 className="mt-1 text-xl font-black text-slate-950">
               Find Students
             </h2>
 
-            <p className="mt-2 text-sm text-slate-600">
-              Search by student name or email address.
+            <p className="mt-1 text-sm text-slate-500">
+              Search the current school directory by learner, email, class or course.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_220px_220px_auto]">
-            <label className="block">
-              <span className="sr-only">Search students</span>
+          <p className="text-sm font-bold text-slate-500">
+            Showing{" "}
+            <span className="text-slate-950">
+              {
+                filteredStudents.length
+              }
+            </span>{" "}
+            of{" "}
+            <span className="text-slate-950">
+              {students.length}
+            </span>
+          </p>
+        </div>
 
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search by name or email..."
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              />
-            </label>
+        <div className="mt-5 grid gap-3 xl:grid-cols-[1fr_180px_180px_auto]">
+          <label className="relative">
+            <span className="sr-only">
+              Search students
+            </span>
 
-            <label className="block">
-              <span className="sr-only">Filter by course</span>
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
-              <select
-                value={courseFilter}
-                onChange={(event) =>
-                  setCourseFilter(event.target.value as CourseFilter)
-                }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="all">All courses</option>
+            <input
+              type="search"
+              value={
+                searchTerm
+              }
+              onChange={(
+                event,
+              ) =>
+                setSearchTerm(
+                  event.target
+                    .value,
+                )
+              }
+              placeholder="Search by name, email or class..."
+              className="w-full rounded-xl border border-slate-300 py-3 pl-11 pr-4"
+            />
+          </label>
 
-                <option value="gcse">GCSE</option>
+          <select
+            value={
+              courseFilter
+            }
+            onChange={(
+              event,
+            ) =>
+              setCourseFilter(
+                event.target
+                  .value as
+                  CourseFilter,
+              )
+            }
+            className="rounded-xl border border-slate-300 px-4 py-3"
+          >
+            <option value="all">
+              All courses
+            </option>
 
-                <option value="a-level">A Level</option>
+            <option value="gcse">
+              GCSE
+            </option>
 
-                <option value="other">Other / not selected</option>
-              </select>
-            </label>
+            <option value="a-level">
+              A Level
+            </option>
 
-            <label className="block">
-              <span className="sr-only">Filter by class membership</span>
+            <option value="other">
+              Course not set
+            </option>
+          </select>
 
-              <select
-                value={membershipFilter}
-                onChange={(event) =>
-                  setMembershipFilter(event.target.value as MembershipFilter)
-                }
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="all">All students</option>
+          <select
+            value={
+              membershipFilter
+            }
+            onChange={(
+              event,
+            ) =>
+              setMembershipFilter(
+                event.target
+                  .value as
+                  MembershipFilter,
+              )
+            }
+            className="rounded-xl border border-slate-300 px-4 py-3"
+          >
+            <option value="all">
+              All students
+            </option>
 
-                <option value="enrolled">Enrolled</option>
+            <option value="enrolled">
+              Enrolled
+            </option>
 
-                <option value="unassigned">Unassigned</option>
-              </select>
-            </label>
+            <option value="unassigned">
+              Unassigned
+            </option>
+          </select>
 
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="rounded-xl border border-slate-300 px-5 py-3 font-bold text-slate-700 transition hover:bg-slate-50"
-            >
-              Clear
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={
+              clearFilters
+            }
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-black text-slate-700"
+          >
+            Clear
+          </button>
         </div>
       </Card>
 
-      {error ? (
-        <Card className="border-red-200">
-          <div className="rounded-2xl bg-red-50 p-6">
-            <h2 className="text-xl font-bold text-red-900">
-              Student directory unavailable
+      <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
+        <div className="flex flex-col gap-4 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">
+              Registered accounts
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-slate-950">
+              School Students
             </h2>
 
-            <p className="mt-2 text-red-700">{error}</p>
-
-            <p className="mt-3 text-sm text-red-600">
-              This may be caused by Firestore permissions. The teacher account
-              must be allowed to read registered student profiles.
+            <p className="mt-1 text-sm text-slate-500">
+              These are unique active student accounts belonging to your school.
             </p>
           </div>
-        </Card>
-      ) : (
-        <Card>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-                Registered Accounts
-              </p>
 
-              <h2 className="mt-2 text-2xl font-bold text-slate-900">
-                Students
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-600">
-                Showing{" "}
-                <span className="font-bold text-slate-900">
-                  {filteredStudents.length}
-                </span>{" "}
-                of{" "}
-                <span className="font-bold text-slate-900">
-                  {students.length}
-                </span>{" "}
-                students.
-              </p>
-            </div>
-
-            <Link
-              href="/teacher/classes"
-              className="rounded-xl bg-indigo-600 px-5 py-3 text-center font-bold text-white transition hover:bg-indigo-700"
-            >
-              Manage Classes
-            </Link>
-          </div>
-
-          {students.length === 0 ? (
-            <EmptyState
-              icon="👨‍🎓"
-              title="No student accounts found"
-              description="Students will appear here after registering with the student role."
-            />
-          ) : filteredStudents.length === 0 ? (
-            <EmptyState
-              icon="🔍"
-              title="No matching students"
-              description="Try changing the search text or clearing the selected filters."
-              actionLabel="Clear filters"
-              onAction={clearFilters}
-            />
-          ) : (
-            <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {filteredStudents.map((student) => (
-                <StudentCard key={student.uid} student={student} />
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function StudentCard({ student }: { student: StudentDirectoryRecord }) {
-  const qualification = formatQualification(student.qualification);
-
-  const examBoard = formatExamBoard(student.examBoard);
-
-  const hasCourse =
-    Boolean(student.qualification.trim()) || Boolean(student.examBoard.trim());
-
-  const classCount = student.classIds.length;
-
-  return (
-    <article className="group rounded-2xl border border-slate-200 bg-slate-50 p-6 transition hover:-translate-y-1 hover:border-indigo-200 hover:bg-white hover:shadow-md">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-100 text-lg font-extrabold text-indigo-700">
-            {getInitials(student.name)}
-          </div>
-
-          <div className="min-w-0">
-            <h3 className="truncate text-lg font-bold text-slate-900">
-              {student.name}
-            </h3>
-
-            <p className="mt-1 truncate text-sm text-slate-600">
-              {student.email || "No email address"}
-            </p>
-          </div>
+          <Link
+            href="/teacher/classes"
+            className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-black text-white"
+          >
+            Manage Classes
+          </Link>
         </div>
 
-        <span
-          className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
-            classCount > 0
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-amber-100 text-amber-700"
-          }`}
-        >
-          {classCount > 0 ? "Enrolled" : "Unassigned"}
-        </span>
-      </div>
+        {error ? (
+          <div className="p-8">
+            <p className="font-black text-red-700">
+              Student directory unavailable
+            </p>
 
-      <div className="mt-5 rounded-2xl bg-white p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Current Course
-        </p>
+            <p className="mt-2 text-sm text-red-600">
+              {error}
+            </p>
+          </div>
+        ) : filteredStudents.length ===
+          0 ? (
+          <EmptyState
+            title="No student accounts found"
+            description={
+              students.length ===
+              0
+                ? "Students will appear after joining your school."
+                : "No school students match the current filters."
+            }
+          />
+        ) : (
+          <div className="divide-y divide-slate-200">
+            {filteredStudents.map(
+              (student) => (
+                <div
+                  key={
+                    student.uid
+                  }
+                  className="grid gap-4 px-6 py-5 lg:grid-cols-[1.3fr_1.3fr_1fr_auto] lg:items-center"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-black text-indigo-700">
+                      {getInitials(
+                        student.name,
+                      )}
+                    </div>
 
-        <p className="mt-2 font-bold text-slate-900">
-          {hasCourse
-            ? `${qualification} · ${examBoard}`
-            : "Course not selected"}
-        </p>
+                    <div className="min-w-0">
+                      <p className="truncate font-black text-slate-950">
+                        {
+                          student.name
+                        }
+                      </p>
 
-        {student.currentCourse && (
-          <p className="mt-1 text-xs text-slate-500">{student.currentCourse}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {student.email ||
+                          "No email address"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {student.classContexts.length >
+                    0 ? (
+                      student.classContexts.map(
+                        (
+                          context,
+                        ) => (
+                          <span
+                            key={
+                              context.classId
+                            }
+                            className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700"
+                          >
+                            {
+                              context.className
+                            }
+                          </span>
+                        ),
+                      )
+                    ) : (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                        Unassigned
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-black text-slate-900">
+                      {formatQualification(
+                        String(
+                          student.profile
+                            ?.qualification ??
+                            "",
+                        ),
+                      )}
+                    </p>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatExamBoard(
+                        String(
+                          student.profile
+                            ?.examBoard ??
+                            "",
+                        ),
+                      )}{" "}
+                      ·{" "}
+                      {
+                        student.classContexts
+                          .length
+                      }{" "}
+                      class
+                      {student.classContexts
+                        .length ===
+                      1
+                        ? ""
+                        : "es"}
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/teacher/analytics/${student.uid}`}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-800"
+                  >
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+                    Intelligence
+                  </Link>
+                </div>
+              ),
+            )}
+          </div>
         )}
-      </div>
+      </Card>
 
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        <StudentMetric label="XP" value={formatNumber(student.xp)} />
+      <Card className="rounded-3xl border border-teal-200 bg-teal-50 p-5">
+        <div className="flex items-start gap-3">
+          <BookOpenCheck className="mt-0.5 h-5 w-5 shrink-0 text-teal-700" />
 
-        <StudentMetric label="Streak" value={`${student.streak}d`} />
-
-        <StudentMetric label="Classes" value={classCount.toString()} />
-      </div>
-
-      <div className="mt-5 border-t border-slate-200 pt-5">
-        <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Progress
+            <p className="font-black text-teal-950">
+              Multi-class learner model
             </p>
 
-            <p className="mt-1 text-sm font-semibold text-slate-800">
-              {student.completedLessons.length} lessons completed
-            </p>
-          </div>
-
-          <div className="text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Topics
-            </p>
-
-            <p className="mt-1 text-sm font-semibold text-slate-800">
-              {student.completedTopics.length}
+            <p className="mt-1 text-sm leading-6 text-teal-800">
+              A learner appears once in this directory even when enrolled in several classes. Analytics and interventions continue to preserve separate class contexts.
             </p>
           </div>
         </div>
-      </div>
-
-      <Link
-        href={`/teacher/students/${student.uid}`}
-        className="mt-5 block w-full rounded-xl bg-teal-600 px-4 py-3 text-center font-bold text-white transition hover:bg-teal-700"
-      >
-        View Student Profile →
-      </Link>
-    </article>
-  );
-}
-
-function StudentMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-white px-3 py-4 text-center">
-      <p className="text-lg font-extrabold text-slate-900">{value}</p>
-
-      <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
+      </Card>
     </div>
   );
 }
 
-function SummaryCard({
+function MetricCard({
   label,
   value,
   description,
   icon,
 }: {
   label: string;
-  value: string;
+  value:
+    | number
+    | string;
   description: string;
-  icon: string;
+  icon:
+    ReactNode;
 }) {
   return (
-    <Card>
+    <Card className="rounded-3xl border border-slate-200 p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-slate-500">{label}</p>
+          <p className="text-sm font-bold text-slate-500">
+            {label}
+          </p>
 
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{value}</p>
+          <p className="mt-2 text-3xl font-black text-slate-950">
+            {value}
+          </p>
 
-          <p className="mt-2 text-sm text-slate-500">{description}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            {description}
+          </p>
         </div>
 
-        <div className="text-3xl">{icon}</div>
+        <div className="rounded-2xl bg-slate-50 p-3 text-slate-700">
+          {icon}
+        </div>
       </div>
     </Card>
   );
 }
 
-function EmptyState({
-  icon,
-  title,
-  description,
-  actionLabel,
-  onAction,
+function MiniMetric({
+  label,
+  value,
 }: {
-  icon: string;
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
+  label: string;
+  value:
+    | number
+    | string;
 }) {
   return (
-    <div className="mt-8 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
-      <div className="text-5xl">{icon}</div>
-
-      <h3 className="mt-4 text-xl font-bold text-slate-900">{title}</h3>
-
-      <p className="mx-auto mt-2 max-w-lg leading-7 text-slate-600">
-        {description}
+    <div className="min-w-0 rounded-2xl bg-slate-50 p-4">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+        {label}
       </p>
 
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="mt-6 rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
-        >
-          {actionLabel}
-        </button>
-      )}
+      <p className="mt-2 truncate font-black text-slate-950">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="p-10 text-center">
+      <GraduationCap className="mx-auto h-10 w-10 text-slate-300" />
+
+      <p className="mt-4 font-black text-slate-950">
+        {title}
+      </p>
+
+      <p className="mt-2 text-sm text-slate-500">
+        {description}
+      </p>
     </div>
   );
 }

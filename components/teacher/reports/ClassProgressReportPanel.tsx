@@ -8,6 +8,7 @@ import {
   ArrowRight,
   BarChart3,
   Download,
+  Printer,
   FileCheck2,
   Search,
   Target,
@@ -155,8 +156,70 @@ export default function ClassProgressReportPanel({
     URL.revokeObjectURL(url);
   }
 
+  function printReport() {
+    document.body.classList.add(
+      "cs-report-printing",
+    );
+
+    const cleanup = () => {
+      document.body.classList.remove(
+        "cs-report-printing",
+      );
+
+      window.removeEventListener(
+        "afterprint",
+        cleanup,
+      );
+    };
+
+    window.addEventListener(
+      "afterprint",
+      cleanup,
+    );
+
+    window.print();
+  }
+
+  const secureTopics =
+    report.strongestTopics.filter(
+      (topic) =>
+        topic.mastery >= 70,
+    );
+
+  const attentionTopics =
+    report.priorityTopics.filter(
+      (topic) =>
+        topic.mastery < 70,
+    );
+
   return (
-    <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
+    <>
+      <style>{`
+        @media print {
+          body.cs-report-printing * {
+            visibility: hidden !important;
+          }
+
+          body.cs-report-printing [data-cs-report-print-root="true"],
+          body.cs-report-printing [data-cs-report-print-root="true"] * {
+            visibility: visible !important;
+          }
+
+          body.cs-report-printing [data-cs-report-print-root="true"] {
+            position: absolute !important;
+            inset: 0 auto auto 0 !important;
+            width: 100% !important;
+            background: white !important;
+          }
+
+          body.cs-report-printing [data-cs-report-print-hidden="true"] {
+            display: none !important;
+          }
+        }
+      `}</style>
+
+      <div data-cs-report-print-root="true">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200 p-0">
       <div className="flex flex-col gap-4 bg-gradient-to-r from-teal-950 via-cyan-950 to-sky-900 p-6 text-white lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.16em] text-teal-200">
@@ -173,14 +236,28 @@ export default function ClassProgressReportPanel({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-teal-950"
+        <div
+          data-cs-report-print-hidden="true"
+          className="flex flex-wrap gap-2"
         >
-          <Download className="h-4 w-4" />
-          Export intelligence CSV
-        </button>
+          <button
+            type="button"
+            onClick={printReport}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-xs font-black text-white"
+          >
+            <Printer className="h-4 w-4" />
+            Print / Save PDF
+          </button>
+
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-white px-4 text-xs font-black text-teal-950"
+          >
+            <Download className="h-4 w-4" />
+            Export intelligence CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-4 p-6 sm:grid-cols-2 xl:grid-cols-6">
@@ -237,11 +314,11 @@ export default function ClassProgressReportPanel({
       <div className="grid gap-5 border-t border-slate-100 p-6 lg:grid-cols-2">
         <TopicList
           title="Strongest curriculum areas"
-          items={report.strongestTopics}
+          items={secureTopics}
         />
         <TopicList
           title="Priority curriculum areas"
-          items={report.priorityTopics}
+          items={attentionTopics}
         />
       </div>
 
@@ -593,7 +670,9 @@ export default function ClassProgressReportPanel({
           items={report.recommendedActions}
         />
       </div>
-    </Card>
+        </Card>
+      </div>
+    </>
   );
 }
 

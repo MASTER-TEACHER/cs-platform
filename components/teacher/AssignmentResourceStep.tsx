@@ -12,6 +12,7 @@ import LessonAssignmentSelector from "@/components/teacher/lesson/LessonAssignme
 import ExistingQuizSelector from "@/components/teacher/quiz/ExistingQuizSelector";
 import ExamPaperAssignmentSelector from "@/components/teacher/exam/ExamPaperAssignmentSelector";
 import ProgrammingChallengeSelector from "@/components/teacher/programming/ProgrammingChallengeSelector";
+import ExistingTeachingResourceSelector from "@/components/teacher/resources/ExistingTeachingResourceSelector";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -65,6 +66,12 @@ const resourceOptions: Array<{
     title: "Exam Paper",
     description: "Assign an exam-style assessment or practice paper.",
     icon: "📄",
+  },
+  {
+    type: "teaching-resource",
+    title: "Teaching Resource",
+    description: "Assign a published resource from your teacher content library.",
+    icon: "📘",
   },
   {
     type: "programming-challenge",
@@ -176,7 +183,8 @@ export default function AssignmentResourceStep({
       option.type === "quiz" ||
       option.type === "ai-quiz" ||
       option.type === "exam-paper" ||
-      option.type === "programming-challenge"
+      option.type === "programming-challenge" ||
+      option.type === "teaching-resource"
     ) {
       if (selectedResource?.resourceType !== option.type) {
         onSelect(
@@ -190,7 +198,9 @@ export default function AssignmentResourceStep({
                 ? "Choose an Exam Paper"
                 : option.type === "programming-challenge"
                   ? "Choose a Programming Challenge"
-                  : "Choose an AI Quiz",
+                  : option.type === "teaching-resource"
+                    ? "Choose a Teaching Resource"
+                    : "Choose an AI Quiz",
             option.type === "lesson"
               ? "Select an exact curriculum lesson from the library below."
               : option.type === "quiz"
@@ -199,7 +209,9 @@ export default function AssignmentResourceStep({
                 ? "Select an exact saved paper from your Question Bank below."
                 : option.type === "programming-challenge"
                   ? "Select an exact challenge from the library below."
-                  : "Select a saved quiz from the list below.",
+                  : option.type === "teaching-resource"
+                    ? "Select a published teacher resource from the library below."
+                    : "Select a saved quiz from the list below.",
           ),
         );
       }
@@ -237,7 +249,8 @@ export default function AssignmentResourceStep({
     !(
       selectedResource.resourceType === "programming-challenge" &&
       selectedResource.resourceId === "programming-challenge"
-    );
+    ) &&
+    !(selectedResource.resourceType === "teaching-resource" && selectedResource.resourceId === "teaching-resource");
 
   return (
     <Card>
@@ -376,6 +389,16 @@ export default function AssignmentResourceStep({
           selectedResource={selectedResource}
           onSelect={(resource) => {
             setSelectedType("exam-paper");
+            onSelect(resource);
+          }}
+        />
+      )}
+
+      {selectedType === "teaching-resource" && (
+        <ExistingTeachingResourceSelector
+          selectedResource={selectedResource}
+          onSelect={(resource) => {
+            setSelectedType("teaching-resource");
             onSelect(resource);
           }}
         />

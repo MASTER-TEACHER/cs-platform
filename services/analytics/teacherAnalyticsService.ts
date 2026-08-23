@@ -286,11 +286,12 @@ async function getStudentIdentity(
         };
       }
     }
-  } catch (error) {
-    console.warn(
-      `Unable to read profile identity for student ${studentId}; using class snapshot.`,
-      error,
-    );
+  } catch {
+    /*
+     * A teacher may legitimately be denied a direct read of users/{studentId}
+     * by tenant rules. Identity is already embedded in the teacher-owned class
+     * snapshot, so permission denial is a normal fallback rather than an error.
+     */
   }
 
   const embeddedName =
@@ -342,9 +343,15 @@ async function getTeacherOwnedStudentAnalytics({
     examSubmissionsSnapshot,
     resourceAssignmentsSnapshot,
   ] = await Promise.all([
+    /*
+     * Student profile reads are optional for teacher analytics.
+     * Firestore may correctly deny this direct user-document read while still
+     * allowing the teacher to analyse teacher-owned class/assignment evidence.
+     * Returning null preserves the class snapshot + target-grade fallback.
+     */
     getDoc(
       doc(db, "users", studentId),
-    ),
+    ).catch(() => null),
 
     getDocs(
       query(
@@ -415,7 +422,7 @@ async function getTeacherOwnedStudentAnalytics({
   ]);
 
   const profile =
-    profileSnapshot.exists()
+    profileSnapshot?.exists()
       ? profileSnapshot.data()
       : {};
 

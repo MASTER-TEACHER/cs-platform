@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowRight } from "lucide-react";
 
 import CreateInterventionModal from "@/components/teacher/interventions/CreateInterventionModal";
@@ -25,6 +26,22 @@ import type { Intervention } from "@/types/intervention";
 export default function TeacherInterventionsPage() {
   const { user } = useAuth();
   const { profile } = useUserProfile();
+  const searchParams = useSearchParams();
+
+  const requestedStudentId =
+    searchParams.get("studentId")?.trim() || "";
+
+  const requestedStudentName =
+    searchParams.get("studentName")?.trim() || "";
+
+  const requestedClassName =
+    searchParams.get("className")?.trim() || "";
+
+  const requestedTopic =
+    searchParams.get("topic")?.trim() || "";
+
+  const deepLinkApplied =
+    useRef(false);
 
   const [candidates, setCandidates] =
     useState<InterventionCandidate[]>([]);
@@ -37,31 +54,75 @@ export default function TeacherInterventionsPage() {
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   async function load() {
-    if (!user?.uid) {
+    const teacherId =
+      user?.uid;
+
+    if (!teacherId) {
       setLoading(false);
       return;
     }
 
     setLoading(true);
+    setError("");
 
     try {
-      const [nextCandidates, nextInterventions] = await Promise.all([
-        getInterventionCandidates(user.uid),
-        getTeacherInterventions(user.uid),
+      const [
+        nextCandidates,
+        nextInterventions,
+      ] = await Promise.all([
+        getInterventionCandidates(
+          teacherId,
+        ),
+        getTeacherInterventions(
+          teacherId,
+        ),
       ]);
 
-      setCandidates(nextCandidates);
-      setInterventions(nextInterventions);
+      setCandidates(
+        nextCandidates,
+      );
 
-      setSelectedImpactId((current) => {
-        if (!current) return null;
+      setInterventions(
+        nextInterventions,
+      );
 
-        return nextInterventions.some((item) => item.id === current)
-          ? current
-          : null;
-      });
+      setSelectedImpactId(
+        (current) => {
+          if (!current) {
+            return null;
+          }
+
+          return nextInterventions.some(
+            (item) =>
+              item.id === current,
+          )
+            ? current
+            : null;
+        },
+      );
+    } catch (caughtError: unknown) {
+      const firebaseCode =
+        typeof caughtError === "object" &&
+        caughtError !== null &&
+        "code" in caughtError &&
+        typeof (caughtError as { code?: unknown }).code === "string"
+          ? (caughtError as { code: string }).code
+          : "";
+
+      setCandidates([]);
+      setInterventions([]);
+
+      setError(
+        firebaseCode === "permission-denied" ||
+          firebaseCode === "firestore/permission-denied"
+          ? "Intervention data is unavailable for this teacher account."
+          : caughtError instanceof Error
+            ? caughtError.message
+            : "Intervention data could not be loaded.",
+      );
     } finally {
       setLoading(false);
     }
@@ -70,6 +131,60 @@ export default function TeacherInterventionsPage() {
   useEffect(() => {
     void load();
   }, [user?.uid]);
+
+  /*
+   * Analytics -> Intervention hand-off.
+   *
+   * The same learner may belong to multiple classes, so the hand-off carries
+   * both learner identity and class name. We pre-filter the intervention list
+   * and automatically open the matching candidate once per navigation.
+   */
+  useEffect(() => {
+    if (
+      loading ||
+      deepLinkApplied.current ||
+      !requestedStudentId
+    ) {
+      return;
+    }
+
+    const requested =
+      candidates.find(
+        (candidate) =>
+          candidate.student.uid ===
+            requestedStudentId &&
+          (!requestedClassName ||
+            candidate.className ===
+              requestedClassName),
+      );
+
+    if (!requested) {
+      if (requestedStudentName) {
+        setSearch(
+          requestedStudentName,
+        );
+      }
+
+      return;
+    }
+
+    deepLinkApplied.current = true;
+
+    setSearch(
+      requestedStudentName ||
+        requested.student.name,
+    );
+
+    setSelected(
+      requested,
+    );
+  }, [
+    loading,
+    candidates,
+    requestedStudentId,
+    requestedStudentName,
+    requestedClassName,
+  ]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -100,6 +215,31 @@ export default function TeacherInterventionsPage() {
       <div className="space-y-6">
         <Skeleton className="h-48" />
         <Skeleton className="h-96" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="border border-red-200 bg-red-50">
+          <p className="text-sm font-black uppercase tracking-wide text-red-700">
+            Intervention Centre
+          </p>
+          <h1 className="mt-2 text-2xl font-black text-red-950">
+            Intervention data unavailable
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-red-800">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="mt-5 rounded-xl bg-red-700 px-5 py-3 text-sm font-black text-white transition hover:bg-red-800"
+          >
+            Try again
+          </button>
+        </Card>
       </div>
     );
   }
@@ -163,144 +303,69 @@ export default function TeacherInterventionsPage() {
 
       <InterventionActionContext />
 
-      <Card>
-  <h2 className="text-2xl font-black">
-    Recommended interventions
-  </h2>
-
-  {filtered.length === 0 ? (
-    <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-      <p className="font-bold text-slate-700">
-        No matching intervention recommendations
-      </p>
-
-      <p className="mt-2 text-sm text-slate-500">
-        Try changing the search term or priority filter.
-      </p>
-    </div>
-  ) : (
-    <>
-      {/*
-       * Mobile layout:
-       * show each candidate as a readable card instead of
-       * forcing the desktop table into a 390px viewport.
-       */}
-      <div className="mt-6 grid gap-4 md:hidden">
-        {filtered.map((candidate) => (
-          <article
-            key={candidate.student.uid}
-            className="rounded-2xl border border-slate-200 bg-white p-5"
-          >
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                Student
+      {requestedStudentId && (
+        <Card className="border border-violet-200 bg-violet-50">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-700">
+                Analytics hand-off
               </p>
 
-              <h3 className="text-lg font-black text-slate-950">
-                {candidate.student.name}
-              </h3>
+              <h2 className="mt-1 text-xl font-black text-violet-950">
+                {requestedStudentName || "Selected learner"}
+                {requestedClassName
+                  ? ` · ${requestedClassName}`
+                  : ""}
+              </h2>
 
-              <p className="text-sm text-slate-500">
-                {candidate.student.email}
-              </p>
-
-              <p className="text-sm font-semibold text-slate-600">
-                {candidate.className}
+              <p className="mt-2 text-sm leading-6 text-violet-800">
+                This intervention context came directly from Teacher Analytics.
+                {requestedTopic
+                  ? ` Current evidence highlights ${requestedTopic}.`
+                  : ""}
               </p>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                  Performance
-                </p>
-
-                <p className="mt-1 text-xl font-black text-slate-950">
-  {candidate.priorityTopicScore}%
-</p>
-              </div>
-
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                  Priority
-                </p>
-
-                <span
-                  className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-black uppercase ${
-                    candidate.priority === "high"
-                      ? "bg-red-100 text-red-700"
-                      : candidate.priority === "medium"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-emerald-100 text-emerald-700"
-                  }`}
-                >
-                  {candidate.priority}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                Priority topic
-              </p>
-
-              <p className="mt-1 font-black text-slate-900">
-                {candidate.priorityTopic}
-              </p>
-            </div>
-
-            <div className="mt-5">
-              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
-                Recommendation
-              </p>
-
-              <p className="mt-1 text-sm leading-6 text-slate-600">
-                {candidate.recommendation}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelected(candidate)}
-              className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-teal-600 px-4 text-sm font-black text-white transition hover:bg-teal-700"
+            <Link
+              href="/teacher/analytics"
+              className="shrink-0 rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-black text-violet-700"
             >
-              Create intervention
-            </button>
-          </article>
-        ))}
-      </div>
+              Back to analytics
+            </Link>
+          </div>
+        </Card>
+      )}
 
-      {/*
-       * Desktop / tablet layout:
-       * preserve the existing table.
-       */}
-      <div className="mt-6 hidden overflow-x-auto md:block">
-        <table className="w-full min-w-[1100px]">
-          <thead>
-            <tr className="border-b bg-slate-50 text-left">
-              <th className="p-4">Student</th>
-              <th className="p-4">Performance</th>
-              <th className="p-4">Priority topic</th>
-              <th className="p-4">Priority</th>
-              <th className="p-4">Recommendation</th>
-              <th className="p-4">Action</th>
-            </tr>
-          </thead>
+      <Card>
+        <h2 className="text-2xl font-black">
+          Recommended interventions
+        </h2>
 
-          <tbody>
-            {filtered.map((candidate) => (
-              <InterventionStudentRow
-                key={candidate.student.uid}
-                candidate={candidate}
-                onCreate={setSelected}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </>
-  )}
-</Card>
+        <div className="mt-6 overflow-x-auto">
+          <table className="w-full min-w-[1100px]">
+            <thead>
+              <tr className="border-b bg-slate-50 text-left">
+                <th className="p-4">Student</th>
+                <th className="p-4">Performance</th>
+                <th className="p-4">Priority topic</th>
+                <th className="p-4">Priority</th>
+                <th className="p-4">Recommendation</th>
+                <th className="p-4">Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {filtered.map((candidate) => (
+                <InterventionStudentRow
+                  key={`${candidate.student.uid}-${candidate.className}`}
+                  candidate={candidate}
+                  onCreate={setSelected}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <InterventionIntelligencePanel />
 

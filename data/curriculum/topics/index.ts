@@ -15,7 +15,19 @@ import { programmingLanguagesTopic } from "./programming-languages";
 import { programmingTopic } from "./programming";
 import { soundTopic } from "./sound";
 import { systemsSoftwareTopic } from "./systems-software";
+
+import { advancedDataRepresentationTopic } from "./a-level/advanced-data-representation";
+import { advancedDatabasesTopic } from "./a-level/advanced-databases";
+import { advancedNetworksTopic } from "./a-level/advanced-networks";
 import { advancedProgrammingTopic } from "./a-level/advanced-programming";
+import { advancedSystemsTopic } from "./a-level/advanced-systems";
+import { bigDataTopic } from "./a-level/big-data";
+import { computationalThinkingTopic } from "./a-level/computational-thinking";
+import { dataStructuresTopic } from "./a-level/data-structures";
+import { functionalProgrammingTopic } from "./a-level/functional-programming";
+import { legalEthicalALevelTopic } from "./a-level/legal-ethical-a-level";
+import { softwareDevelopmentTopic } from "./a-level/software-development";
+import { theoryComputationTopic } from "./a-level/theory-computation";
 
 import type { Topic } from "@/types/curriculum";
 
@@ -46,11 +58,18 @@ export const publishedTopics: Topic[] = [
   ethicalLegalTopic,
   programmingLanguagesTopic,
 
-  /*
-   * A-level-specific authored curriculum.
-   * Do not silently show this to GCSE students: curriculumMap controls access.
-   */
   advancedProgrammingTopic,
+  advancedDataRepresentationTopic,
+  advancedSystemsTopic,
+  advancedNetworksTopic,
+  advancedDatabasesTopic,
+  dataStructuresTopic,
+  computationalThinkingTopic,
+  theoryComputationTopic,
+  functionalProgrammingTopic,
+  softwareDevelopmentTopic,
+  bigDataTopic,
+  legalEthicalALevelTopic,
 ];
 
 export const topicLibrary =

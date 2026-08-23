@@ -267,63 +267,65 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
         id: "aqa-al-programming",
         title: "Programming",
         description:
-          "Develop procedural, object-oriented and recursive programming skills together with robust solution design.",
-        topicIds: ["advanced-programming"],
+          "Develop advanced procedural, object-oriented, recursive and functional programming skills together with robust solution design.",
+        topicIds: [
+          "advanced-programming",
+          "functional-programming",
+          "software-development",
+        ],
       },
       {
         id: "aqa-al-data-structures-algorithms",
-        title: "Data Structures and Algorithms",
+        title: "Data Structures, Algorithms and Computational Thinking",
         description:
-          "Study algorithms, abstraction, searching, sorting, recursion and advanced data structures.",
-        topicIds: ["algorithms", "advanced-programming"],
+          "Study abstract data structures, algorithm design, complexity, computational thinking and theoretical models of computation.",
+        topicIds: [
+          "data-structures",
+          "computational-thinking",
+          "theory-computation",
+        ],
       },
       {
         id: "aqa-al-data-representation",
         title: "Data Representation",
         description:
-          "Study number systems, character encoding, images, sound and compression at an advanced level.",
-        topicIds: [
-          "binary",
-          "hexadecimal",
-          "characters",
-          "images",
-          "sound",
-          "compression",
-        ],
+          "Study signed binary, number systems, floating-point ideas, character encoding, images, sound and compression at A-level depth.",
+        topicIds: ["advanced-data-representation"],
       },
       {
         id: "aqa-al-computer-systems",
         title: "Computer Systems",
         description:
-          "Study processors, memory, storage, systems software and Boolean logic.",
-        topicIds: [
-          "cpu",
-          "memory-storage",
-          "systems-software",
-          "boolean-logic",
-          "programming-languages",
-        ],
+          "Study processor architecture, memory, storage, operating systems, translators and Boolean logic at A-level depth.",
+        topicIds: ["advanced-systems"],
       },
       {
         id: "aqa-al-networks-security",
         title: "Networks and Cyber Security",
         description:
-          "Study network communication, protocols, security threats and defensive measures.",
-        topicIds: ["networks", "cyber-security"],
+          "Study layered network communication, routing, internet technologies, vulnerabilities and defensive security.",
+        topicIds: ["advanced-networks"],
       },
       {
         id: "aqa-al-databases",
         title: "Databases",
         description:
-          "Study relational databases, SQL and database design.",
-        topicIds: ["databases"],
+          "Study relational design, normalisation, SQL, transactions and database management.",
+        topicIds: ["advanced-databases"],
+      },
+      {
+        id: "aqa-al-big-data",
+        title: "Big Data",
+        description:
+          "Understand large-scale datasets, distributed processing, privacy, bias and the challenges created by volume, velocity and variety.",
+        topicIds: ["big-data"],
       },
       {
         id: "aqa-al-ethical-legal",
         title: "Consequences of Computing",
         description:
-          "Evaluate ethical, legal, cultural and environmental consequences of computer systems.",
-        topicIds: ["ethical-legal"],
+          "Evaluate legal, moral, cultural, ethical and environmental consequences of computer systems.",
+        topicIds: ["legal-ethical-a-level"],
       },
     ],
   },
@@ -338,17 +340,16 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
         id: "ocr-al-processors",
         title: "The Characteristics of Contemporary Processors",
         description:
-          "Study processor architecture, performance and input, output and storage devices.",
-        topicIds: ["cpu", "memory-storage"],
+          "Study processor architecture, memory hierarchy, low-level execution, storage and performance.",
+        topicIds: ["advanced-systems"],
       },
       {
         id: "ocr-al-software-development",
         title: "Software and Software Development",
         description:
-          "Study operating systems, translators, programming methodologies and advanced software development.",
+          "Study software-development practice, translators, programming methodologies, object orientation, recursion and robust program design.",
         topicIds: [
-          "systems-software",
-          "programming-languages",
+          "software-development",
           "advanced-programming",
         ],
       },
@@ -356,44 +357,43 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
         id: "ocr-al-data-exchange",
         title: "Exchanging Data",
         description:
-          "Study compression, databases, networks, protocols and web technologies.",
-        topicIds: ["compression", "databases", "networks"],
+          "Study data representation, compression, relational databases, networks, protocols and communication technologies.",
+        topicIds: [
+          "advanced-data-representation",
+          "advanced-databases",
+          "advanced-networks",
+        ],
       },
       {
-        id: "ocr-al-data-types",
-        title: "Data Types, Structures and Algorithms",
+        id: "ocr-al-data-structures",
+        title: "Data Types, Data Structures and Algorithms",
         description:
-          "Study data representation, Boolean algebra, algorithms and programming structures.",
+          "Study advanced data structures, computational thinking, algorithm design and problem-solving techniques.",
         topicIds: [
-          "binary",
-          "hexadecimal",
-          "characters",
-          "images",
-          "sound",
-          "boolean-logic",
-          "algorithms",
+          "data-structures",
+          "computational-thinking",
         ],
       },
       {
         id: "ocr-al-programming",
         title: "Programming and Problem Solving",
         description:
-          "Develop advanced programming, recursion, object orientation, abstraction and computational-thinking skills.",
-        topicIds: ["advanced-programming", "algorithms"],
+          "Develop advanced programming, abstraction, object orientation, recursion and robust solution design.",
+        topicIds: ["advanced-programming"],
       },
       {
-        id: "ocr-al-security",
+        id: "ocr-al-networks-security",
         title: "Networks and Security",
         description:
-          "Study network communication and cyber-security principles.",
-        topicIds: ["networks", "cyber-security"],
+          "Study layered communication, routing, internet technologies, cyber-security principles and defensive measures.",
+        topicIds: ["advanced-networks"],
       },
       {
         id: "ocr-al-ethical-legal",
         title: "Legal, Moral, Cultural and Ethical Issues",
         description:
-          "Evaluate the wider impact of computer systems and digital technology.",
-        topicIds: ["ethical-legal"],
+          "Evaluate the wider legal, moral, cultural, ethical and environmental impact of computer systems.",
+        topicIds: ["legal-ethical-a-level"],
       },
     ],
   },

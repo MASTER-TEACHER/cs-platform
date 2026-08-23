@@ -24,6 +24,7 @@ import { createAssignment } from "@/services/assignmentService";
 import { createProgrammingAssignment } from "@/services/programmingAssignmentService";
 import { createExamAssignment } from "@/services/examAssignmentService";
 import { getExamQuestionSetById } from "@/services/examQuestionService";
+import { getTeacherResources } from "@/services/teacherResourceService";
 import { createResourceAssignment } from "@/services/resourceAssignmentService";
 
 import type {
@@ -46,6 +47,8 @@ export default function AssignmentWizardPage() {
     useAuth();
   const searchParams = useSearchParams();
   const quizId = searchParams.get("quizId");
+  const contentType = searchParams.get("contentType");
+  const contentId = searchParams.get("contentId");
 
   const [step, setStep] =
     useState<AssignmentWizardStep>(
@@ -245,6 +248,114 @@ export default function AssignmentWizardPage() {
     };
   }, [quizId, user]);
 
+  useEffect(() => {
+    if (!contentType || !contentId || !user) return;
+
+    /*
+     * Capture the guarded values as stable non-null strings before
+     * entering the nested async function.
+     *
+     * TypeScript does not preserve the narrowing of search-param values
+     * inside an async closure unless we store them after the guard.
+     */
+    const selectedContentType = contentType;
+    const selectedContentId = contentId;
+    const teacherId = user.uid;
+
+    let cancelled = false;
+
+    async function loadContent() {
+      setLoadingResource(true);
+      try {
+        if (selectedContentType === "teaching-resource") {
+          const resources = await getTeacherResources(teacherId);
+          if (cancelled) return;
+          const saved = resources.find(
+            (item) => item.id === selectedContentId,
+          );
+          if (!saved) {
+            toast.error("The selected teaching resource could not be found.");
+            return;
+          }
+          if (saved.status !== "published") {
+            toast.error("Publish this teaching resource before assigning it.");
+            return;
+          }
+
+          const resource: AssignmentWizardResource = {
+            id: saved.id,
+            title: saved.title,
+            description: saved.content.overview || `Complete ${saved.title}.`,
+            resourceType: "teaching-resource",
+            resourceId: saved.id,
+            topicTitle: saved.topic,
+            examBoard: saved.examBoard,
+            qualification:
+              saved.yearGroup === "A Level" ||
+              saved.yearGroup === "Year 12" ||
+              saved.yearGroup === "Year 13"
+                ? "A_LEVEL"
+                : "GCSE",
+          };
+
+          setWizardData((current) => ({
+            ...current,
+            resource,
+            instructions: current.instructions || resource.description,
+          }));
+          setStep("classes");
+          toast.success("Teaching resource loaded into the assignment wizard.");
+          return;
+        }
+
+        if (selectedContentType === "exam-paper") {
+          const questionSet = await getExamQuestionSetById(selectedContentId);
+          if (cancelled) return;
+          if (!questionSet || questionSet.teacherId !== teacherId) {
+            toast.error("The selected exam paper could not be found.");
+            return;
+          }
+          if (questionSet.status !== "published") {
+            toast.error("Publish this question set before assigning it.");
+            return;
+          }
+
+          const resource: AssignmentWizardResource = {
+            id: questionSet.id,
+            title: questionSet.title,
+            description: `${questionSet.questionCount} questions · ${questionSet.totalMarks} marks`,
+            resourceType: "exam-paper",
+            resourceId: questionSet.id,
+            examTopic: questionSet.topic,
+            examBoard: questionSet.examBoard,
+            examQualification: questionSet.qualification,
+            qualification: questionSet.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
+            questionCount: questionSet.questionCount,
+            totalMarks: questionSet.totalMarks,
+          };
+
+          setWizardData((current) => ({
+            ...current,
+            resource,
+            instructions:
+              current.instructions ||
+              "Complete the written assessment under the conditions set by your teacher.",
+          }));
+          setStep("classes");
+          toast.success("Exam paper loaded into the assignment wizard.");
+        }
+      } catch (error) {
+        console.error("Failed to load content into assignment wizard:", error);
+        toast.error(error instanceof Error ? error.message : "The selected content could not be loaded.");
+      } finally {
+        if (!cancelled) setLoadingResource(false);
+      }
+    }
+
+    void loadContent();
+    return () => { cancelled = true; };
+  }, [contentType, contentId, user]);
+
   function selectResource(
     resource: AssignmentWizardResource,
   ) {
@@ -349,6 +460,40 @@ export default function AssignmentWizardPage() {
                 },
               ),
           ),
+        );
+      } else if (
+        wizardData.resource.resourceType ===
+        "teaching-resource"
+      ) {
+        await Promise.all(
+          wizardData.selectedClassIds.map(async (selectedClassId) => {
+            const selectedClass = classes.find((item) => item.id === selectedClassId);
+            if (!selectedClass) throw new Error("A selected class could not be found.");
+
+            const classSnapshot = await getDoc(doc(db, "classes", selectedClassId));
+            if (!classSnapshot.exists()) throw new Error("A selected class could not be found.");
+            const classData = classSnapshot.data();
+            const studentIds = Array.isArray(classData.studentIds)
+              ? classData.studentIds.filter(
+                  (value): value is string =>
+                    typeof value === "string" && Boolean(value.trim()),
+                )
+              : [];
+
+            await createResourceAssignment({
+              resourceId: wizardData.resource!.resourceId,
+              resourceTitle: wizardData.resource!.title,
+              resourceTopic: wizardData.resource!.topicTitle || "Teaching resource",
+              resourceType: "teacher-resource",
+              teacherId: user.uid,
+              teacherName: user.displayName || "Teacher",
+              classId: selectedClassId,
+              className: selectedClass.name,
+              instructions: wizardData.instructions.trim(),
+              dueDate: new Date(`${wizardData.dueDate}T23:59:59`),
+              studentIds,
+            });
+          }),
         );
       } else if (
         wizardData.resource.resourceType ===
@@ -582,7 +727,10 @@ export default function AssignmentWizardPage() {
           "programming-challenge"
             ? "Programming assignment"
             : wizardData.resource.resourceType ===
-                "lesson"
+                "teaching-resource"
+              ? "Resource assignment"
+              : wizardData.resource.resourceType ===
+                  "lesson"
               ? "Lesson assignment"
               : wizardData.resource.resourceType ===
                   "exam-paper"

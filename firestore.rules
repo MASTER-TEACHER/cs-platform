@@ -41,6 +41,115 @@ service cloud.firestore {
         currentUserProfile().role == "admin";
     }
 
+    // ─────────────────────────────────────────────
+    // School / tenant helpers
+    // ─────────────────────────────────────────────
+
+    function currentUserHasSchool() {
+      return userProfileExists() &&
+        ("schoolId" in currentUserProfile()) &&
+        currentUserProfile().schoolId is string &&
+        currentUserProfile().schoolId != "";
+    }
+
+    function currentSchoolId() {
+      return currentUserProfile().schoolId;
+    }
+
+    function schoolExists(schoolId) {
+      return schoolId is string &&
+        schoolId != "" &&
+        exists(
+          /databases/$(database)/documents/schools/$(schoolId)
+        );
+    }
+
+    function schoolMemberExists(schoolId, userId) {
+      return signedIn() &&
+        schoolId is string &&
+        schoolId != "" &&
+        exists(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(userId)
+        );
+    }
+
+    function schoolMemberData(schoolId, userId) {
+      return get(
+        /databases/$(database)/documents/schools/$(schoolId)/members/$(userId)
+      ).data;
+    }
+
+    function isSchoolMember(schoolId) {
+      return schoolMemberExists(schoolId, currentUserId()) &&
+        schoolMemberData(schoolId, currentUserId()).status == "active";
+    }
+
+    function isSchoolAdmin(schoolId) {
+      return isAdmin() ||
+        (
+          isSchoolMember(schoolId) &&
+          schoolMemberData(schoolId, currentUserId()).role == "school_admin"
+        );
+    }
+
+    function isSchoolStaff(schoolId) {
+      return isAdmin() ||
+        (
+          isSchoolMember(schoolId) &&
+          schoolMemberData(schoolId, currentUserId()).role in [
+            "teacher",
+            "school_admin"
+          ]
+        );
+    }
+
+    function sameSchoolUser(userId) {
+      return signedIn() &&
+        currentUserHasSchool() &&
+        exists(
+          /databases/$(database)/documents/users/$(userId)
+        ) &&
+        get(
+          /databases/$(database)/documents/users/$(userId)
+        ).data.schoolId == currentSchoolId();
+    }
+
+    function validAccountType(data) {
+      return !("accountType" in data) ||
+        data.accountType == "individual" ||
+        data.accountType == "school";
+    }
+
+    function validPersonalPlan(data) {
+      return !("personalPlan" in data) ||
+        data.personalPlan == "free" ||
+        data.personalPlan == "premium";
+    }
+
+    function validEffectivePlan(data) {
+      return !("plan" in data) ||
+        data.plan == "free" ||
+        data.plan == "premium" ||
+        data.plan == "school";
+    }
+
+    function validSchoolIdField(data) {
+      return !("schoolId" in data) ||
+        data.schoolId == null ||
+        data.schoolId is string;
+    }
+
+    function activeMembershipAfter(schoolId, userId) {
+      return schoolId is string &&
+        schoolId != "" &&
+        existsAfter(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(userId)
+        ) &&
+        getAfter(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(userId)
+        ).data.status == "active";
+    }
+
     function validQualification(data) {
       return !("qualification" in data) ||
         data.qualification == null ||
@@ -184,28 +293,28 @@ service cloud.firestore {
     // Users
     // ─────────────────────────────────────────────
 
-   match /users/{userId} {
+  match /users/{userId} {
 
   allow get: if signedIn() &&
     (
       currentUserId() == userId ||
-      isTeacher()
+      isAdmin() ||
+      (
+        isTeacher() &&
+        sameSchoolUser(userId)
+      )
     );
 
-  allow list: if isTeacher();
+  allow list: if signedIn() &&
+    (
+      isAdmin() ||
+      (
+        isTeacher() &&
+        currentUserHasSchool() &&
+        resource.data.schoolId == currentSchoolId()
+      )
+    );
 
-  /*
-   * Public registration.
-   *
-   * Every self-registered account begins with the protected
-   * Firestore role "student".
-   *
-   * accountIntent controls which journey the account follows:
-   * - student -> curriculum onboarding
-   * - teacher -> teacher-access request
-   *
-   * A user can NEVER grant themselves the teacher/admin role.
-   */
   allow create: if signedIn() &&
     currentUserId() == userId &&
     request.resource.data.uid == currentUserId() &&
@@ -224,17 +333,79 @@ service cloud.firestore {
     ) &&
     validQualification(request.resource.data) &&
     validExamBoard(request.resource.data) &&
-    validOnboardingStatus(request.resource.data);
+    validOnboardingStatus(request.resource.data) &&
+    validAccountType(request.resource.data) &&
+    validPersonalPlan(request.resource.data) &&
+    validEffectivePlan(request.resource.data) &&
+    validSchoolIdField(request.resource.data) &&
+    userAccountType(request.resource.data) == "individual" &&
+    userEffectivePlan(request.resource.data) == "free" &&
+    userSchoolId(request.resource.data) == "";
 
   /*
-   * A user may maintain their own safe profile,
-   * curriculum and progress fields.
+   * Self-service profile update.
    *
-   * They may also move through the teacher-application journey,
-   * but they CANNOT promote their own role.
+   * This version is intentionally legacy-safe:
+   * old accounts that pre-date schoolId/accountType/personalPlan
+   * are interpreted as:
    *
-   * Existing role must remain unchanged.
+   *   schoolId     = ""
+   *   accountType  = "individual"
+   *   personalPlan = "free"
+   *
+   * That lets an authenticated teacher move into a school account
+   * only when the matching active school membership exists after
+   * the same atomic write.
    */
+   /*
+ * Legacy approved teacher -> school account migration.
+ *
+ * Older development teacher accounts can pre-date schoolId,
+ * accountType and plan fields. This permits only the one-time
+ * transition into an active school membership created in the
+ * same atomic batch.
+ */
+allow update: if signedIn() &&
+  currentUserId() == userId &&
+
+  (
+    resource.data.role == "teacher" ||
+    resource.data.role == "admin"
+  ) &&
+
+  request.resource.data.role == resource.data.role &&
+  request.resource.data.uid == currentUserId() &&
+  request.resource.data.email == resource.data.email &&
+
+  (
+    !("schoolId" in resource.data) ||
+    resource.data.schoolId == null ||
+    resource.data.schoolId == ""
+  ) &&
+
+  request.resource.data.schoolId is string &&
+  request.resource.data.schoolId != "" &&
+
+  request.resource.data.accountType == "school" &&
+  request.resource.data.plan == "school" &&
+
+  activeMembershipAfter(
+    request.resource.data.schoolId,
+    currentUserId()
+  ) &&
+
+  request.resource.data
+    .diff(resource.data)
+    .affectedKeys()
+    .hasOnly([
+      "uid",
+      "schoolId",
+      "accountType",
+      "plan",
+      "personalPlan",
+      "updatedAt"
+    ]);
+    
   allow update: if signedIn() &&
     currentUserId() == userId &&
     request.resource.data.uid == currentUserId() &&
@@ -251,17 +422,26 @@ service cloud.firestore {
     ) &&
     (
       !("accountIntent" in request.resource.data) ||
+      !("accountIntent" in resource.data) ||
+      request.resource.data.accountIntent == resource.data.accountIntent ||
       request.resource.data.accountIntent == "student" ||
       request.resource.data.accountIntent == "teacher"
     ) &&
     (
       !("teacherAccessStatus" in request.resource.data) ||
+      !("teacherAccessStatus" in resource.data) ||
+      request.resource.data.teacherAccessStatus ==
+        resource.data.teacherAccessStatus ||
       request.resource.data.teacherAccessStatus == "not_submitted" ||
       request.resource.data.teacherAccessStatus == "pending"
     ) &&
     validQualification(request.resource.data) &&
     validExamBoard(request.resource.data) &&
     validOnboardingStatus(request.resource.data) &&
+    validAccountType(request.resource.data) &&
+    validPersonalPlan(request.resource.data) &&
+    validEffectivePlan(request.resource.data) &&
+    validSchoolIdField(request.resource.data) &&
     request.resource.data
       .diff(resource.data)
       .affectedKeys()
@@ -270,18 +450,16 @@ service cloud.firestore {
         "name",
         "email",
         "role",
-
-        // Account journey
         "accountIntent",
         "teacherAccessStatus",
-
-        // Student curriculum
+        "accountType",
+        "plan",
+        "personalPlan",
+        "schoolId",
         "currentCourse",
         "qualification",
         "examBoard",
         "onboardingComplete",
-
-        // Student progress
         "xp",
         "streak",
         "badges",
@@ -290,21 +468,149 @@ service cloud.firestore {
         "completedUnits",
         "completedPapers",
         "classIds",
-
-        // General
         "updatedAt"
-      ]);
+      ]) &&
+    (
+      /*
+       * Normal update while staying in the same tenant/account state.
+       */
+      (
+        userSchoolId(request.resource.data) ==
+          userSchoolId(resource.data) &&
+        userAccountType(request.resource.data) ==
+          userAccountType(resource.data) &&
+        (
+          userAccountType(request.resource.data) == "school" ||
+          userEffectivePlan(request.resource.data) ==
+            userPersonalPlan(request.resource.data)
+        )
+      ) ||
+
+      /*
+       * Join/create a school.
+       *
+       * The resulting membership must already exist as ACTIVE
+       * after this same atomic write.
+       */
+      (
+        userSchoolId(request.resource.data) != "" &&
+        userAccountType(request.resource.data) == "school" &&
+        userEffectivePlan(request.resource.data) == "school" &&
+        activeMembershipAfter(
+          userSchoolId(request.resource.data),
+          currentUserId()
+        )
+      ) ||
+
+      /*
+       * Leave a school.
+       *
+       * The previous membership must become FORMER in the
+       * same atomic operation.
+       */
+      (
+        userSchoolId(request.resource.data) == "" &&
+        userAccountType(request.resource.data) == "individual" &&
+        userEffectivePlan(request.resource.data) ==
+          userPersonalPlan(request.resource.data) &&
+        userSchoolId(resource.data) != "" &&
+        existsAfter(
+          /databases/$(database)/documents/schools/$(userSchoolId(resource.data))/members/$(currentUserId())
+        ) &&
+        getAfter(
+          /databases/$(database)/documents/schools/$(userSchoolId(resource.data))/members/$(currentUserId())
+        ).data.status == "former"
+      )
+    );
+
+
+// ============================================================
+// T1H LEGACY ROSTER -> SCHOOL TENANCY MIGRATION
+// ============================================================
+// INSERT INSIDE match /users/{userId} {
+// Place BEFORE the existing teacher update rule that only allows
+// classIds + updatedAt on student profiles.
+
+allow update: if signedIn() &&
+  resource.data.role == "student" &&
+  request.resource.data.role == resource.data.role &&
+  request.resource.data.email == resource.data.email &&
+  (
+    !("schoolId" in resource.data) ||
+    resource.data.schoolId == null ||
+    resource.data.schoolId == ""
+  ) &&
+  request.resource.data.schoolId is string &&
+  request.resource.data.schoolId != "" &&
+  request.resource.data.accountType == "school" &&
+  request.resource.data.plan == "school" &&
+  isSchoolAdmin(request.resource.data.schoolId) &&
+  request.resource.data
+    .diff(resource.data)
+    .affectedKeys()
+    .hasOnly([
+      "schoolId",
+      "accountType",
+      "plan",
+      "updatedAt"
+    ]) &&
+  existsAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ) &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.userId == userId &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.schoolId == request.resource.data.schoolId &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.role == "student" &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.status == "active" &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.migrationType == "legacy_roster" &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.migratedBy == currentUserId() &&
+  getAfter(
+    /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+  ).data.migrationClassId is string &&
+  existsAfter(
+    /databases/$(database)/documents/classes/$(getAfter(
+      /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+    ).data.migrationClassId)
+  ) &&
+  getAfter(
+    /databases/$(database)/documents/classes/$(getAfter(
+      /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+    ).data.migrationClassId)
+  ).data.teacherId == currentUserId() &&
+  userId in getAfter(
+    /databases/$(database)/documents/classes/$(getAfter(
+      /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+    ).data.migrationClassId)
+  ).data.studentIds &&
+  getAfter(
+    /databases/$(database)/documents/classes/$(getAfter(
+      /databases/$(database)/documents/schools/$(request.resource.data.schoolId)/members/$(userId)
+    ).data.migrationClassId)
+  ).data.schoolId == request.resource.data.schoolId;
+
 
   /*
-   * Teachers may only change class membership fields
-   * on student profiles.
-   *
-   * They cannot change identity, account intent,
-   * approval status, role or curriculum.
+   * Teacher may only maintain classIds on a student
+   * inside the same school.
    */
   allow update: if isTeacher() &&
     resource.data.role == "student" &&
     request.resource.data.role == resource.data.role &&
+    (
+      isAdmin() ||
+      sameSchoolUser(userId)
+    ) &&
     request.resource.data
       .diff(resource.data)
       .affectedKeys()
@@ -332,15 +638,35 @@ service cloud.firestore {
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         request.resource.data.studentIds is list &&
-        request.resource.data.assignmentIds is list;
+        request.resource.data.assignmentIds is list &&
+        (
+          isAdmin() ||
+          (
+            currentUserHasSchool() &&
+            request.resource.data.schoolId == currentSchoolId()
+          )
+        );
 
       allow update: if isTeacher() &&
         (
           resource.data.teacherId == currentUserId() ||
           isAdmin()
         ) &&
-        request.resource.data.teacherId ==
-          resource.data.teacherId;
+        request.resource.data.teacherId == resource.data.teacherId &&
+        (
+          isAdmin() ||
+          (
+            (
+              "schoolId" in resource.data &&
+              request.resource.data.schoolId == resource.data.schoolId
+            ) ||
+            (
+              !("schoolId" in resource.data) &&
+              currentUserHasSchool() &&
+              request.resource.data.schoolId == currentSchoolId()
+            )
+          )
+        );
 
       allow delete: if isTeacher() &&
         (
@@ -778,7 +1104,11 @@ allow update: if signedIn() &&
           isAdmin()
         );
 
-      allow list: if isTeacher();
+      allow list: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
 
       /*
        * Signed-in students may load an assigned quiz directly.
@@ -891,7 +1221,11 @@ allow update: if signedIn() &&
       /*
        * Teachers may query their own resource library.
        */
-      allow list: if isTeacher();
+      allow list: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
 
       /*
        * Teachers/admins may open managed resources.
@@ -1344,6 +1678,326 @@ match /studentTutorConversations/{conversationId} {
 
   allow delete: if false;
 }
+
+    // ─────────────────────────────────────────────
+    // Schools / organisations
+    // ─────────────────────────────────────────────
+
+    match /schools/{schoolId} {
+
+      allow create: if isTeacher() &&
+        request.resource.data.name is string &&
+        request.resource.data.slug is string &&
+        request.resource.data.status == "active" &&
+        request.resource.data.ownerUserId == currentUserId() &&
+        existsAfter(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(currentUserId())
+        ) &&
+        getAfter(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(currentUserId())
+        ).data.role == "school_admin" &&
+        getAfter(
+          /databases/$(database)/documents/schools/$(schoolId)/members/$(currentUserId())
+        ).data.status == "active" &&
+        getAfter(
+          /databases/$(database)/documents/users/$(currentUserId())
+        ).data.schoolId == schoolId;
+
+      allow get, list: if signedIn() &&
+        (
+          isAdmin() ||
+          isSchoolMember(schoolId)
+        );
+
+      allow update: if isSchoolAdmin(schoolId) &&
+        request.resource.data.ownerUserId == resource.data.ownerUserId &&
+        request.resource.data.slug == resource.data.slug;
+
+      allow delete: if isAdmin();
+
+      match /members/{memberId} {
+
+        allow get, list: if signedIn() &&
+          (
+            isAdmin() ||
+            isSchoolMember(schoolId)
+          );
+
+        allow create: if signedIn() &&
+          memberId == currentUserId() &&
+          request.resource.data.userId == currentUserId() &&
+          request.resource.data.schoolId == schoolId &&
+          request.resource.data.role == "school_admin" &&
+          request.resource.data.status == "active" &&
+          existsAfter(
+            /databases/$(database)/documents/schools/$(schoolId)
+          ) &&
+          getAfter(
+            /databases/$(database)/documents/schools/$(schoolId)
+          ).data.ownerUserId == currentUserId();
+
+        allow create: if signedIn() &&
+          memberId == currentUserId() &&
+          request.resource.data.userId == currentUserId() &&
+          request.resource.data.schoolId == schoolId &&
+          request.resource.data.status == "active" &&
+          request.resource.data.role in [
+            "student",
+            "teacher"
+          ] &&
+          request.resource.data.inviteId is string &&
+          exists(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ) &&
+          get(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ).data.schoolId == schoolId &&
+          get(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ).data.role == request.resource.data.role &&
+          get(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ).data.status == "active" &&
+          getAfter(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ).data.status == "used" &&
+          getAfter(
+            /databases/$(database)/documents/schoolInvites/$(request.resource.data.inviteId)
+          ).data.usedBy == currentUserId();
+
+        allow create: if isSchoolAdmin(schoolId) &&
+          request.resource.data.schoolId == schoolId &&
+          request.resource.data.userId == memberId &&
+          request.resource.data.status == "active" &&
+          request.resource.data.role in [
+            "student",
+            "teacher",
+            "school_admin"
+          ];
+
+        allow update: if isSchoolAdmin(schoolId) &&
+          request.resource.data.schoolId == resource.data.schoolId &&
+          request.resource.data.userId == resource.data.userId;
+
+        allow update: if signedIn() &&
+          memberId == currentUserId() &&
+          resource.data.userId == currentUserId() &&
+          request.resource.data.userId == resource.data.userId &&
+          request.resource.data.schoolId == resource.data.schoolId &&
+          request.resource.data.role == resource.data.role &&
+          resource.data.status == "active" &&
+          request.resource.data.status == "former";
+
+        allow delete: if isAdmin();
+      }
+
+      match /settings/{settingId} {
+        allow get, list: if isSchoolMember(schoolId);
+        allow create, update: if isSchoolAdmin(schoolId);
+        allow delete: if isAdmin();
+      }
+
+      match /auditLogs/{logId} {
+        allow get, list: if isSchoolAdmin(schoolId);
+        allow create, update, delete: if false;
+      }
+    }
+
+
+    // ─────────────────────────────────────────────
+    // School invitations / join codes
+    // ─────────────────────────────────────────────
+
+    match /schoolInvites/{inviteId} {
+
+      allow create: if isSchoolStaff(request.resource.data.schoolId) &&
+        request.resource.data.code == inviteId &&
+        request.resource.data.schoolId is string &&
+        request.resource.data.createdBy == currentUserId() &&
+        request.resource.data.status == "active" &&
+        request.resource.data.usedBy == "" &&
+        request.resource.data.role in [
+          "student",
+          "teacher"
+        ] &&
+        (
+          request.resource.data.role == "student" ||
+          isSchoolAdmin(request.resource.data.schoolId)
+        );
+
+      allow get: if signedIn() &&
+        (
+          isAdmin() ||
+          isSchoolStaff(resource.data.schoolId) ||
+          resource.data.status == "active"
+        );
+
+      allow list: if false;
+
+      allow update: if signedIn() &&
+        resource.data.status == "active" &&
+        request.resource.data.status == "used" &&
+        request.resource.data.usedBy == currentUserId() &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.schoolId == resource.data.schoolId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        existsAfter(
+          /databases/$(database)/documents/schools/$(resource.data.schoolId)/members/$(currentUserId())
+        ) &&
+        getAfter(
+          /databases/$(database)/documents/schools/$(resource.data.schoolId)/members/$(currentUserId())
+        ).data.inviteId == inviteId &&
+        getAfter(
+          /databases/$(database)/documents/users/$(currentUserId())
+        ).data.schoolId == resource.data.schoolId;
+
+      allow update: if isSchoolAdmin(resource.data.schoolId) &&
+        resource.data.status == "active" &&
+        request.resource.data.status == "revoked" &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.schoolId == resource.data.schoolId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.usedBy == resource.data.usedBy;
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────────
+    // School transfer requests - future phase
+    // ─────────────────────────────────────────────
+
+    match /schoolTransferRequests/{transferId} {
+
+      allow create: if signedIn() &&
+        request.resource.data.studentId == currentUserId() &&
+        request.resource.data.toSchoolId is string &&
+        request.resource.data.toSchoolId != "" &&
+        request.resource.data.status == "pending" &&
+        schoolExists(request.resource.data.toSchoolId);
+
+      allow get, list: if signedIn() &&
+        (
+          isAdmin() ||
+          resource.data.studentId == currentUserId() ||
+          isSchoolAdmin(resource.data.fromSchoolId) ||
+          isSchoolAdmin(resource.data.toSchoolId)
+        );
+
+      allow update: if signedIn() &&
+        (
+          isAdmin() ||
+          isSchoolAdmin(resource.data.toSchoolId) ||
+          isSchoolAdmin(resource.data.fromSchoolId)
+        ) &&
+        request.resource.data.studentId == resource.data.studentId &&
+        request.resource.data.fromSchoolId == resource.data.fromSchoolId &&
+        request.resource.data.toSchoolId == resource.data.toSchoolId &&
+        request.resource.data.status in [
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled",
+          "completed"
+        ];
+
+      allow delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Generated reports - future reporting phase
+    // ─────────────────────────────────────────────
+
+    match /generatedReports/{reportId} {
+
+      allow create: if isTeacher() &&
+        currentUserHasSchool() &&
+        request.resource.data.teacherId == currentUserId() &&
+        request.resource.data.schoolId == currentSchoolId();
+
+      allow get, list: if signedIn() &&
+        (
+          isAdmin() ||
+          (
+            currentUserHasSchool() &&
+            isSchoolStaff(resource.data.schoolId) &&
+            resource.data.schoolId == currentSchoolId()
+          ) ||
+          resource.data.studentId == currentUserId()
+        );
+
+      allow update, delete: if isAdmin() ||
+        (
+          isTeacher() &&
+          currentUserHasSchool() &&
+          resource.data.teacherId == currentUserId() &&
+          resource.data.schoolId == currentSchoolId()
+        );
+    }
+
+
+    // ─────────────────────────────────────────────
+    // User notifications - future alerts phase
+    // ─────────────────────────────────────────────
+
+    match /users/{userId}/notifications/{notificationId} {
+      allow get, list: if signedIn() &&
+        currentUserId() == userId;
+
+      allow create, delete: if false;
+
+      allow update: if signedIn() &&
+        currentUserId() == userId &&
+        request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly([
+            "read",
+            "readAt",
+            "updatedAt"
+          ]);
+    }
+
+
+    // ─────────────────────────────────────────────
+    // Licensing / subscriptions / billing
+    // Future Free -> Premium -> School phase
+    // ─────────────────────────────────────────────
+
+    match /subscriptions/{userId} {
+      allow get: if signedIn() &&
+        (
+          currentUserId() == userId ||
+          isAdmin()
+        );
+
+      allow list: if isAdmin();
+
+      allow create, update, delete: if false;
+    }
+
+    match /schoolLicences/{schoolId} {
+      allow get: if signedIn() &&
+        (
+          isAdmin() ||
+          isSchoolAdmin(schoolId)
+        );
+
+      allow list: if isAdmin();
+
+      allow create, update, delete: if false;
+    }
+
+    match /billingEvents/{eventId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if false;
+    }
+
 
     // ─────────────────────────────────────────────
     // Deny collections not explicitly listed

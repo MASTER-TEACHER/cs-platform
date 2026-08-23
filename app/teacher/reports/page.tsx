@@ -66,17 +66,32 @@ export default function TeacherReportsPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
-              Review whole-platform performance, completion and student support
-              information.
+              Turn evidence-backed attainment, curriculum mastery and intervention history into usable class and learner reports.
             </p>
           </div>
 
-          <Link
-            href="/teacher"
-            className="rounded-xl bg-white px-5 py-3 text-center font-bold text-teal-700 transition hover:bg-emerald-50"
-          >
-            ← Teacher Dashboard
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/teacher/analytics"
+              className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-center font-bold text-white transition hover:bg-white/20"
+            >
+              Analytics
+            </Link>
+
+            <Link
+              href="/teacher/interventions"
+              className="rounded-xl border border-white/30 bg-white/10 px-5 py-3 text-center font-bold text-white transition hover:bg-white/20"
+            >
+              Interventions
+            </Link>
+
+            <Link
+              href="/teacher"
+              className="rounded-xl bg-white px-5 py-3 text-center font-bold text-teal-700 transition hover:bg-emerald-50"
+            >
+              ← Teacher Dashboard
+            </Link>
+          </div>
         </div>
       </Card>
 
