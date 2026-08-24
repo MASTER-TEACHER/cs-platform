@@ -1,254 +1,119 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import QuizPlayer from "@/components/quiz/QuizPlayer";
-import Card from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Skeleton from "@/components/ui/Skeleton";
-import { quizLibrary } from "@/data/quizzes/index";
-import { db } from "@/lib/firebase";
-import type { Quiz } from "@/types/quiz";
+import { useAuth } from "@/contexts/AuthContext";
 
-type SavedQuizQuestion = {
-  id?: string;
-  type?: string;
-  question?: string;
-  options?: string[];
-  correctAnswer?: string;
-  explanation?: string;
-  xpReward?: number;
-};
-
-export default function QuizPage() {
+export default function HomePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const topicParam = searchParams.get("topic");
-  const assignmentId = searchParams.get("assignment");
-
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
-  const [generatedQuiz, setGeneratedQuiz] = useState<Quiz | null>(null);
-  const [loadingGeneratedQuiz, setLoadingGeneratedQuiz] = useState(false);
-  const [loadError, setLoadError] = useState("");
-
-  const quizzes = useMemo(() => Object.values(quizLibrary), []);
-
-  const builtInQuiz = selectedQuizId ? quizLibrary[selectedQuizId] : null;
-
-  const selectedQuiz = generatedQuiz || builtInQuiz;
+  const {
+    user,
+    profile,
+    loading,
+    profileReady,
+    profileError,
+  } = useAuth();
 
   useEffect(() => {
-    if (!topicParam) {
-      setGeneratedQuiz(null);
-      setSelectedQuizId(null);
-      setLoadError("");
+    if (loading) {
       return;
     }
 
-    const existingQuiz = quizLibrary[topicParam];
-
-    if (existingQuiz) {
-      setSelectedQuizId(topicParam);
-      setGeneratedQuiz(null);
-      setLoadError("");
+    if (!user) {
+      router.replace("/landing");
       return;
     }
 
-    let cancelled = false;
-
-    async function loadGeneratedQuiz() {
-      setLoadingGeneratedQuiz(true);
-      setLoadError("");
-      setSelectedQuizId(null);
-
-      try {
-        const quizSnapshot = await getDoc(
-          doc(db, "generatedQuizzes", topicParam as string),
-        );
-
-        if (cancelled) {
-          return;
-        }
-
-        if (!quizSnapshot.exists()) {
-          setGeneratedQuiz(null);
-          setLoadError("The assigned quiz could not be found.");
-          return;
-        }
-
-        const data = quizSnapshot.data();
-
-        const rawQuestions: SavedQuizQuestion[] = Array.isArray(data.questions)
-          ? data.questions
-          : [];
-
-        const questions = rawQuestions
-          .filter(
-            (question) =>
-              typeof question.question === "string" &&
-              Array.isArray(question.options) &&
-              typeof question.correctAnswer === "string",
-          )
-          .map((question, index) => ({
-            id: question.id || `${quizSnapshot.id}-question-${index + 1}`,
-            type: "multipleChoice" as const,
-            question: question.question || `Question ${index + 1}`,
-            options: question.options || [],
-            correctAnswer: question.correctAnswer || "",
-            explanation:
-              question.explanation || "Review this topic with your teacher.",
-            xpReward:
-              typeof question.xpReward === "number" ? question.xpReward : 10,
-          }));
-
-        if (questions.length === 0) {
-          setGeneratedQuiz(null);
-          setLoadError("This quiz does not contain any valid questions.");
-          return;
-        }
-
-        const loadedQuiz: Quiz = {
-          id: quizSnapshot.id,
-          topicId: quizSnapshot.id,
-          title: data.title || "AI Generated Quiz",
-          description:
-            data.description || "Complete this quiz assigned by your teacher.",
-          estimatedTime: data.estimatedTime || "10 minutes",
-          questions,
-        };
-
-        setGeneratedQuiz(loadedQuiz);
-      } catch (error) {
-        console.error("Failed to load generated quiz:", error);
-
-        if (!cancelled) {
-          setGeneratedQuiz(null);
-          setLoadError("The assigned quiz could not be loaded.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingGeneratedQuiz(false);
-        }
-      }
+    if (!profileReady || !profile) {
+      return;
     }
 
-    void loadGeneratedQuiz();
+    if (profile.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
 
-    return () => {
-      cancelled = true;
-    };
-  }, [topicParam]);
+    if (profile.role === "teacher") {
+      router.replace("/teacher");
+      return;
+    }
 
-  function selectBuiltInQuiz(topicId: string) {
-    setSelectedQuizId(topicId);
-    setGeneratedQuiz(null);
-    setLoadError("");
+    if (
+      profile.accountIntent === "teacher"
+    ) {
+      router.replace("/teacher-access");
+      return;
+    }
 
-    router.push(`/quiz?topic=${encodeURIComponent(topicId)}`);
-  }
+    if (
+      !profile.onboardingComplete ||
+      !profile.qualification ||
+      !profile.examBoard
+    ) {
+      router.replace("/onboarding");
+      return;
+    }
 
-  function returnToQuizLibrary() {
-    setSelectedQuizId(null);
-    setGeneratedQuiz(null);
-    setLoadError("");
+    router.replace("/dashboard");
+  }, [
+    loading,
+    user,
+    profileReady,
+    profile,
+    router,
+  ]);
 
-    router.push("/quiz");
-  }
-
-  if (loadingGeneratedQuiz) {
+  if (profileError) {
     return (
-      <div className="space-y-8">
-        <Skeleton className="h-24 w-48" />
-        <Skeleton className="h-72 w-full" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    );
-  }
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6 py-12">
+        <section className="w-full max-w-xl rounded-3xl border border-red-200 bg-white p-8 shadow-xl">
+          <p className="text-sm font-black uppercase tracking-widest text-red-700">
+            CS Master
+          </p>
 
-  if (loadError) {
-    return (
-      <Card>
-        <div className="text-5xl">⚠️</div>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">
+            Your account could not be opened
+          </h1>
 
-        <h1 className="mt-4 text-2xl font-bold text-slate-900">
-          Quiz unavailable
-        </h1>
+          <p className="mt-4 leading-7 text-slate-600">
+            {profileError}
+          </p>
 
-        <p className="mt-3 text-slate-600">{loadError}</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() =>
+                window.location.reload()
+              }
+              className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white hover:bg-blue-700"
+            >
+              Retry
+            </button>
 
-        <div className="mt-6">
-          <Button variant="secondary" onClick={returnToQuizLibrary}>
-            ← Back to quizzes
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  if (selectedQuiz) {
-    return (
-      <div className="space-y-8">
-        {!assignmentId && (
-          <Button variant="secondary" onClick={returnToQuizLibrary}>
-            ← Back to quizzes
-          </Button>
-        )}
-
-        {assignmentId && (
-          <Card className="border border-blue-200 bg-blue-50">
-            <p className="font-semibold text-blue-800">
-              📋 You are completing an assigned quiz.
-            </p>
-
-            <p className="mt-1 text-sm text-blue-700">
-              Your result will be recorded in your teacher&apos;s markbook.
-            </p>
-          </Card>
-        )}
-
-        <QuizPlayer quiz={selectedQuiz} />
-      </div>
+            <Link
+              href="/landing"
+              className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-black text-slate-700 hover:bg-slate-50"
+            >
+              Go to home page
+            </Link>
+          </div>
+        </section>
+      </main>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-          Quiz Centre
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
+      <div className="text-center">
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+
+        <p className="mt-4 font-black text-slate-700">
+          Opening CS Master...
         </p>
-
-        <h1 className="mt-3 text-3xl font-bold text-slate-900">
-          Choose a quiz
-        </h1>
-
-        <p className="mt-2 text-slate-600">
-          Test your knowledge, review your answers and build exam confidence.
-        </p>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {quizzes.map((quiz) => (
-          <Card key={quiz.id}>
-            <h2 className="text-2xl font-bold text-slate-900">{quiz.title}</h2>
-
-            <p className="mt-3 text-slate-600">{quiz.description}</p>
-
-            <p className="mt-4 text-sm font-semibold text-slate-500">
-              ⏱ {quiz.estimatedTime} · {quiz.questions.length} questions
-            </p>
-
-            <div className="mt-6">
-              <Button onClick={() => selectBuiltInQuiz(quiz.topicId)}>
-                Start Quiz →
-              </Button>
-            </div>
-          </Card>
-        ))}
       </div>
-    </div>
+    </main>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+import { getCurriculumDefinition } from "@/data/curriculum/curriculumMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserCourseSelection } from "@/services/userService";
 import type { ExamBoard, Qualification } from "@/types/user";
@@ -97,8 +98,15 @@ export default function CurriculumSettingsPage() {
       return;
     }
 
-    if (qualification === "A_LEVEL" && examBoard === "EDEXCEL") {
-      setError("Pearson Edexcel A-level content is not yet available.");
+    if (
+      !getCurriculumDefinition(
+        qualification,
+        examBoard,
+      )
+    ) {
+      setError(
+        "This qualification and exam-board combination is not currently published.",
+      );
       return;
     }
 
@@ -293,10 +301,13 @@ export default function CurriculumSettingsPage() {
             </div>
           </fieldset>
 
-          {qualification === "A_LEVEL" && examBoard === "EDEXCEL" && (
+          {!getCurriculumDefinition(
+            qualification,
+            examBoard,
+          ) && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 font-semibold text-amber-900">
-              Pearson Edexcel A-level content is not yet available. Choose AQA
-              or OCR.
+              This qualification and exam-board combination is not currently
+              published in CS Master. Choose an available curriculum.
             </div>
           )}
 
@@ -304,7 +315,10 @@ export default function CurriculumSettingsPage() {
             type="submit"
             disabled={
               submitting ||
-              (qualification === "A_LEVEL" && examBoard === "EDEXCEL")
+              !getCurriculumDefinition(
+                qualification,
+                examBoard,
+              )
             }
             className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >

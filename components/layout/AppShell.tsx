@@ -5,6 +5,7 @@ import { Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import Sidebar from "@/components/layout/Sidebar";
+import StudentAccessGate from "@/components/student/StudentAccessGate";
 
 export default function AppShell({
   children,
@@ -22,7 +23,6 @@ export default function AppShell({
     "/login",
     "/register",
     "/forgot-password",
-    "/auth-test",
     "/onboarding",
 
     /*
@@ -36,17 +36,18 @@ export default function AppShell({
   const isPublicPage =
     publicPages.includes(pathname);
 
-  /*
-   * Close the mobile drawer whenever navigation occurs.
-   */
+  const isTeacherWorkspace =
+    pathname === "/teacher" ||
+    pathname.startsWith("/teacher/");
+
+  const isAdminWorkspace =
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
+
   useEffect(() => {
     setMobileSidebarOpen(false);
   }, [pathname]);
 
-  /*
-   * Prevent the page behind the mobile navigation drawer
-   * from scrolling while the drawer is open.
-   */
   useEffect(() => {
     if (!mobileSidebarOpen) {
       return;
@@ -71,7 +72,7 @@ export default function AppShell({
     );
   }
 
-  return (
+  const applicationShell = (
     <div className="min-h-screen bg-slate-100 xl:flex">
       <Sidebar
         mobileOpen={mobileSidebarOpen}
@@ -81,12 +82,6 @@ export default function AppShell({
       />
 
       <div className="min-w-0 flex-1">
-        {/*
-         * Tablet / mobile application bar.
-         *
-         * The permanent sidebar begins at xl (1280px),
-         * so smaller screens receive the full page width.
-         */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm sm:px-6 xl:hidden">
           <div>
             <p className="text-sm font-black tracking-wide text-slate-950">
@@ -117,5 +112,24 @@ export default function AppShell({
         </main>
       </div>
     </div>
+  );
+
+  /*
+   * Teacher and administrator workspaces keep their own
+   * role-specific protection. Every other authenticated
+   * application route is a student workspace and passes
+   * through the student production gate.
+   */
+  if (
+    isTeacherWorkspace ||
+    isAdminWorkspace
+  ) {
+    return applicationShell;
+  }
+
+  return (
+    <StudentAccessGate>
+      {applicationShell}
+    </StudentAccessGate>
   );
 }

@@ -470,7 +470,7 @@ export default function InteractiveLessonEngine({
             </ul>
           ) : (
             <p className="mt-4 italic text-slate-500">
-              Learning objectives are coming soon.
+              No separate learning objectives are required for this lesson.
             </p>
           )}
         </Card>
@@ -490,7 +490,7 @@ export default function InteractiveLessonEngine({
           </div>
 
           <p className="mt-5 whitespace-pre-wrap text-lg leading-8 text-slate-700">
-            {lesson.explanation || "Explanation coming soon."}
+            {lesson.explanation || "This lesson does not include a separate explanation step."}
           </p>
         </Card>
       )}
@@ -510,7 +510,7 @@ export default function InteractiveLessonEngine({
           </div>
 
           <div className="mt-5 rounded-2xl bg-amber-50 p-5 text-lg leading-8 text-amber-950">
-            {lesson.workedExample || "Worked example coming soon."}
+            {lesson.workedExample || "This lesson does not include a separate worked example."}
           </div>
         </Card>
       )}

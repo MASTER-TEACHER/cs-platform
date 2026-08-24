@@ -106,7 +106,7 @@ export default function LessonPracticeStep({
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-6">
         <p className="italic text-slate-500">
-          Practice questions are coming soon.
+          No guided-practice questions are required for this lesson.
         </p>
       </div>
     );

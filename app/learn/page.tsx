@@ -206,13 +206,14 @@ export default function LearnPage() {
         {!coverage.complete && (
           <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
             <p className="font-black">
-              Curriculum authoring gap detected
+              Curriculum availability notice
             </p>
 
             <p className="mt-2">
-              These mapped topics are not yet published:{" "}
-              {coverage.missingTopicIds.join(", ")}.
-              They are not silently replaced with another exam board's content.
+              {coverage.missingTopicIds.length} mapped topic
+              {coverage.missingTopicIds.length === 1 ? " is" : "s are"} not
+              currently published for this curriculum. CS Master will never
+              substitute content from a different qualification or exam board.
             </p>
           </div>
         )}
@@ -258,10 +259,9 @@ export default function LearnPage() {
               {missingTopicIds.length >
                 0 && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  Authoring still required for:{" "}
-                  {missingTopicIds.join(
-                    ", ",
-                  )}
+                  {missingTopicIds.length} mapped topic
+                  {missingTopicIds.length === 1 ? " is" : "s are"} not
+                  currently published in this unit.
                 </div>
               )}
 
@@ -371,7 +371,7 @@ export default function LearnPage() {
                               disabled
                               className="w-full cursor-not-allowed rounded-xl bg-slate-200 px-6 py-4 font-black text-slate-500"
                             >
-                              Lessons coming soon
+                              No published lessons
                             </button>
                           )}
                         </div>

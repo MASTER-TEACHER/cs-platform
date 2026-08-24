@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 
+import { getCurriculumDefinition } from "@/data/curriculum/curriculumMap";
 import { updateUserCourseSelection } from "@/services/userService";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -398,28 +399,25 @@ export default function OnboardingPage() {
               </div>
             </fieldset>
 
-            {qualification ===
-              "A_LEVEL" &&
-              examBoard ===
-                "EDEXCEL" && (
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-                  Pearson Edexcel
-                  A-level content is
-                  not yet available.
-                  Select AQA or OCR for
-                  the current A-level
-                  curriculum.
-                </div>
-              )}
+            {!getCurriculumDefinition(
+              qualification,
+              examBoard,
+            ) && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+                This qualification and exam-board combination is not currently
+                published in CS Master. Choose one of the available curriculum
+                combinations to continue.
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={
                 submitting ||
-                (qualification ===
-                  "A_LEVEL" &&
-                  examBoard ===
-                    "EDEXCEL")
+                !getCurriculumDefinition(
+                  qualification,
+                  examBoard,
+                )
               }
               className="w-full rounded-2xl bg-blue-600 px-6 py-4 text-lg font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             >

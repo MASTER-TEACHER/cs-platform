@@ -133,6 +133,49 @@ function normaliseQualification(
   profile: Record<string, unknown>,
   assignments: UnifiedAssignment[],
 ): AnalyticsQualification {
+  /*
+   * Canonical student curriculum selection takes precedence.
+   *
+   * A learner can remain enrolled in legacy or mixed-year class records,
+   * so inferring qualification from class year before reading the canonical
+   * users/{uid}.qualification field can incorrectly downgrade an A-level
+   * learner to GCSE (or vice versa).
+   *
+   * The profile field is the student's explicit CS Master curriculum choice
+   * and is already validated during onboarding/profile updates.
+   */
+  const explicitQualification =
+    safeString(
+      profile.qualification,
+    )
+      .trim()
+      .toUpperCase();
+
+  if (
+    explicitQualification === "GCSE"
+  ) {
+    return "GCSE";
+  }
+
+  if (
+    explicitQualification ===
+      "A_LEVEL" ||
+    explicitQualification ===
+      "A-LEVEL" ||
+    explicitQualification ===
+      "A LEVEL" ||
+    explicitQualification ===
+      "ALEVEL"
+  ) {
+    return "A_LEVEL";
+  }
+
+  /*
+   * Legacy fallback only.
+   *
+   * Older profiles may pre-date the canonical qualification field. In that
+   * case, infer from year/class evidence, then from older course/level fields.
+   */
   for (const value of [
     profile.yearGroup,
     profile.year,
@@ -159,9 +202,6 @@ function normaliseQualification(
   }
 
   const raw =
-    safeString(
-      profile.qualification,
-    ) ||
     safeString(
       profile.course,
     ) ||

@@ -47,7 +47,8 @@ export function getCurriculumCoverage(
         .filter(
           (topic): topic is Topic =>
             Boolean(topic) &&
-            topic.status !== "coming-soon",
+            topic.status !== "coming-soon" &&
+            topic.lessons.length > 0,
         );
 
       const missingTopicIds =
@@ -55,7 +56,8 @@ export function getCurriculumCoverage(
           (topicId) =>
             !topicLibrary[topicId] ||
             topicLibrary[topicId].status ===
-              "coming-soon",
+              "coming-soon" ||
+            topicLibrary[topicId].lessons.length === 0,
         );
 
       return {
