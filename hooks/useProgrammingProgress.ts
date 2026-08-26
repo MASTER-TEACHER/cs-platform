@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAuth } from "@/contexts/AuthContext";
 import { useProgress } from "@/contexts/ProgressContext";
 import type {
   ProgrammingChallenge,
@@ -10,7 +11,11 @@ import type {
   ProgrammingSkillProgress,
 } from "@/types/programming";
 
-const STORAGE_KEY = "cs-master-programming-progress-v2";
+const LEGACY_STORAGE_KEY = "cs-master-programming-progress-v2";
+
+function storageKey(studentId: string): string {
+  return `cs-master-programming-progress-v3:${studentId}`;
+}
 
 const emptyProgress: ProgrammingProgressSnapshot = {
   attempts: 0,
@@ -23,12 +28,21 @@ const emptyProgress: ProgrammingProgressSnapshot = {
   skillProgress: {},
 };
 
-function loadProgress(): ProgrammingProgressSnapshot {
-  if (typeof window === "undefined") return emptyProgress;
+function loadProgress(studentId: string): ProgrammingProgressSnapshot {
+  if (typeof window === "undefined" || !studentId) return emptyProgress;
 
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const scopedKey = storageKey(studentId);
+    const scoped = window.localStorage.getItem(scopedKey);
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = scoped ?? legacy;
+
     if (!raw) return emptyProgress;
+
+    if (!scoped && legacy) {
+      window.localStorage.setItem(scopedKey, legacy);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
 
     const parsed = JSON.parse(raw) as Partial<ProgrammingProgressSnapshot>;
 
@@ -77,24 +91,27 @@ function updateSkillProgress(
 }
 
 export function useProgrammingProgress() {
+  const { user } = useAuth();
   const { addXP } = useProgress();
+  const studentId = user?.uid ?? "";
   const [progress, setProgress] =
     useState<ProgrammingProgressSnapshot>(emptyProgress);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setProgress(loadProgress());
-    setHydrated(true);
-  }, []);
+    setHydrated(false);
+    setProgress(loadProgress(studentId));
+    setHydrated(Boolean(studentId));
+  }, [studentId]);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || !studentId) return;
 
     window.localStorage.setItem(
-      STORAGE_KEY,
+      storageKey(studentId),
       JSON.stringify(progress),
     );
-  }, [hydrated, progress]);
+  }, [hydrated, progress, studentId]);
 
   const accuracy = useMemo(() => {
     if (progress.attempts === 0) return 0;

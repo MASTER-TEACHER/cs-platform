@@ -79,7 +79,7 @@ function getExaminerGuidance(value: unknown): string[] {
 }
 
 function normaliseAnswerText(value: string): string {
-  return value.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " ");
+  return value.trim().toLowerCase().replace(/[Ã¢â‚¬â„¢Ã¢â‚¬Ëœ]/g, "'").replace(/\s+/g, " ");
 }
 
 /**
@@ -377,7 +377,7 @@ function demoSuggestion(
     missedMarkPoints,
     evidenceFromResponse: matchedModelKeywords
       .slice(0, 4)
-      .map((keyword) => `The response uses the relevant term “${keyword}”.`),
+      .map((keyword) => `The response uses the relevant term Ã¢â‚¬Å“${keyword}Ã¢â‚¬Â.`),
     feedback:
       suggestedMarks === question.marks
         ? "The response appears to address the available marking points. Confirm the accuracy and development before accepting full marks."
@@ -681,7 +681,13 @@ export async function POST(request: Request) {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json(createDemoResult(body, "missing_api_key"));
+      return NextResponse.json(
+        {
+          error:
+            "Live AI marking is not configured. Demo marking is available only when AI_MARKING_DEMO_MODE=true.",
+        },
+        { status: 503 },
+      );
     }
 
     try {

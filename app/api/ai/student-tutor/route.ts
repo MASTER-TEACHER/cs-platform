@@ -29,11 +29,11 @@ function demo(body: Body, warning?: string): TutorResponse {
 4. Attempt one exam-style question.
 5. Compare your answer with the mark scheme.
 
-Aim for 25–30 minutes.`;
+Aim for 25-30 minutes.`;
   else if (/predicted grade|what grade/.test(m))
     reply = `Your current platform estimate is grade ${c.currentGrade}, with a predicted grade of ${c.predictedGrade}. This is not an official or guaranteed exam-board prediction.`;
   else
-    reply = `Let’s work through that, ${first}. Start by telling me what you already know or the exact step that is confusing. Use this structure: definition → process → example → exam wording. Your current priority topic is ${topic}, so I will connect the explanation to it when relevant.`;
+    reply = `Let us work through that, ${first}. Start by telling me what you already know or the exact step that is confusing. Use this structure: definition -> process -> example -> exam wording. Your current priority topic is ${topic}, so I will connect the explanation to it when relevant.`;
   return {
     reply,
     mode: "demo",
@@ -73,10 +73,15 @@ export async function POST(request: Request) {
     if (process.env.AI_STUDENT_TUTOR_DEMO_MODE === "true")
       return NextResponse.json(demo(body, "Demo tutor mode is enabled."));
     const key = process.env.OPENAI_API_KEY;
-    if (!key)
+    if (!key) {
       return NextResponse.json(
-        demo(body, "No live AI key was available, so demo mode was used."),
+        {
+          error:
+            "AI Tutor is temporarily unavailable because live AI is not configured.",
+        },
+        { status: 503 },
       );
+    }
     try {
       const client = new OpenAI({ apiKey: key });
       const completion = await client.chat.completions.create({
@@ -106,12 +111,13 @@ export async function POST(request: Request) {
           : [],
       });
     } catch (e) {
-      console.error("Live tutor unavailable; demo fallback:", e);
+      console.error("Live tutor unavailable:", e);
       return NextResponse.json(
-        demo(
-          body,
-          "Live AI was unavailable, so demo mode was used automatically.",
-        ),
+        {
+          error:
+            "AI Tutor is temporarily unavailable. Please try again later.",
+        },
+        { status: 503 },
       );
     }
   } catch (e) {

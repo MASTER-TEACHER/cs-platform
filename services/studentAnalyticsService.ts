@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
+import { indicativeGradeFromPercentage } from "@/services/qualificationGradeService";
 import {
   getStudentById,
   type StudentDirectoryRecord,
@@ -181,18 +182,6 @@ function average(values: number[]): number {
   return Math.round(
     values.reduce((total, value) => total + value, 0) / values.length,
   );
-}
-
-function gradeFromPercentage(percentage: number): string {
-  if (percentage >= 90) return "9";
-  if (percentage >= 80) return "8";
-  if (percentage >= 70) return "7";
-  if (percentage >= 60) return "6";
-  if (percentage >= 50) return "5";
-  if (percentage >= 40) return "4";
-  if (percentage >= 30) return "3";
-  if (percentage >= 20) return "2";
-  return "1";
 }
 
 function isOverdue(dueDate: Date | null, completed: boolean): boolean {
@@ -789,8 +778,11 @@ export async function getStudentAnalytics(
     lowestExamScore: examScores.length > 0 ? Math.min(...examScores) : 0,
 
     combinedAssessmentAverage,
-    currentGrade: gradeFromPercentage(combinedAssessmentAverage),
-    predictedGrade: gradeFromPercentage(
+    currentGrade: indicativeGradeFromPercentage(
+      combinedAssessmentAverage,
+      student.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
+    ),
+    predictedGrade: indicativeGradeFromPercentage(
       Math.max(
         0,
         Math.min(
@@ -798,6 +790,7 @@ export async function getStudentAnalytics(
           combinedAssessmentAverage + Math.round(improvementTrend * 0.4),
         ),
       ),
+      student.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
     ),
 
     totalXP: student.xp,

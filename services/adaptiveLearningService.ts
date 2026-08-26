@@ -16,6 +16,7 @@ import { buildAdaptiveActions } from "@/services/adaptiveRecommendationService";
 import { getStudentExamAssignments } from "@/services/examAssignmentService";
 import { getExamSubmission } from "@/services/examSubmissionService";
 import { getStudentInterventions } from "@/services/interventionService";
+import { indicativeGradeFromPercentage } from "@/services/qualificationGradeService";
 import { normaliseTopic } from "@/services/topicNormalisationService";
 import { getUserProfile } from "@/services/userService";
 
@@ -53,21 +54,6 @@ const average = (
         ) / values.length,
       )
     : 0;
-
-function gradeFromPercentage(
-  percentage: number,
-): string {
-  if (percentage >= 90) return "9";
-  if (percentage >= 80) return "8";
-  if (percentage >= 70) return "7";
-  if (percentage >= 60) return "6";
-  if (percentage >= 50) return "5";
-  if (percentage >= 40) return "4";
-  if (percentage >= 30) return "3";
-  if (percentage >= 20) return "2";
-
-  return "1";
-}
 
 function groupEvidence(
   evidence: AdaptiveEvidence[],
@@ -347,9 +333,9 @@ function resolveAssignedQuizTopic({
    *
    * Example:
    * "character encoding Demo Quiz"
-   *          ↓
+   *          Ã¢â€ â€œ
    * "character encoding"
-   *          ↓
+   *          Ã¢â€ â€œ
    * topicNormalisationService
    */
   const assignmentTitle =
@@ -814,13 +800,15 @@ export async function getAdaptiveLearningPlan(
     confidence,
 
     currentGrade:
-      gradeFromPercentage(
+      indicativeGradeFromPercentage(
         examReadiness,
+        profile?.qualification,
       ),
 
     predictedGrade:
-      gradeFromPercentage(
+      indicativeGradeFromPercentage(
         predictedScore,
+        profile?.qualification,
       ),
 
     dueForReviewCount:

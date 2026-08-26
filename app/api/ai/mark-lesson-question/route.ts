@@ -36,7 +36,7 @@ function normalise(value: string): string {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[’‘]/g, "'")
+    .replace(/[Ã¢â‚¬â„¢Ã¢â‚¬Ëœ]/g, "'")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ");
 }
@@ -320,7 +320,13 @@ export async function POST(request: Request) {
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json(demoResult(body, "missing_api_key"));
+      return NextResponse.json(
+        {
+          error:
+            "Live AI marking is not configured. Demo marking is available only when AI_MARKING_DEMO_MODE=true.",
+        },
+        { status: 503 },
+      );
     }
 
     try {
@@ -348,7 +354,7 @@ export async function POST(request: Request) {
       return NextResponse.json(parseLiveResult(output, body));
     } catch (liveError) {
       console.error(
-        "Live lesson marking unavailable; using demo fallback:",
+        "Live lesson marking unavailable:",
         liveError,
       );
 
@@ -358,7 +364,17 @@ export async function POST(request: Request) {
           ? "rate_limit"
           : "live_error";
 
-      return NextResponse.json(demoResult(body, reason));
+      return NextResponse.json(
+        {
+          error:
+            reason === "quota"
+              ? "Live AI marking is temporarily unavailable because the configured API quota has been exhausted."
+              : reason === "rate_limit"
+                ? "Live AI marking is temporarily rate-limited. Please try again shortly."
+                : "Live AI marking is temporarily unavailable. Please try again later.",
+        },
+        { status: 503 },
+      );
     }
   } catch (error) {
     console.error("Lesson marking route error:", error);

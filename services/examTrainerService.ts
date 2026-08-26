@@ -1,3 +1,6 @@
+import { indicativeGradeFromPercentage } from "@/services/qualificationGradeService";
+import type { Qualification } from "@/types/user";
+
 import type {
   ExamTrainerAnswer,
   ExamTrainerDifficulty,
@@ -120,9 +123,11 @@ export function buildExamQuestions({
 export async function markExamTrainerAttempt({
   questions,
   answers,
+  qualification,
 }: {
   questions: ExamTrainerQuestion[];
   answers: ExamTrainerAnswer[];
+  qualification?: Qualification | "";
 }): Promise<ExamTrainerReport> {
   const markedAnswers = await Promise.all(
     questions.map(async (question) => {
@@ -217,23 +222,12 @@ export async function markExamTrainerAttempt({
     }))
     .sort((first, second) => second.percentage - first.percentage);
 
-  function gradeFromPercentage(value: number): string {
-    if (value >= 90) return "9";
-    if (value >= 80) return "8";
-    if (value >= 70) return "7";
-    if (value >= 60) return "6";
-    if (value >= 50) return "5";
-    if (value >= 40) return "4";
-    if (value >= 30) return "3";
-    if (value >= 20) return "2";
-    return "1";
-  }
 
   return {
     totalAwardedMarks,
     totalAvailableMarks,
     percentage,
-    grade: gradeFromPercentage(percentage),
+    grade: indicativeGradeFromPercentage(percentage, qualification),
     topicScores,
     strongestTopics: topicScores
       .filter((topic) => topic.percentage >= 70)
