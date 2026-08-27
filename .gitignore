@@ -72,3 +72,20 @@ serviceAccount*.json
 **/serviceAccount*.json
 firebase-admin*.json
 **/firebase-admin*.json
+
+# P1 remediation scratch artifacts
+APPLY-P1-LINT-PASS*.ps1
+CREATE-P1-LINT-PASS*.ps1
+P1-FINAL-LINT-*.json
+P1-LAST-WARNING.json
+P1-LINT-AFTER-PASS*.csv
+P1-LINT-AFTER-PASS*.json
+P1-LINT-CURRENT.csv
+P1-LINT-CURRENT.json
+P1-LINT-PASS*-CURRENT.json
+P1-LINT-PASS*-SOURCE.txt
+P1-LINT-PASS*-REPORT.json
+P1-LINT-PASS*-SUMMARY.txt
+P1-LINT-PASS*-INVENTORY.txt
+P1-BACKUPS/
+.p1-lint-backup-*/
