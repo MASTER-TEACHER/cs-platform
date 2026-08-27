@@ -123,18 +123,20 @@ export default function ExamQuestionGeneratorPage() {
 
     const requestedTotalMarks = Number(searchParams.get("totalMarks")) || 13;
 
-    setSettings({
-      topic: topic.trim(),
-      qualification: searchParams.get("qualification") || "GCSE",
-      examBoard: searchParams.get("examBoard") || "AQA",
-      difficulty,
-      generationMode: "automatic",
-      blueprint: createBlueprintFromQuery({
+    void Promise.resolve().then(() => {
+      setSettings({
         topic: topic.trim(),
+        qualification: searchParams.get("qualification") || "GCSE",
+        examBoard: searchParams.get("examBoard") || "AQA",
         difficulty,
-        questionCount,
-        totalMarks: requestedTotalMarks,
-      }),
+        generationMode: "automatic",
+        blueprint: createBlueprintFromQuery({
+          topic: topic.trim(),
+          difficulty,
+          questionCount,
+          totalMarks: requestedTotalMarks,
+        }),
+      });
     });
   }, [searchParams]);
 

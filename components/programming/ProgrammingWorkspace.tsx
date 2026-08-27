@@ -129,13 +129,23 @@ export default function ProgrammingWorkspace({
   useEffect(() => {
     if (!assignedChallenge) return;
 
-    setMode(assignedChallenge.mode);
-    setDifficulty(
-      assignedChallenge.difficulty,
-    );
-    setCurrentChallengeId(
-      assignedChallenge.id,
-    );
+    let active = true;
+
+    void Promise.resolve().then(() => {
+      if (!active) return;
+
+      setMode(assignedChallenge.mode);
+      setDifficulty(
+        assignedChallenge.difficulty,
+      );
+      setCurrentChallengeId(
+        assignedChallenge.id,
+      );
+    });
+
+    return () => {
+      active = false;
+    };
   }, [assignedChallenge]);
 
   const availableChallenges =
@@ -263,7 +273,9 @@ export default function ProgrammingWorkspace({
   useEffect(() => {
     if (assignedMode) return;
 
-    setCurrentChallengeId(null);
+    void Promise.resolve().then(() => {
+      setCurrentChallengeId(null);
+    });
   }, [
     assignedMode,
     difficulty,
@@ -273,38 +285,40 @@ export default function ProgrammingWorkspace({
   ]);
 
   useEffect(() => {
-    if (
-      mode === "explore" &&
-      !assignedMode
-    ) {
-      setCode(exploreStarter);
-      setStdin("Ada");
-    } else if (challenge) {
-      setCode(
-        challenge.starterCode,
-      );
-
-      setStdin(
-        challenge.stdin ??
-          challenge.visibleTests[0]
-            ?.input ??
-          "",
-      );
-
+    void Promise.resolve().then(() => {
       if (
-        challenge.id !==
-        currentChallengeId
+        mode === "explore" &&
+        !assignedMode
       ) {
-        setCurrentChallengeId(
-          challenge.id,
+        setCode(exploreStarter);
+        setStdin("Ada");
+      } else if (challenge) {
+        setCode(
+          challenge.starterCode,
         );
-      }
-    }
 
-    setRunResult(emptyRun);
-    setEvaluation(null);
-    setHintLevel(0);
-    setShowExplanation(false);
+        setStdin(
+          challenge.stdin ??
+            challenge.visibleTests[0]
+              ?.input ??
+            "",
+        );
+
+        if (
+          challenge.id !==
+          currentChallengeId
+        ) {
+          setCurrentChallengeId(
+            challenge.id,
+          );
+        }
+      }
+
+      setRunResult(emptyRun);
+      setEvaluation(null);
+      setHintLevel(0);
+      setShowExplanation(false);
+    });
   }, [
     assignedMode,
     challenge,
@@ -882,7 +896,7 @@ export default function ProgrammingWorkspace({
         </h2>
 
         <p className="mt-3 leading-7 text-amber-900">
-          Python runs on the student's device
+          Python runs on the student&apos;s device
           rather than on the CS Master server.
           Browser, network and process-control
           modules are blocked and long-running
@@ -915,11 +929,11 @@ export default function ProgrammingWorkspace({
                     </p>
 
                     <p className="text-sm text-slate-500">
-                      {item.mode} ·{" "}
+                      {item.mode} Â·{" "}
                       {
                         item.difficulty
                       }{" "}
-                      ·{" "}
+                      Â·{" "}
                       {item.skills.join(
                         ", ",
                       )}

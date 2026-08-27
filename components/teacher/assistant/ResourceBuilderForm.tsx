@@ -615,17 +615,19 @@ export default function ResourceBuilderForm({
   const resourceLabel = RESOURCE_LABELS[resolvedResourceType];
 
   useEffect(() => {
-    setForm({
-      ...DEFAULT_FORM,
-      ...initialValues,
-      duration: initialValues.duration ?? DEFAULT_FORM.duration,
-      difficulty: initialValues.difficulty ?? DEFAULT_FORM.difficulty,
-    });
+    void Promise.resolve().then(() => {
+      setForm({
+        ...DEFAULT_FORM,
+        ...initialValues,
+        duration: initialValues.duration ?? DEFAULT_FORM.duration,
+        difficulty: initialValues.difficulty ?? DEFAULT_FORM.difficulty,
+      });
 
-    setResource(null);
-    setError(null);
-    setSuccess(null);
-    setIsSaved(false);
+      setResource(null);
+      setError(null);
+      setSuccess(null);
+      setIsSaved(false);
+    });
   }, [resolvedResourceType, initialValues, prefillVersion]);
 
   useEffect(() => {

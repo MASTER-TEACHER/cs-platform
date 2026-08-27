@@ -169,7 +169,7 @@ export default function MergeSortSimulator() {
 
   const [phase, setPhase] = useState<"split" | "merge" | "complete">("split");
 
-  const [mergeQueue, setMergeQueue] = useState<MergeGroup[][]>([]);
+  const [, setMergeQueue] = useState<MergeGroup[][]>([]);
 
   const [currentMerge, setCurrentMerge] = useState<MergeState | null>(null);
 

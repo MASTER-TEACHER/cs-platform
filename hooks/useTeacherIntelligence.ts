@@ -8,6 +8,8 @@ import type { TeacherAnalyticsPortfolio } from "@/types/teacherAnalytics";
 
 export function useTeacherIntelligence() {
   const { user, profile, loading: authLoading } = useAuth();
+  const userId = user?.uid;
+  const role = profile?.role;
 
   const [portfolio, setPortfolio] =
     useState<TeacherAnalyticsPortfolio | null>(null);
@@ -15,52 +17,57 @@ export function useTeacherIntelligence() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     if (
-      !user?.uid ||
-      (profile?.role !== "teacher" && profile?.role !== "admin")
+      !userId ||
+      (role !== "teacher" && role !== "admin")
     ) {
-      setPortfolio(null);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setPortfolio(null);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getTeacherAnalyticsPortfolio(userId);
+      })
+      .then((result) => {
+        setPortfolio(result);
+      })
+      .catch((caughtError: unknown) => {
+        const firebaseCode =
+          typeof caughtError === "object" &&
+          caughtError !== null &&
+          "code" in caughtError &&
+          typeof (caughtError as { code?: unknown }).code === "string"
+            ? (caughtError as { code: string }).code
+            : "";
 
-      const result = await getTeacherAnalyticsPortfolio(user.uid);
+        setPortfolio(null);
 
-      setPortfolio(result);
-    } catch (caughtError: unknown) {
-      const firebaseCode =
-        typeof caughtError === "object" &&
-        caughtError !== null &&
-        "code" in caughtError &&
-        typeof (caughtError as { code?: unknown }).code === "string"
-          ? (caughtError as { code: string }).code
-          : "";
-
-      setPortfolio(null);
-
-      if (
-        firebaseCode === "permission-denied" ||
-        firebaseCode === "firestore/permission-denied"
-      ) {
-        setError(
-          "Teacher intelligence is unavailable for this account.",
-        );
-      } else {
-        setError(
-          caughtError instanceof Error
-            ? caughtError.message
-            : "Teacher intelligence could not be loaded.",
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [profile?.role, user?.uid]);
+        if (
+          firebaseCode === "permission-denied" ||
+          firebaseCode === "firestore/permission-denied"
+        ) {
+          setError(
+            "Teacher intelligence is unavailable for this account.",
+          );
+        } else {
+          setError(
+            caughtError instanceof Error
+              ? caughtError.message
+              : "Teacher intelligence could not be loaded.",
+          );
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [role, userId]);
 
   useEffect(() => {
     if (authLoading) return;

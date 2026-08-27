@@ -1,0 +1,335 @@
+CS MASTER - P1 LINT PASS 5A INVENTORY
+Generated: 2026-08-27 10:14:39
+Project: C:\Users\cr7ri\cs-platform-clean
+
+Purpose: exact source-aware inventory for warnings/purity cleanup.
+No source files were changed.
+
+====================================================================================================
+FILE: app\api\ai\generate-exam-questions\route.ts
+====================================================================================================
+
+RULE: @typescript-eslint/no-unused-vars
+LOCATION: app\api\ai\generate-exam-questions\route.ts:1433:10
+MESSAGE: 'specificExplanation' is defined but never used.
+
+CONTEXT:
+    1423:       "benefit",
+    1424:       "limitation",
+    1425:     ],
+    1426:   };
+    1427: }
+    1428: 
+    1429: function specificDefinition(topic: string): string {
+    1430:   return resolveTopicProfile(topic).definition;
+    1431: }
+    1432: 
+>>  1433: function specificExplanation(topic: string): string {
+    1434:   return resolveTopicProfile(topic).explanation;
+    1435: }
+    1436: 
+    1437: function specificExtendedAnswer(topic: string, contextLabel: string): string {
+    1438:   const profile = resolveTopicProfile(topic);
+    1439: 
+    1440:   const benefitOne = profile.benefits[0];
+    1441: 
+    1442:   const benefitTwo = profile.benefits[1];
+    1443: 
+
+====================================================================================================
+FILE: app\assignments\exam\[assignmentId]\page.tsx
+====================================================================================================
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: app\assignments\exam\[assignmentId]\page.tsx:630:6
+MESSAGE: React Hook useEffect has missing dependencies: 'beginFullscreenCountdown', 'logIncident', 'resolveFullscreenExit', and 'terminateForIntegrity'. Either include them or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [activeQuestionNumber, assignment, beginFullscreenCountdown, integrityStarted, locked, logIncident, resolveFullscreenExit, terminateForIntegrity, user?.uid]
+
+CONTEXT:
+     620:       document.removeEventListener(
+     621:         "fullscreenchange",
+     622:         onFullscreenChange,
+     623:       );
+     624: 
+     625:       document.removeEventListener(
+     626:         "visibilitychange",
+     627:         onVisibilityChange,
+     628:       );
+     629:     };
+>>   630:   }, [
+     631:     activeQuestionNumber,
+     632:     assignment,
+     633:     integrityStarted,
+     634:     locked,
+     635:     user?.uid,
+     636:   ]);
+     637: 
+     638:   async function enterExamMode() {
+     639:     if (
+     640:       !assignment ||
+
+====================================================================================================
+FILE: app\teacher\classes\page.tsx
+====================================================================================================
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: app\teacher\classes\page.tsx:216:6
+MESSAGE: React Hook useEffect has a missing dependency: 'loadClasses'. Either include it or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [authLoading, loadClasses, profileReady, user.uid]
+
+CONTEXT:
+     206: 
+     207:   useEffect(() => {
+     208:     if (
+     209:       authLoading ||
+     210:       !profileReady
+     211:     ) {
+     212:       return;
+     213:     }
+     214: 
+     215:     void loadClasses();
+>>   216:   }, [
+     217:     authLoading,
+     218:     profileReady,
+     219:     user?.uid,
+     220:   ]);
+     221: 
+     222:   const visibleClasses =
+     223:     useMemo(() => {
+     224:       const search =
+     225:         searchTerm
+     226:           .trim()
+
+====================================================================================================
+FILE: app\teacher\interventions\page.tsx
+====================================================================================================
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: app\teacher\interventions\page.tsx:133:6
+MESSAGE: React Hook useEffect has a missing dependency: 'load'. Either include it or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [load, user.uid]
+
+CONTEXT:
+     123:             ? caughtError.message
+     124:             : "Intervention data could not be loaded.",
+     125:       );
+     126:     } finally {
+     127:       setLoading(false);
+     128:     }
+     129:   }
+     130: 
+     131:   useEffect(() => {
+     132:     void load();
+>>   133:   }, [user?.uid]);
+     134: 
+     135:   /*
+     136:    * Analytics -> Intervention hand-off.
+     137:    *
+     138:    * The same learner may belong to multiple classes, so the hand-off carries
+     139:    * both learner identity and class name. We pre-filter the intervention list
+     140:    * and automatically open the matching candidate once per navigation.
+     141:    */
+     142:   useEffect(() => {
+     143:     if (
+
+====================================================================================================
+FILE: components\Simulators\BubbleSortSimulator.tsx
+====================================================================================================
+
+RULE: @typescript-eslint/no-unused-vars
+LOCATION: components\Simulators\BubbleSortSimulator.tsx:159:9
+MESSAGE: 'currentLeft' is assigned a value but never used.
+
+CONTEXT:
+     149:   const procedureAttempts = procedureCorrectSteps + procedureMistakes;
+     150: 
+     151:   const procedureAccuracy =
+     152:     procedureAttempts === 0
+     153:       ? 0
+     154:       : Math.round((procedureCorrectSteps / procedureAttempts) * 100);
+     155: 
+     156:   const pairLeft = compareIndex;
+     157:   const pairRight = compareIndex + 1;
+     158: 
+>>   159:   const currentLeft = procedureValues[pairLeft];
+     160:   const currentRight = procedureValues[pairRight];
+     161: 
+     162: 
+     163:   const lastComparisonIndex = procedureValues.length - pass - 1;
+     164: 
+     165:   const currentPairIsLastInPass = compareIndex >= lastComparisonIndex;
+     166: 
+     167:   /*
+     168:    * Foundation:
+     169:    * simulator automatically identifies the pair.
+
+RULE: @typescript-eslint/no-unused-vars
+LOCATION: components\Simulators\BubbleSortSimulator.tsx:160:9
+MESSAGE: 'currentRight' is assigned a value but never used.
+
+CONTEXT:
+     150: 
+     151:   const procedureAccuracy =
+     152:     procedureAttempts === 0
+     153:       ? 0
+     154:       : Math.round((procedureCorrectSteps / procedureAttempts) * 100);
+     155: 
+     156:   const pairLeft = compareIndex;
+     157:   const pairRight = compareIndex + 1;
+     158: 
+     159:   const currentLeft = procedureValues[pairLeft];
+>>   160:   const currentRight = procedureValues[pairRight];
+     161: 
+     162: 
+     163:   const lastComparisonIndex = procedureValues.length - pass - 1;
+     164: 
+     165:   const currentPairIsLastInPass = compareIndex >= lastComparisonIndex;
+     166: 
+     167:   /*
+     168:    * Foundation:
+     169:    * simulator automatically identifies the pair.
+     170:    *
+
+====================================================================================================
+FILE: components\adaptive\ReviewSchedule.tsx
+====================================================================================================
+
+RULE: react-hooks/purity
+LOCATION: components\adaptive\ReviewSchedule.tsx:26:55
+MESSAGE: Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Users\cr7ri\cs-platform-clean\components\adaptive\ReviewSchedule.tsx:26:55
+  24 |       <div className="mt-5 space-y-3">
+  25 |         {upcoming.map((topic) => {
+> 26 |           const due = topic.nextReviewAt.getTime() <= Date.now();
+     |                                                       ^^^^^^^^^^ Cannot call impure function
+  27 |
+  28 |           return (
+  29 |             <div
+
+CONTEXT:
+      16:     <div className="rounded-3xl border border-slate-200 bg-white p-6">
+      17:       <p className="text-sm font-bold uppercase tracking-wide text-teal-600">
+      18:         Spaced retrieval
+      19:       </p>
+      20:       <h2 className="mt-2 text-2xl font-black text-slate-950">
+      21:         Review schedule
+      22:       </h2>
+      23: 
+      24:       <div className="mt-5 space-y-3">
+      25:         {upcoming.map((topic) => {
+>>    26:           const due = topic.nextReviewAt.getTime() <= Date.now();
+      27: 
+      28:           return (
+      29:             <div
+      30:               key={topic.id}
+      31:               className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4"
+      32:             >
+      33:               <div>
+      34:                 <p className="font-black text-slate-900">{topic.topic}</p>
+      35:                 <p className="mt-1 text-xs text-slate-500">
+      36:                   Every {topic.reviewIntervalDays} day
+
+====================================================================================================
+FILE: components\exam-trainer\ExamQuestionTrainer.tsx
+====================================================================================================
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: components\exam-trainer\ExamQuestionTrainer.tsx:123:6
+MESSAGE: React Hook useEffect has missing dependencies: 'attempt' and 'submitExam'. Either include them or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [attempt, attempt.id, attempt.secondsRemaining, stage, submitExam]
+
+CONTEXT:
+     113:           ? {
+     114:               ...current,
+     115:               secondsRemaining: Math.max(0, current.secondsRemaining - 1),
+     116:               updatedAt: new Date(),
+     117:             }
+     118:           : current,
+     119:       );
+     120:     }, 1000);
+     121: 
+     122:     return () => window.clearInterval(timer);
+>>   123:   }, [attempt?.id, attempt?.secondsRemaining, stage]);
+     124: 
+     125:   useEffect(() => {
+     126:     if (stage !== "exam" || !attempt) return;
+     127: 
+     128:     const signature = JSON.stringify({
+     129:       id: attempt.id,
+     130:       answers: attempt.answers,
+     131:       currentQuestionIndex: attempt.currentQuestionIndex,
+     132:       secondsRemaining: Math.floor(attempt.secondsRemaining / 5),
+     133:     });
+
+====================================================================================================
+FILE: components\quiz\QuizPlayer.tsx
+====================================================================================================
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: components\quiz\QuizPlayer.tsx:389:6
+MESSAGE: React Hook useEffect has a missing dependency: 'finishQuiz'. Either include it or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [showResults, assignmentLoading, assessmentMode, integrityStarted, finishQuiz]
+
+CONTEXT:
+     379:           });
+     380: 
+     381:           return 0;
+     382:         }
+     383: 
+     384:         return previousTime - 1;
+     385:       });
+     386:     }, 1000);
+     387: 
+     388:     return () => window.clearInterval(timer);
+>>   389:   }, [
+     390:     showResults,
+     391:     assignmentLoading,
+     392:     assessmentMode,
+     393:     integrityStarted,
+     394:   ]);
+     395: 
+     396:   function beginFullscreenCountdown() {
+     397:     if (
+     398:       !assessmentMode ||
+     399:       !integrityStarted ||
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: components\quiz\QuizPlayer.tsx:522:6
+MESSAGE: React Hook useEffect has missing dependencies: 'appendIntegrityIncident', 'beginFullscreenCountdown', and 'resolveFullscreenExit'. Either include them or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [assessmentMode, integrityStarted, showResults, currentIndex, resolveFullscreenExit, beginFullscreenCountdown, appendIntegrityIncident]
+
+CONTEXT:
+     512:     return () => {
+     513:       document.removeEventListener(
+     514:         "fullscreenchange",
+     515:         onFullscreenChange,
+     516:       );
+     517:       document.removeEventListener(
+     518:         "visibilitychange",
+     519:         onVisibilityChange,
+     520:       );
+     521:     };
+>>   522:   }, [
+     523:     assessmentMode,
+     524:     integrityStarted,
+     525:     showResults,
+     526:     currentIndex,
+     527:   ]);
+     528: 
+     529:   async function enterAssessmentMode() {
+     530:     if (!assessmentRootRef.current) {
+     531:       return;
+     532:     }
+
+====================================================================================================
+SUMMARY
+====================================================================================================
+
+Target findings captured: 10
+
+react-hooks/exhaustive-deps: 6
+@typescript-eslint/no-unused-vars: 3
+react-hooks/purity: 1

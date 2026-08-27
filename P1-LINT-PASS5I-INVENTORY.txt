@@ -1,0 +1,566 @@
+CS MASTER - P1 LINT PASS 5I INVENTORY
+Generated: 2026-08-27 12:41:35
+Project: C:\Users\cr7ri\cs-platform-clean
+
+Purpose: exact source-aware inventory for final remaining P1 lint findings.
+No source files were changed.
+
+==============================================================================================================
+FILE: app\profile\curriculum\page.tsx
+==============================================================================================================
+
+RULE: react-hooks/set-state-in-effect
+LOCATION: app\profile\curriculum\page.tsx:81:7
+MESSAGE: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cr7ri\cs-platform-clean\app\profile\curriculum\page.tsx:81:7
+  79 |       profile?.qualification === "A_LEVEL"
+  80 |     ) {
+> 81 |       setQualification(profile.qualification);
+     |       ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  82 |     }
+  83 |
+  84 |     if (
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      56:     useAuth();
+      57: 
+      58:   const [qualification, setQualification] = useState<Qualification>("GCSE");
+      59: 
+      60:   const [examBoard, setExamBoard] = useState<ExamBoard>("AQA");
+      61: 
+      62:   const [submitting, setSubmitting] = useState(false);
+      63:   const [saved, setSaved] = useState(false);
+      64:   const [error, setError] = useState("");
+      65: 
+      66:   useEffect(() => {
+      67:     if (!loading && !user) {
+      68:       router.replace("/login");
+      69:       return;
+      70:     }
+      71: 
+      72:     if (!loading && profileReady && profile && profile.role !== "student") {
+      73:       router.replace(profile.role === "admin" ? "/admin" : "/teacher");
+      74:       return;
+      75:     }
+      76: 
+      77:     if (
+      78:       profile?.qualification === "GCSE" ||
+      79:       profile?.qualification === "A_LEVEL"
+      80:     ) {
+>>    81:       setQualification(profile.qualification);
+      82:     }
+      83: 
+      84:     if (
+      85:       profile?.examBoard === "AQA" ||
+      86:       profile?.examBoard === "OCR" ||
+      87:       profile?.examBoard === "EDEXCEL"
+      88:     ) {
+      89:       setExamBoard(profile.examBoard);
+      90:     }
+      91:   }, [loading, user, profileReady, profile, router]);
+      92: 
+      93:   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+      94:     event.preventDefault();
+      95: 
+      96:     if (!user) {
+      97:       setError("You must be signed in to change your curriculum.");
+      98:       return;
+      99:     }
+     100: 
+     101:     if (
+     102:       !getCurriculumDefinition(
+     103:         qualification,
+     104:         examBoard,
+     105:       )
+     106:     ) {
+     107:       setError(
+     108:         "This qualification and exam-board combination is not currently published.",
+     109:       );
+     110:       return;
+     111:     }
+     112: 
+     113:     setSubmitting(true);
+     114:     setSaved(false);
+     115:     setError("");
+     116: 
+
+==============================================================================================================
+FILE: components\exam-trainer\ExamQuestionTrainer.tsx
+==============================================================================================================
+
+RULE: @typescript-eslint/no-unused-vars
+LOCATION: components\exam-trainer\ExamQuestionTrainer.tsx:3:21
+MESSAGE: 'useEffectEvent' is defined but never used.
+SUGGESTION: Remove unused variable "useEffectEvent".
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+       1: "use client";
+       2: 
+>>     3: import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+       4: import Link from "next/link";
+       5: 
+       6: import Card from "@/components/ui/Card";
+       7: import { useAuth } from "@/contexts/AuthContext";
+       8: import {
+       9:   examTrainerQuestionBank,
+      10:   examTrainerTopics,
+      11: } from "@/data/examTrainerQuestionBank";
+      12: import {
+      13:   createExamTrainerAttempt,
+      14:   createExamTrainerAttemptId,
+      15:   getLatestInProgressExamTrainerAttempt,
+      16:   saveExamTrainerDraft,
+      17:   submitExamTrainerAttempt,
+      18: } from "@/services/examTrainerAttemptService";
+      19: import {
+      20:   buildExamQuestions,
+      21:   markExamTrainerAttempt,
+      22: } from "@/services/examTrainerService";
+      23: import type { ExamTrainerAttempt, ExamTrainerDifficulty, ExamTrainerReport } from "@/types/examTrainer";
+      24: 
+      25: type Stage = "loading" | "setup" | "exam" | "marking" | "report";
+      26: 
+      27: function formatSeconds(totalSeconds: number): string {
+      28:   const minutes = Math.floor(totalSeconds / 60);
+      29:   const seconds = totalSeconds % 60;
+      30:   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+      31: }
+      32: 
+      33: export default function ExamQuestionTrainer() {
+      34:   const { user, profile } = useAuth();
+      35: 
+      36:   const [stage, setStage] = useState<Stage>("loading");
+      37:   const [topic, setTopic] = useState("all");
+      38:   const [difficulty, setDifficulty] = useState<ExamTrainerDifficulty | "all">(
+
+RULE: react-hooks/set-state-in-effect
+LOCATION: components\exam-trainer\ExamQuestionTrainer.tsx:72:7
+MESSAGE: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cr7ri\cs-platform-clean\components\exam-trainer\ExamQuestionTrainer.tsx:72:7
+  70 |   useEffect(() => {
+  71 |     if (!user) {
+> 72 |       setStage("setup");
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  73 |       return;
+  74 |     }
+  75 |
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      47:   const [error, setError] = useState("");
+      48: 
+      49:   const submittingRef = useRef(false);
+      50:   const lastSavedSignatureRef = useRef("");
+      51: 
+      52:   const questions = attempt?.questions ?? [];
+      53:   const answers = attempt?.answers ?? [];
+      54:   const currentIndex = attempt?.currentQuestionIndex ?? 0;
+      55:   const secondsRemaining = attempt?.secondsRemaining ?? 0;
+      56:   const currentQuestion = questions[currentIndex];
+      57: 
+      58:   const availableCount = useMemo(
+      59:     () =>
+      60:       examTrainerQuestionBank.filter((question) => {
+      61:         const topicMatches = topic === "all" || question.topic === topic;
+      62:         const difficultyMatches =
+      63:           difficulty === "all" || question.difficulty === difficulty;
+      64: 
+      65:         return topicMatches && difficultyMatches;
+      66:       }).length,
+      67:     [difficulty, topic],
+      68:   );
+      69: 
+      70:   useEffect(() => {
+      71:     if (!user) {
+>>    72:       setStage("setup");
+      73:       return;
+      74:     }
+      75: 
+      76:     const userId = user.uid;
+      77:     let active = true;
+      78: 
+      79:     async function loadResumeAttempt() {
+      80:       try {
+      81:         const existing = await getLatestInProgressExamTrainerAttempt(userId);
+      82: 
+      83:         if (active && existing) {
+      84:           setResumeAttempt(existing);
+      85:         }
+      86:       } catch (loadError) {
+      87:         console.error("Resume attempt load error:", loadError);
+      88:       } finally {
+      89:         if (active) {
+      90:           setStage("setup");
+      91:         }
+      92:       }
+      93:     }
+      94: 
+      95:     void loadResumeAttempt();
+      96: 
+      97:     return () => {
+      98:       active = false;
+      99:     };
+     100:   }, [user]);
+     101: 
+     102:   useEffect(() => {
+     103:     if (stage !== "exam" || !attempt) return;
+     104: 
+     105:     if (attempt.secondsRemaining <= 0) {
+     106:       void submitExam();
+     107:       return;
+
+RULE: react-hooks/exhaustive-deps
+LOCATION: components\exam-trainer\ExamQuestionTrainer.tsx:123:6
+MESSAGE: React Hook useEffect has missing dependencies: 'attempt' and 'submitExam'. Either include them or remove the dependency array.
+SUGGESTION: Update the dependencies array to be: [attempt, attempt.id, attempt.secondsRemaining, stage, submitExam]
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      98:       active = false;
+      99:     };
+     100:   }, [user]);
+     101: 
+     102:   useEffect(() => {
+     103:     if (stage !== "exam" || !attempt) return;
+     104: 
+     105:     if (attempt.secondsRemaining <= 0) {
+     106:       void submitExam();
+     107:       return;
+     108:     }
+     109: 
+     110:     const timer = window.setInterval(() => {
+     111:       setAttempt((current) =>
+     112:         current
+     113:           ? {
+     114:               ...current,
+     115:               secondsRemaining: Math.max(0, current.secondsRemaining - 1),
+     116:               updatedAt: new Date(),
+     117:             }
+     118:           : current,
+     119:       );
+     120:     }, 1000);
+     121: 
+     122:     return () => window.clearInterval(timer);
+>>   123:   }, [attempt?.id, attempt?.secondsRemaining, stage]);
+     124: 
+     125:   useEffect(() => {
+     126:     if (stage !== "exam" || !attempt) return;
+     127: 
+     128:     const signature = JSON.stringify({
+     129:       id: attempt.id,
+     130:       answers: attempt.answers,
+     131:       currentQuestionIndex: attempt.currentQuestionIndex,
+     132:       secondsRemaining: Math.floor(attempt.secondsRemaining / 5),
+     133:     });
+     134: 
+     135:     if (signature === lastSavedSignatureRef.current) return;
+     136: 
+     137:     const timer = window.setTimeout(() => {
+     138:       void saveExamTrainerDraft(attempt)
+     139:         .then(() => {
+     140:           lastSavedSignatureRef.current = signature;
+     141:         })
+     142:         .catch((saveError) => {
+     143:           console.error("Exam trainer autosave error:", saveError);
+     144:         });
+     145:     }, 700);
+     146: 
+     147:     return () => window.clearTimeout(timer);
+     148:   }, [attempt, stage]);
+     149: 
+     150:   function updateAttempt(
+     151:     updater: (current: ExamTrainerAttempt) => ExamTrainerAttempt,
+     152:   ) {
+     153:     setAttempt((current) => (current ? updater(current) : current));
+     154:   }
+     155: 
+     156:   async function startExam() {
+     157:     if (!user) {
+     158:       setError("Please sign in before starting an exam.");
+
+==============================================================================================================
+FILE: components\layout\AppShell.tsx
+==============================================================================================================
+
+RULE: react-hooks/set-state-in-effect
+LOCATION: components\layout\AppShell.tsx:48:5
+MESSAGE: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cr7ri\cs-platform-clean\components\layout\AppShell.tsx:48:5
+  46 |
+  47 |   useEffect(() => {
+> 48 |     setMobileSidebarOpen(false);
+     |     ^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |   }, [pathname]);
+  50 |
+  51 |   useEffect(() => {
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      23:     "/login",
+      24:     "/register",
+      25:     "/forgot-password",
+      26:     "/onboarding",
+      27: 
+      28:     /*
+      29:      * Teacher applicants use this route before receiving
+      30:      * the teacher role, so it must not render the normal
+      31:      * authenticated sidebar shell.
+      32:      */
+      33:     "/teacher-access",
+      34:   ];
+      35: 
+      36:   const isPublicPage =
+      37:     publicPages.includes(pathname);
+      38: 
+      39:   const isTeacherWorkspace =
+      40:     pathname === "/teacher" ||
+      41:     pathname.startsWith("/teacher/");
+      42: 
+      43:   const isAdminWorkspace =
+      44:     pathname === "/admin" ||
+      45:     pathname.startsWith("/admin/");
+      46: 
+      47:   useEffect(() => {
+>>    48:     setMobileSidebarOpen(false);
+      49:   }, [pathname]);
+      50: 
+      51:   useEffect(() => {
+      52:     if (!mobileSidebarOpen) {
+      53:       return;
+      54:     }
+      55: 
+      56:     const previousOverflow =
+      57:       document.body.style.overflow;
+      58: 
+      59:     document.body.style.overflow = "hidden";
+      60: 
+      61:     return () => {
+      62:       document.body.style.overflow =
+      63:         previousOverflow;
+      64:     };
+      65:   }, [mobileSidebarOpen]);
+      66: 
+      67:   if (isPublicPage) {
+      68:     return (
+      69:       <main className="min-h-screen bg-slate-100">
+      70:         {children}
+      71:       </main>
+      72:     );
+      73:   }
+      74: 
+      75:   const applicationShell = (
+      76:     <div className="min-h-screen bg-slate-100 xl:flex">
+      77:       <Sidebar
+      78:         mobileOpen={mobileSidebarOpen}
+      79:         onMobileClose={() =>
+      80:           setMobileSidebarOpen(false)
+      81:         }
+      82:       />
+      83: 
+
+==============================================================================================================
+FILE: components\lesson-engine\LessonPracticeStep.tsx
+==============================================================================================================
+
+RULE: react-hooks/set-state-in-effect
+LOCATION: components\lesson-engine\LessonPracticeStep.tsx:68:5
+MESSAGE: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cr7ri\cs-platform-clean\components\lesson-engine\LessonPracticeStep.tsx:68:5
+  66 |
+  67 |   useEffect(() => {
+> 68 |     setResponses(createInitialResponses(questions, initialResponses));
+     |     ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  69 |   }, [questions, initialResponses]);
+  70 |
+  71 |   function updateResponse(
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      43:     const existingResponse = existingResponses.find(
+      44:       (response) => response.questionIndex === index,
+      45:     );
+      46: 
+      47:     return (
+      48:       existingResponse ?? {
+      49:         questionIndex: index,
+      50:         response: "",
+      51:         correct: false,
+      52:         checked: false,
+      53:       }
+      54:     );
+      55:   });
+      56: }
+      57: 
+      58: export default function LessonPracticeStep({
+      59:   questions,
+      60:   initialResponses,
+      61:   onChange,
+      62: }: Props) {
+      63:   const [responses, setResponses] = useState<PracticeResponse[]>(() =>
+      64:     createInitialResponses(questions, initialResponses),
+      65:   );
+      66: 
+      67:   useEffect(() => {
+>>    68:     setResponses(createInitialResponses(questions, initialResponses));
+      69:   }, [questions, initialResponses]);
+      70: 
+      71:   function updateResponse(
+      72:     questionIndex: number,
+      73:     updates: Partial<PracticeResponse>,
+      74:   ) {
+      75:     const updatedResponses = responses.map((response) =>
+      76:       response.questionIndex === questionIndex
+      77:         ? {
+      78:             ...response,
+      79:             ...updates,
+      80:           }
+      81:         : response,
+      82:     );
+      83: 
+      84:     setResponses(updatedResponses);
+      85:     onChange(updatedResponses);
+      86:   }
+      87: 
+      88:   function checkAnswer(questionIndex: number) {
+      89:     const question = questions[questionIndex];
+      90: 
+      91:     const response = responses.find(
+      92:       (item) => item.questionIndex === questionIndex,
+      93:     );
+      94: 
+      95:     if (!question || !response) {
+      96:       return;
+      97:     }
+      98: 
+      99:     updateResponse(questionIndex, {
+     100:       checked: true,
+     101:       correct: isAcceptedAnswer(response.response, question),
+     102:     });
+     103:   }
+
+==============================================================================================================
+FILE: hooks\useProgrammingProgress.ts
+==============================================================================================================
+
+RULE: react-hooks/set-state-in-effect
+LOCATION: hooks\useProgrammingProgress.ts:102:5
+MESSAGE: Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\cr7ri\cs-platform-clean\hooks\useProgrammingProgress.ts:102:5
+  100 |
+  101 |   useEffect(() => {
+> 102 |     setHydrated(false);
+      |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  103 |     setProgress(loadProgress(studentId));
+  104 |     setHydrated(Boolean(studentId));
+  105 |   }, [studentId]);
+AUTO_FIX_AVAILABLE: no
+
+CONTEXT:
+      77:       accuracy: 0,
+      78:     };
+      79: 
+      80:     const attempts = existing.attempts + 1;
+      81:     const correct = existing.correct + (passed ? 1 : 0);
+      82: 
+      83:     next[skill] = {
+      84:       attempts,
+      85:       correct,
+      86:       accuracy: Math.round((correct / attempts) * 100),
+      87:     };
+      88:   }
+      89: 
+      90:   return next;
+      91: }
+      92: 
+      93: export function useProgrammingProgress() {
+      94:   const { user } = useAuth();
+      95:   const { addXP } = useProgress();
+      96:   const studentId = user?.uid ?? "";
+      97:   const [progress, setProgress] =
+      98:     useState<ProgrammingProgressSnapshot>(emptyProgress);
+      99:   const [hydrated, setHydrated] = useState(false);
+     100: 
+     101:   useEffect(() => {
+>>   102:     setHydrated(false);
+     103:     setProgress(loadProgress(studentId));
+     104:     setHydrated(Boolean(studentId));
+     105:   }, [studentId]);
+     106: 
+     107:   useEffect(() => {
+     108:     if (!hydrated || !studentId) return;
+     109: 
+     110:     window.localStorage.setItem(
+     111:       storageKey(studentId),
+     112:       JSON.stringify(progress),
+     113:     );
+     114:   }, [hydrated, progress, studentId]);
+     115: 
+     116:   const accuracy = useMemo(() => {
+     117:     if (progress.attempts === 0) return 0;
+     118: 
+     119:     return Math.round(
+     120:       (progress.correct / progress.attempts) * 100,
+     121:     );
+     122:   }, [progress.attempts, progress.correct]);
+     123: 
+     124:   const weakSkills = useMemo(() => {
+     125:     return Object.entries(progress.skillProgress)
+     126:       .filter(([, value]) => value && value.attempts >= 2)
+     127:       .sort(
+     128:         (a, b) =>
+     129:           (a[1]?.accuracy ?? 100) - (b[1]?.accuracy ?? 100),
+     130:       )
+     131:       .slice(0, 4)
+     132:       .map(([skill]) => skill as ProgrammingSkill);
+     133:   }, [progress.skillProgress]);
+     134: 
+     135:   const recordAttempt = useCallback(
+     136:     (challenge: ProgrammingChallenge, passed: boolean) => {
+     137:       let awarded = 0;
+
+==============================================================================================================
+SUMMARY
+==============================================================================================================
+
+Target findings captured: 7
+
+react-hooks/set-state-in-effect: 5
+react-hooks/exhaustive-deps: 1
+@typescript-eslint/no-unused-vars: 1

@@ -87,7 +87,7 @@ export function useSimulator<TQuestion>({
 
   const initialQuestionId =
     getQuestionId?.(initialQuestion, "foundation") ??
-    createSessionQuestionId(simulatorId, questionSequenceRef.current);
+    createSessionQuestionId(simulatorId, 1);
 
   const [questionId, setQuestionId] = useState(initialQuestionId);
 

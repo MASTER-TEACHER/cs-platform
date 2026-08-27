@@ -166,78 +166,79 @@ export default function TeacherResourceAssignmentPage() {
 
   const [exporting, setExporting] = useState(false);
 
-  const loadAssignment = useCallback(async () => {
+  const loadAssignment = useCallback(() => {
     if (!assignmentId || !user?.uid) {
-      return;
+      return Promise.resolve();
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    const teacherId = user.uid;
 
-      const loadedAssignment = await getAssignmentById(assignmentId);
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getAssignmentById(assignmentId);
+      })
+      .then(async (loadedAssignment) => {
+        if (!loadedAssignment) {
+          setAssignment(null);
+          setRows([]);
+          setError("This resource assignment could not be found.");
+          return;
+        }
 
-      if (!loadedAssignment) {
+        if (loadedAssignment.teacherId !== teacherId) {
+          setAssignment(null);
+          setRows([]);
+          setError("You do not have permission to view this assignment.");
+          return;
+        }
+
+        const loadedRows = await Promise.all(
+          loadedAssignment.studentIds.map(async (studentId) => {
+            const [profileSnapshot, progress] = await Promise.all([
+              getDoc(doc(db, "users", studentId)),
+              getStudentAssignmentProgress(loadedAssignment.id, studentId),
+            ]);
+
+            const profileData = profileSnapshot.exists()
+              ? profileSnapshot.data()
+              : null;
+
+            return {
+              student: {
+                id: studentId,
+                name: profileData?.name || "Student",
+                email: profileData?.email || "No email available",
+              },
+              progress,
+            } satisfies StudentProgressRow;
+          }),
+        );
+
+        loadedRows.sort((first, second) =>
+          first.student.name.localeCompare(second.student.name),
+        );
+
+        setAssignment(loadedAssignment);
+        setRows(loadedRows);
+      })
+      .catch((caughtError) => {
+        console.error("Failed to load assignment progress:", caughtError);
+
         setAssignment(null);
         setRows([]);
 
-        setError("This resource assignment could not be found.");
-
-        return;
-      }
-
-      if (loadedAssignment.teacherId !== user.uid) {
-        setAssignment(null);
-        setRows([]);
-
-        setError("You do not have permission to view this assignment.");
-
-        return;
-      }
-
-      const loadedRows = await Promise.all(
-        loadedAssignment.studentIds.map(async (studentId) => {
-          const [profileSnapshot, progress] = await Promise.all([
-            getDoc(doc(db, "users", studentId)),
-            getStudentAssignmentProgress(loadedAssignment.id, studentId),
-          ]);
-
-          const profileData = profileSnapshot.exists()
-            ? profileSnapshot.data()
-            : null;
-
-          return {
-            student: {
-              id: studentId,
-              name: profileData?.name || "Student",
-              email: profileData?.email || "No email available",
-            },
-            progress,
-          } satisfies StudentProgressRow;
-        }),
-      );
-
-      loadedRows.sort((first, second) =>
-        first.student.name.localeCompare(second.student.name),
-      );
-
-      setAssignment(loadedAssignment);
-      setRows(loadedRows);
-    } catch (caughtError) {
-      console.error("Failed to load assignment progress:", caughtError);
-
-      setAssignment(null);
-      setRows([]);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "The assignment dashboard could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [assignmentId, user?.uid]);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The assignment dashboard could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [assignmentId, user]);
 
   useEffect(() => {
     void loadAssignment();

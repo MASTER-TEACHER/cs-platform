@@ -113,7 +113,11 @@ export default function CyberSecurityScenarioSimulator() {
     const safe: ChoiceOption = ["safe", simulator.question.safe];
     const unsafe: ChoiceOption = ["unsafe", simulator.question.unsafe];
 
-    return Math.random() > 0.5 ? [safe, unsafe] : [unsafe, safe];
+    const orderKey = `${simulator.question.safe}|${simulator.question.unsafe}`
+      .split("")
+      .reduce((total, character) => total + character.charCodeAt(0), 0);
+
+    return orderKey % 2 === 0 ? [safe, unsafe] : [unsafe, safe];
   }, [simulator.question]);
 
   function checkAnswer() {

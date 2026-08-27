@@ -69,8 +69,6 @@ export default function AdminDashboardPage() {
     }
 
     if (!isAdmin) {
-      setRequests([]);
-      setLoadingRequests(false);
       return;
     }
 
@@ -182,7 +180,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  if (profileLoading || loadingRequests) {
+  if (profileLoading || (isAdmin && loadingRequests)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-52 w-full" />

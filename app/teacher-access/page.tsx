@@ -75,22 +75,22 @@ export default function TeacherAccessPage() {
     }
 
     if (
-      extendedProfile
-        ?.teacherAccessStatus ===
-      "pending"
+      extendedProfile?.teacherAccessStatus === "pending" ||
+      (user && !name)
     ) {
-      setSubmitted(true);
-    }
+      void Promise.resolve().then(() => {
+        if (extendedProfile?.teacherAccessStatus === "pending") {
+          setSubmitted(true);
+        }
 
-    if (
-      user &&
-      !name
-    ) {
-      setName(
-        profile?.name ||
-          user.displayName ||
-          "",
-      );
+        if (user && !name) {
+          setName(
+            profile?.name ||
+              user.displayName ||
+              "",
+          );
+        }
+      });
     }
   }, [
     loading,

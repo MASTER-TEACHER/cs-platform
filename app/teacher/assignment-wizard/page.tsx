@@ -73,8 +73,11 @@ export default function AssignmentWizardPage() {
     if (authLoading) return;
 
     if (!user) {
-      setClasses([]);
-      setLoadingClasses(false);
+      void Promise.resolve().then(() => {
+        setClasses([]);
+        setLoadingClasses(false);
+      });
+
       return;
     }
 
@@ -139,6 +142,10 @@ export default function AssignmentWizardPage() {
     let cancelled = false;
 
     async function loadSavedQuiz() {
+      await Promise.resolve();
+
+      if (cancelled) return;
+
       setLoadingResource(true);
 
       try {
@@ -265,6 +272,10 @@ export default function AssignmentWizardPage() {
     let cancelled = false;
 
     async function loadContent() {
+      await Promise.resolve();
+
+      if (cancelled) return;
+
       setLoadingResource(true);
       try {
         if (selectedContentType === "teaching-resource") {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
@@ -65,22 +65,13 @@ export default function LearnPage() {
     router,
   ]);
 
-  const coverage = useMemo(() => {
-    if (
-      !profile?.qualification ||
-      !profile.examBoard
-    ) {
-      return null;
-    }
-
-    return getCurriculumCoverage(
-      profile.qualification,
-      profile.examBoard,
-    );
-  }, [
-    profile?.qualification,
-    profile?.examBoard,
-  ]);
+  const coverage =
+    profile?.qualification && profile.examBoard
+      ? getCurriculumCoverage(
+          profile.qualification,
+          profile.examBoard,
+        )
+      : null;
 
   if (
     loading ||

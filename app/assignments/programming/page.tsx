@@ -384,6 +384,8 @@ export default function StudentAssignmentsPage() {
 
   const loadAssignments =
     useCallback(async () => {
+      await Promise.resolve();
+
       if (!user?.uid) {
         setAssignments([]);
         setLoading(false);
@@ -415,10 +417,10 @@ export default function StudentAssignmentsPage() {
       } finally {
         setLoading(false);
       }
-    }, [user?.uid]);
+    }, [user]);
 
   useEffect(() => {
-    void loadAssignments();
+    void Promise.resolve().then(() => loadAssignments());
   }, [loadAssignments]);
 
   const filteredAssignments =

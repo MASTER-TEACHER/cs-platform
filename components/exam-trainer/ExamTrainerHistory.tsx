@@ -25,39 +25,49 @@ export default function ExamTrainerHistory() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
+
     if (!user) {
-      setHistory([]);
-      setLoading(false);
-      return;
+      void Promise.resolve().then(() => {
+        if (!active) return;
+        setHistory([]);
+        setError("");
+        setLoading(false);
+      });
+
+      return () => {
+        active = false;
+      };
     }
 
     const userId = user.uid;
-    let active = true;
 
-    async function loadHistory() {
-      try {
+    void Promise.resolve()
+      .then(() => {
+        if (!active) return null;
+
         setLoading(true);
         setError("");
 
-        const items = await getExamTrainerHistory(userId);
-
-        if (active) {
+        return getExamTrainerHistory(userId);
+      })
+      .then((items) => {
+        if (active && items) {
           setHistory(items);
         }
-      } catch (loadError) {
+      })
+      .catch((loadError) => {
         console.error("Exam trainer history error:", loadError);
 
         if (active) {
           setError("Your saved exam history could not be loaded.");
         }
-      } finally {
+      })
+      .finally(() => {
         if (active) {
           setLoading(false);
         }
-      }
-    }
-
-    void loadHistory();
+      });
 
     return () => {
       active = false;

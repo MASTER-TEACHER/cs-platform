@@ -73,10 +73,12 @@ export default function ReportingWorkspace({
       return;
     }
 
-    setSelectedClassId(
-      classes[0]?.classId ||
-        "",
-    );
+    void Promise.resolve().then(() => {
+      setSelectedClassId(
+        classes[0]?.classId ||
+          "",
+      );
+    });
   }, [
     classes,
     selectedClassId,
@@ -166,17 +168,21 @@ export default function ReportingWorkspace({
       return;
     }
 
-    setSelectedStudentId(
-      classStudents[0]
-        ?.studentId || "",
-    );
+    void Promise.resolve().then(() => {
+      setSelectedStudentId(
+        classStudents[0]
+          ?.studentId || "",
+      );
+    });
   }, [
     selectedClass,
     selectedStudentId,
   ]);
 
   useEffect(() => {
-    setStudentSearch("");
+    void Promise.resolve().then(() => {
+      setStudentSearch("");
+    });
   }, [selectedClassId]);
 
   const selectedStudent =

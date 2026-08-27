@@ -41,18 +41,20 @@ export default function CreateInterventionModal({
     const date = new Date();
     date.setDate(date.getDate() + 7);
 
-    setDueDate(date.toISOString().slice(0, 10));
-    setTitle(`${candidate.priorityTopic} intervention`);
-    setTopic(candidate.priorityTopic);
-    setReason(candidate.recommendation);
-    setPriority(
-      candidate.priority === "low"
-        ? "medium"
-        : candidate.priority,
-    );
-    setLessonHref(
-      `/learn?search=${encodeURIComponent(candidate.priorityTopic)}`,
-    );
+    void Promise.resolve().then(() => {
+      setDueDate(date.toISOString().slice(0, 10));
+      setTitle(`${candidate.priorityTopic} intervention`);
+      setTopic(candidate.priorityTopic);
+      setReason(candidate.recommendation);
+      setPriority(
+        candidate.priority === "low"
+          ? "medium"
+          : candidate.priority,
+      );
+      setLessonHref(
+        `/learn?search=${encodeURIComponent(candidate.priorityTopic)}`,
+      );
+    });
   }, [candidate]);
 
   if (!candidate) return null;

@@ -113,15 +113,19 @@ export default function AssignmentResourceStep({
   const [quizLoadError, setQuizLoadError] = useState("");
 
   useEffect(() => {
-    setSelectedType(selectedResource?.resourceType || null);
+    void Promise.resolve().then(() => {
+      setSelectedType(selectedResource?.resourceType || null);
+    });
   }, [selectedResource]);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      setSavedQuizzes([]);
-      setLoadingQuizzes(false);
+      void Promise.resolve().then(() => {
+        setSavedQuizzes([]);
+        setLoadingQuizzes(false);
+      });
       return;
     }
 

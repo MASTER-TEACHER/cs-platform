@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -162,12 +163,12 @@ export default function ExamPaperAssignmentSelector({
           />
         </label>
 
-        <a
+        <Link
           href="/teacher/question-bank"
           className="inline-flex min-h-11 items-center justify-center rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
         >
           Open Question Bank
-        </a>
+        </Link>
       </div>
 
       {loading ? (
@@ -248,7 +249,7 @@ export default function ExamPaperAssignmentSelector({
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
-                        {content.examBoard} ·{" "}
+                        {content.examBoard} Â·{" "}
                         {cleanLabel(
                           content.qualification,
                         )}
@@ -277,7 +278,7 @@ export default function ExamPaperAssignmentSelector({
                           : "border-slate-300 text-transparent"
                       }`}
                     >
-                      ✓
+                      âœ“
                     </div>
                   </div>
 

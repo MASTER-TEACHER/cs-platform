@@ -14,14 +14,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-import type {
-  ExamAssignment,
-  ExamIntegrityIncident,
-  ExamIntegrityIncidentType,
-  ExamIntegrityPolicy,
-  ExamSubmission,
-  StudentExamAnswer,
-} from "@/types/examAssignment";
+import type { ExamAssignment, ExamIntegrityIncident, ExamIntegrityIncidentType, ExamSubmission, StudentExamAnswer } from "@/types/examAssignment";
 
 type FirestoreIntegrityIncident = Omit<
   ExamIntegrityIncident,

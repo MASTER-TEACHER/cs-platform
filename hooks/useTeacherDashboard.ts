@@ -34,59 +34,45 @@ export function useTeacherDashboard() {
     }
 
     if (!user?.uid) {
-      setData(emptyTeacherDashboardData);
-
-      setError("");
-      setLoading(false);
-
       return;
     }
 
+    const teacherId = user.uid;
     let cancelled = false;
 
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const dashboardData = await getTeacherDashboardData(user!.uid);
-
-        if (cancelled) {
-          return;
-        }
+    void getTeacherDashboardData(teacherId)
+      .then((dashboardData) => {
+        if (cancelled) return;
 
         setData(dashboardData);
-      } catch (caughtError) {
+        setError("");
+      })
+      .catch((caughtError) => {
         console.error("Teacher dashboard load error:", caughtError);
 
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         setData(emptyTeacherDashboardData);
-
         setError(
           caughtError instanceof Error
             ? caughtError.message
             : "The teacher dashboard could not be loaded.",
         );
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    }
-
-    void loadDashboard();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user?.uid]);
+  }, [authLoading, user]);
 
   return {
-    ...data,
-    loading: authLoading || loading,
-    error,
+    ...(user?.uid ? data : emptyTeacherDashboardData),
+    loading: authLoading || (Boolean(user?.uid) && loading),
+    error: user?.uid ? error : "",
   };
 }

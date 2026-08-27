@@ -156,13 +156,6 @@ export default function BubbleSortSimulator() {
   const pairLeft = compareIndex;
   const pairRight = compareIndex + 1;
 
-  const currentLeft = procedureValues[pairLeft];
-  const currentRight = procedureValues[pairRight];
-
-  const shouldSwap =
-    currentLeft !== undefined &&
-    currentRight !== undefined &&
-    currentLeft > currentRight;
 
   const lastComparisonIndex = procedureValues.length - pass - 1;
 

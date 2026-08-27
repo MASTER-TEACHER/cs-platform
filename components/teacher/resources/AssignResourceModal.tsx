@@ -120,20 +120,19 @@ export default function AssignResourceModal({
     void loadClasses();
   }, [isOpen, teacherId]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      setSelectedClassId("");
-      setDueDate("");
-      setInstructions("");
-      setLoadError("");
-    }
-  }, [isOpen]);
+  function resetForm() {
+    setSelectedClassId("");
+    setDueDate("");
+    setInstructions("");
+    setLoadError("");
+  }
 
   function handleClose() {
     if (isSubmitting) {
       return;
     }
 
+    resetForm();
     onClose();
   }
 
@@ -193,6 +192,7 @@ export default function AssignResourceModal({
 
       onAssignmentCreated?.(assignmentId);
 
+      resetForm();
       onClose();
     } catch (error) {
       console.error("Unable to create assignment:", error);

@@ -114,9 +114,6 @@ export default function ClassProgressReportPanel({
     );
   }, [examPageSize, filteredExamSummaries, safeExamPage]);
 
-  useEffect(() => {
-    setExamPage(1);
-  }, [examSearch, examPageSize]);
 
   if (loading) {
     return (
@@ -418,7 +415,10 @@ export default function ClassProgressReportPanel({
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     value={examSearch}
-                    onChange={(event) => setExamSearch(event.target.value)}
+                    onChange={(event) => {
+                      setExamSearch(event.target.value);
+                      setExamPage(1);
+                    }}
                     placeholder="Search title, topic, AO, grade or confidence"
                     className="min-h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-indigo-400"
                   />
@@ -431,9 +431,10 @@ export default function ClassProgressReportPanel({
                 </span>
                 <select
                   value={examPageSize}
-                  onChange={(event) =>
-                    setExamPageSize(Number(event.target.value))
-                  }
+                  onChange={(event) => {
+                    setExamPageSize(Number(event.target.value));
+                    setExamPage(1);
+                  }}
                   className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:border-indigo-400"
                 >
                   <option value={6}>6</option>

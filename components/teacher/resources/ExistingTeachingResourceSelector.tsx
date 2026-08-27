@@ -71,8 +71,10 @@ export default function ExistingTeachingResourceSelector({
      * TypeScript would retain string | undefined inside the async closure.
      */
     if (!user?.uid) {
-      setResources([]);
-      setLoading(false);
+      void Promise.resolve().then(() => {
+        setResources([]);
+        setLoading(false);
+      });
 
       return;
     }
@@ -89,6 +91,12 @@ export default function ExistingTeachingResourceSelector({
 
     async function load() {
       try {
+        await Promise.resolve();
+
+        if (cancelled) {
+          return;
+        }
+
         setLoading(true);
 
         const loaded =

@@ -99,9 +99,11 @@ export function useProgrammingProgress() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setHydrated(false);
-    setProgress(loadProgress(studentId));
-    setHydrated(Boolean(studentId));
+    void Promise.resolve().then(() => {
+      setHydrated(false);
+      setProgress(loadProgress(studentId));
+      setHydrated(Boolean(studentId));
+    });
   }, [studentId]);
 
   useEffect(() => {

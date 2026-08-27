@@ -100,43 +100,53 @@ export default function TeacherQuizMarkbookPage() {
   const [filter, setFilter] = useState<ResultFilter>("all");
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
-  const loadMarkbook = useCallback(async () => {
-    if (authLoading || !profileReady) return;
+  const loadMarkbook = useCallback(() => {
+    if (authLoading || !profileReady) {
+      return Promise.resolve();
+    }
 
     if (!assignmentId || !user?.uid) {
-      setDetail(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError("");
-
-      const loadedDetail = await getTeacherQuizAssignmentDetail(
-        assignmentId,
-        user.uid,
-      );
-
-      if (!loadedDetail) {
+      return Promise.resolve().then(() => {
         setDetail(null);
-        setError("This quiz assignment could not be found or you do not have permission to view it.");
-        return;
-      }
-
-      setDetail(loadedDetail);
-    } catch (caughtError) {
-      console.error("Quiz markbook load error:", caughtError);
-      setDetail(null);
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "The quiz markbook could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
+        setError("");
+        setLoading(false);
+      });
     }
-  }, [assignmentId, authLoading, profileReady, user?.uid]);
+
+    const teacherId = user.uid;
+
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+
+        return getTeacherQuizAssignmentDetail(
+          assignmentId,
+          teacherId,
+        );
+      })
+      .then((loadedDetail) => {
+        if (!loadedDetail) {
+          setDetail(null);
+          setError("This quiz assignment could not be found or you do not have permission to view it.");
+          return;
+        }
+
+        setDetail(loadedDetail);
+      })
+      .catch((caughtError) => {
+        console.error("Quiz markbook load error:", caughtError);
+        setDetail(null);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The quiz markbook could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [assignmentId, authLoading, profileReady, user]);
 
   useEffect(() => {
     void loadMarkbook();

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import InterventionImpactCard from "@/components/teacher/interventions/InterventionImpactCard";
@@ -21,19 +21,23 @@ export default function InterventionDetailPage() {
   const [item, setItem] = useState<Intervention | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function load() {
-    setLoading(true);
-
-    try {
-      setItem(await getInterventionById(params.interventionId));
-    } finally {
-      setLoading(false);
-    }
-  }
+  const load = useCallback(() => {
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        return getInterventionById(params.interventionId);
+      })
+      .then((loadedItem) => {
+        setItem(loadedItem);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [params.interventionId]);
 
   useEffect(() => {
     void load();
-  }, [params.interventionId]);
+  }, [load]);
 
   if (loading) {
     return <Skeleton className="h-96" />;

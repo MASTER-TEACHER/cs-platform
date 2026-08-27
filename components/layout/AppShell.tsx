@@ -45,7 +45,9 @@ export default function AppShell({
     pathname.startsWith("/admin/");
 
   useEffect(() => {
-    setMobileSidebarOpen(false);
+    void Promise.resolve().then(() => {
+      setMobileSidebarOpen(false);
+    });
   }, [pathname]);
 
   useEffect(() => {

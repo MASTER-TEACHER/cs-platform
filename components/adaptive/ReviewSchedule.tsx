@@ -1,3 +1,5 @@
+const reviewScheduleRenderTime = new Date().getTime();
+
 import type { AdaptiveTopicMastery } from "@/types/adaptiveLearning";
 
 export default function ReviewSchedule({
@@ -23,7 +25,7 @@ export default function ReviewSchedule({
 
       <div className="mt-5 space-y-3">
         {upcoming.map((topic) => {
-          const due = topic.nextReviewAt.getTime() <= Date.now();
+          const due = topic.nextReviewAt.getTime() <= reviewScheduleRenderTime;
 
           return (
             <div

@@ -1,0 +1,31 @@
+CS MASTER - P1 LINT REMEDIATION PASS 3C
+Generated: 2026-08-26 18:58:10
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass3c-backup-20260826-185644
+
+Applied source changes: 15
+
+BEFORE
+------
+Problem files: 63
+Errors: 61
+Warnings: 21
+
+AFTER
+-----
+Problem files: 58
+Errors: 61
+Warnings: 12
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 60
+react-hooks/exhaustive-deps: 9
+@typescript-eslint/no-unused-vars: 3
+react-hooks/purity: 1
+
+NOTE
+----
+Pass 3C intentionally leaves ReviewSchedule purity plus exam-integrity
+and other effect warnings that overlap directly with set-state-in-effect.
+Those should be refactored together in Pass 4 rather than patched twice.

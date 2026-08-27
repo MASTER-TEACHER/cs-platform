@@ -15,30 +15,43 @@ export default function AchievementsCard({
   xp = 0,
   completedLessons = [],
 }: Props) {
-  function getProgress(achievement: any) {
-    if (achievement.condition.type === "xp") {
-      return Math.min(
-        100,
-        Math.round((xp / achievement.condition.value) * 100),
-      );
+  function getProgress(achievement: (typeof achievements)[number]) {
+  if (achievement.condition.type === "xp") {
+    const targetValue = Number(achievement.condition.value);
+
+    if (!Number.isFinite(targetValue) || targetValue <= 0) {
+      return 0;
     }
 
-    if (achievement.condition.type === "completedLessons") {
-      return Math.min(
-        100,
-        Math.round(
-          (completedLessons.length / achievement.condition.value) * 100,
-        ),
-      );
-    }
-
-    if (achievement.condition.type === "lessonCompleted") {
-      return completedLessons.includes(achievement.condition.value) ? 100 : 0;
-    }
-
-    return 0;
+    return Math.min(
+      100,
+      Math.round((xp / targetValue) * 100),
+    );
   }
 
+  if (achievement.condition.type === "completedLessons") {
+    const targetValue = Number(achievement.condition.value);
+
+    if (!Number.isFinite(targetValue) || targetValue <= 0) {
+      return 0;
+    }
+
+    return Math.min(
+      100,
+      Math.round(
+        (completedLessons.length / targetValue) * 100,
+      ),
+    );
+  }
+
+  if (achievement.condition.type === "lessonCompleted") {
+    const lessonId = String(achievement.condition.value);
+
+    return completedLessons.includes(lessonId) ? 100 : 0;
+  }
+
+  return 0;
+}
   return (
     <Card>
       <div className="flex items-center justify-between">
@@ -72,7 +85,7 @@ export default function AchievementsCard({
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="text-5xl">
-                  {unlocked ? achievement.icon : "🔒"}
+                  {unlocked ? achievement.icon : "Ã°Å¸â€â€™"}
                 </div>
 
                 <span

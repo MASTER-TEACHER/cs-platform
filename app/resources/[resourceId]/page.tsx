@@ -1,21 +1,6 @@
 "use client";
 
-import {
-  AlertCircle,
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  FileQuestion,
-  GraduationCap,
-  Lightbulb,
-  Loader2,
-  Tag,
-  Target,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, FileQuestion, GraduationCap, Lightbulb, Tag, Target } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -151,6 +136,8 @@ export default function StudentResourcePage() {
   const [showAnswers, setShowAnswers] = useState<Record<number, boolean>>({});
 
   const loadResource = useCallback(async () => {
+    await Promise.resolve();
+
     if (!user?.uid || !resourceId) {
       setResource(null);
       setLoading(false);
@@ -211,7 +198,7 @@ export default function StudentResourcePage() {
   }, [resourceId, user?.uid]);
 
   useEffect(() => {
-    void loadResource();
+    void Promise.resolve().then(() => loadResource());
   }, [loadResource]);
 
   const sectionCount = resource?.content.sections.length ?? 0;

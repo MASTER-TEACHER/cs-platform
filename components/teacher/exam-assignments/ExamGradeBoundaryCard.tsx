@@ -187,7 +187,7 @@ export default function ExamGradeBoundaryCard({
         </div>
 
         <h3 className="mt-2 text-2xl font-black">
-          Configure this assessment's grade boundaries
+          Configure this assessment&apos;s grade boundaries
         </h3>
 
         <p className="mt-2 max-w-4xl text-sm leading-6 text-white/75">

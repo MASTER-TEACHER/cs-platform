@@ -53,8 +53,6 @@ export default function AdminTeachersPage() {
     }
 
     if (!isAdmin) {
-      setTeachers([]);
-      setLoadingTeachers(false);
       return;
     }
 
@@ -112,7 +110,7 @@ export default function AdminTeachersPage() {
     );
   }, [teachers, searchTerm]);
 
-  if (profileLoading || loadingTeachers) {
+  if (profileLoading || (isAdmin && loadingTeachers)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-52 w-full" />

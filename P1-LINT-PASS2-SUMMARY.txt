@@ -1,0 +1,16 @@
+CS MASTER - P1 LINT REMEDIATION PASS 2
+Generated: 2026-08-26 18:15:53
+Project: C:\Users\cr7ri\cs-platform-clean
+
+Problem files: 71
+Errors: 76
+Warnings: 32
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 60
+@typescript-eslint/no-unused-vars: 18
+react-hooks/exhaustive-deps: 14
+react-hooks/preserve-manual-memoization: 12
+react-hooks/refs: 2
+react-hooks/purity: 2

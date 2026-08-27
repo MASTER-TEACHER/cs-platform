@@ -1,0 +1,31 @@
+CS MASTER - P1 LINT REMEDIATION PASS 3B
+Generated: 2026-08-26 18:47:29
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass3b-backup-20260826-184559
+
+Applied source changes: 11
+
+BEFORE
+------
+Problem files: 66
+Errors: 73
+Warnings: 21
+
+AFTER
+-----
+Problem files: 63
+Errors: 61
+Warnings: 21
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 60
+react-hooks/exhaustive-deps: 14
+@typescript-eslint/no-unused-vars: 7
+react-hooks/purity: 1
+
+NOTE
+----
+Pass 3B intentionally does not auto-fix ambiguous unused variables,
+effect dependency warnings, ReviewSchedule Date.now purity, or
+react-hooks/set-state-in-effect. Those require source-specific refactors.

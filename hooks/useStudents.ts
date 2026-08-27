@@ -41,7 +41,15 @@ export function useStudents() {
             };
           })
           .filter((student) => student.role === "student")
-          .map(({ role, ...student }) => student);
+          .map((student) => ({
+            id: student.id,
+            name: student.name,
+            email: student.email,
+            xp: student.xp,
+            streak: student.streak,
+            badges: student.badges,
+            completedLessons: student.completedLessons,
+          }));
 
         studentList.sort((a, b) => b.xp - a.xp);
 

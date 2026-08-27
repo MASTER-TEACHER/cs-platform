@@ -11,6 +11,7 @@ import {
   Target,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -69,36 +70,40 @@ export default function InterventionImpactCard({
   const [reviewNote, setReviewNote] = useState("");
   const [error, setError] = useState("");
 
-  async function load() {
-    try {
-      setLoading(true);
-      setError("");
+  const load = useCallback(() => {
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
 
-      setImpact(
-        await getInterventionImpact({
+        return getInterventionImpact({
           interventionId,
           teacherId,
-        }),
-      );
-    } catch (caughtError) {
-      console.error(
-        "Unable to load intervention impact:",
-        caughtError,
-      );
+        });
+      })
+      .then((loadedImpact) => {
+        setImpact(loadedImpact);
+      })
+      .catch((caughtError) => {
+        console.error(
+          "Unable to load intervention impact:",
+          caughtError,
+        );
 
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Intervention impact could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Intervention impact could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [interventionId, teacherId]);
 
   useEffect(() => {
     void load();
-  }, [interventionId, teacherId]);
+  }, [load]);
 
   const review = useMemo(
     () =>

@@ -16,7 +16,6 @@ export default function EditableQuizPreview({
   quiz,
   saving,
   savedQuizId,
-  onChange,
   onSave,
   onDiscard,
 }: EditableQuizPreviewProps) {

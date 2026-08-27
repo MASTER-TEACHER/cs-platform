@@ -45,7 +45,7 @@ export default function StudentActionWorkflowPanel({
         </h2>
 
         <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
-          Use the learner's current working grade, target, trend and mastery
+          Use the learner&apos;s current working grade, target, trend and mastery
           evidence to choose the next teaching action.
         </p>
       </div>

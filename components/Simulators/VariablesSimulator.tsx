@@ -129,7 +129,7 @@ export default function VariablesSimulator() {
           Change the values and observe the memory state.
         </p>
         <div className="mt-4 rounded-xl bg-slate-950 p-4 font-mono text-emerald-300">
-          name = "student"
+          name = &quot;student&quot;
           <br />
           score = 10
         </div>

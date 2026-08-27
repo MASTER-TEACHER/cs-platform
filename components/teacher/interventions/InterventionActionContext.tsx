@@ -112,7 +112,7 @@ export default function InterventionActionContext() {
 
             {examSource && (
               <p className="mt-2 max-w-4xl text-xs leading-5 text-slate-500">
-                Use the exam result alongside the learner's wider mastery,
+                Use the exam result alongside the learner&apos;s wider mastery,
                 completion and trend evidence before deciding the support
                 pathway.
               </p>

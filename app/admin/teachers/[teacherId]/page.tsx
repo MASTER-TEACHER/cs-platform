@@ -82,7 +82,6 @@ export default function AdminTeacherDetailsPage() {
     }
 
     if (!isAdmin) {
-      setLoading(false);
       return;
     }
 
@@ -182,7 +181,7 @@ export default function AdminTeacherDetailsPage() {
     [classes],
   );
 
-  if (profileLoading || loading) {
+  if (profileLoading || (isAdmin && loading)) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-52 w-full" />

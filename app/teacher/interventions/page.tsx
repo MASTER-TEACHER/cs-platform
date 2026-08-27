@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowRight } from "lucide-react";
 
 import CreateInterventionModal from "@/components/teacher/interventions/CreateInterventionModal";
@@ -56,7 +56,9 @@ export default function TeacherInterventionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
+    await Promise.resolve();
+
     const teacherId =
       user?.uid;
 
@@ -126,11 +128,11 @@ export default function TeacherInterventionsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user?.uid]);
 
   useEffect(() => {
-    void load();
-  }, [user?.uid]);
+    void Promise.resolve().then(() => load());
+  }, [load]);
 
   /*
    * Analytics -> Intervention hand-off.
@@ -160,9 +162,11 @@ export default function TeacherInterventionsPage() {
 
     if (!requested) {
       if (requestedStudentName) {
-        setSearch(
-          requestedStudentName,
-        );
+        void Promise.resolve().then(() => {
+          setSearch(
+            requestedStudentName,
+          );
+        });
       }
 
       return;
@@ -170,14 +174,16 @@ export default function TeacherInterventionsPage() {
 
     deepLinkApplied.current = true;
 
-    setSearch(
-      requestedStudentName ||
-        requested.student.name,
-    );
+    void Promise.resolve().then(() => {
+      setSearch(
+        requestedStudentName ||
+          requested.student.name,
+      );
 
-    setSelected(
-      requested,
-    );
+      setSelected(
+        requested,
+      );
+    });
   }, [
     loading,
     candidates,

@@ -1,6 +1,6 @@
 "use client";
 
-import { DragEvent, useCallback, useMemo, useState } from "react";
+import { DragEvent, useMemo, useState } from "react";
 
 import Card from "@/components/ui/Card";
 import { useProgress } from "@/contexts/ProgressContext";

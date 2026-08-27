@@ -1,7 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo } from "react";
+
+import Link from "next/link";
+
 
 import { useAuth } from "@/contexts/AuthContext";
 import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
@@ -33,22 +35,13 @@ function simulatorTitle(
 export default function VisualisersPage() {
   const { profile } = useAuth();
 
-  const coverage = useMemo(() => {
-    if (
-      !profile?.qualification ||
-      !profile.examBoard
-    ) {
-      return null;
-    }
-
-    return getCurriculumCoverage(
-      profile.qualification,
-      profile.examBoard,
-    );
-  }, [
-    profile?.qualification,
-    profile?.examBoard,
-  ]);
+  const coverage =
+    profile?.qualification && profile.examBoard
+      ? getCurriculumCoverage(
+          profile.qualification,
+          profile.examBoard,
+        )
+      : null;
 
   const entries =
     useMemo<VisualiserEntry[]>(() => {
@@ -196,7 +189,7 @@ export default function VisualisersPage() {
             </p>
 
             <p className="mt-1 font-black">
-              {profile?.examBoard} ·{" "}
+              {profile?.examBoard} Â·{" "}
               {profile?.qualification ===
               "A_LEVEL"
                 ? "A-level"
@@ -234,7 +227,7 @@ export default function VisualisersPage() {
                   href={entry.href}
                   className="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 font-black text-white transition hover:bg-blue-700"
                 >
-                  Open interactive lesson →
+                  Open interactive lesson â†’
                 </Link>
               </div>
             </article>

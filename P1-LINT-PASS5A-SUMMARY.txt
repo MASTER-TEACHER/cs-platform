@@ -1,0 +1,31 @@
+CS MASTER - P1 LINT REMEDIATION PASS 5A
+Generated: 2026-08-27 10:19:07
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass5a-backup-20260827-101744
+
+Applied source changes: 3
+
+BEFORE
+------
+Problem files: 17
+Errors: 14
+Warnings: 9
+
+AFTER
+-----
+Problem files: 14
+Errors: 13
+Warnings: 6
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 13
+react-hooks/exhaustive-deps: 6
+
+PASS 5A SCOPE
+-------------
+Removed the three exact unused declarations and isolated ReviewSchedule purity.
+The six exhaustive-deps warnings were intentionally not auto-fixed because
+four are directly tied to exam/quiz timer or integrity callback identity.
+No set-state-in-effect finding was modified.
+No ESLint rule or warning was disabled.

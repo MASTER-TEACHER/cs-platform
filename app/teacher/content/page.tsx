@@ -75,6 +75,8 @@ export default function TeacherContentHubPage() {
   const [updatingKey, setUpdatingKey] = useState("");
 
   const load = useCallback(async () => {
+    await Promise.resolve();
+
     const teacherId = user?.uid;
     if (!teacherId) {
       setItems([]);
@@ -100,7 +102,7 @@ export default function TeacherContentHubPage() {
 
   useEffect(() => {
     if (authLoading || !profileReady) return;
-    void load();
+    void Promise.resolve().then(() => load());
   }, [authLoading, profileReady, load]);
 
   const qualifications = useMemo(

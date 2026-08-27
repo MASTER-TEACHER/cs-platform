@@ -281,6 +281,8 @@ export default function EditTeacherResourcePage() {
   }, []);
 
   const loadResource = useCallback(async () => {
+    await Promise.resolve();
+
     if (!currentUser || !resourceId) {
       setLoading(false);
       return;
@@ -324,7 +326,7 @@ export default function EditTeacherResourcePage() {
 
   useEffect(() => {
     if (!authLoading) {
-      void loadResource();
+      void Promise.resolve().then(() => loadResource());
     }
   }, [authLoading, loadResource]);
 

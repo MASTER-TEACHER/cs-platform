@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { getKnowledgeMap } from "@/services/knowledgeMapService";
@@ -12,29 +12,38 @@ export function useKnowledgeMap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(() => {
     if (!user?.uid) {
-      setMap(null);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setMap(null);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    setLoading(true);
-    setError("");
+    const userId = user.uid;
 
-    try {
-      setMap(await getKnowledgeMap(user.uid));
-    } catch (caughtError) {
-      console.error("Knowledge map error:", caughtError);
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "The knowledge map could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getKnowledgeMap(userId);
+      })
+      .then((loadedMap) => {
+        setMap(loadedMap);
+      })
+      .catch((caughtError) => {
+        console.error("Knowledge map error:", caughtError);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The knowledge map could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [user]);
 
   useEffect(() => {
     if (authLoading) {
@@ -42,7 +51,7 @@ export function useKnowledgeMap() {
     }
 
     void refresh();
-  }, [authLoading, user?.uid]);
+  }, [authLoading, refresh]);
 
   return {
     map,

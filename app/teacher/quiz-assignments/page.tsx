@@ -1,17 +1,6 @@
 "use client";
 
-import {
-  AlertCircle,
-  BarChart3,
-  Brain,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Eye,
-  Loader2,
-  Search,
-  Users,
-} from "lucide-react";
+import { AlertCircle, BarChart3, Brain, CalendarDays, CheckCircle2, Eye, Loader2, Search, Users } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -98,34 +87,40 @@ export default function TeacherQuizAssignmentsPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  const loadAssignments = useCallback(async () => {
+  const loadAssignments = useCallback(() => {
     if (!user?.uid) {
-      setAssignments([]);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setAssignments([]);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    const teacherId = user.uid;
 
-      const loadedAssignments = await getTeacherQuizAssignments(user.uid);
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getTeacherQuizAssignments(teacherId);
+      })
+      .then((loadedAssignments) => {
+        setAssignments(loadedAssignments);
+      })
+      .catch((caughtError) => {
+        console.error("Failed to load quiz assignments:", caughtError);
 
-      setAssignments(loadedAssignments);
-    } catch (caughtError) {
-      console.error("Failed to load quiz assignments:", caughtError);
-
-      setAssignments([]);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Quiz assignments could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
+        setAssignments([]);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Quiz assignments could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [user]);
 
   useEffect(() => {
     void loadAssignments();

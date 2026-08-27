@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import RevisionPlanCard from "@/components/revision-plan/RevisionPlanCard";
@@ -9,20 +9,31 @@ import { getStudentInterventions } from "@/services/interventionService";
 import type { Intervention } from "@/types/intervention";
 export default function RevisionPlanPage() {
   const { user } = useAuth();
+  const userId = user?.uid;
   const [items, setItems] = useState<Intervention[]>([]);
   const [loading, setLoading] = useState(true);
-  async function load() {
-    if (!user?.uid) return;
-    setLoading(true);
-    try {
-      setItems(await getStudentInterventions(user.uid));
-    } finally {
-      setLoading(false);
+
+  const load = useCallback(() => {
+    if (!userId) {
+      return Promise.resolve();
     }
-  }
+
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        return getStudentInterventions(userId);
+      })
+      .then((loadedItems) => {
+        setItems(loadedItems);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [userId]);
+
   useEffect(() => {
     void load();
-  }, [user?.uid]);
+  }, [load]);
   if (loading)
     return (
       <div className="space-y-6">

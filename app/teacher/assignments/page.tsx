@@ -406,47 +406,60 @@ export default function TeacherAssignmentsPage() {
 
   const loadAssignments =
     useCallback(
-      async () => {
+      () => {
         if (!user?.uid) {
-          setSummary(
-            emptySummary,
-          );
-          setLoading(false);
-          return;
+          return Promise.resolve().then(() => {
+            setSummary(
+              emptySummary,
+            );
+            setError("");
+            setLoading(false);
+          });
         }
 
-        try {
-          setLoading(true);
-          setError("");
+        const teacherId =
+          user.uid;
 
-          setSummary(
-            await getUnifiedTeacherAssignments(
-              user.uid,
-            ),
-          );
-        } catch (
-          caughtError
-        ) {
-          console.error(
-            "Unable to load unified teacher assignments:",
-            caughtError,
-          );
+        return Promise.resolve()
+          .then(() => {
+            setLoading(true);
+            setError("");
 
-          setSummary(
-            emptySummary,
-          );
+            return getUnifiedTeacherAssignments(
+              teacherId,
+            );
+          })
+          .then(
+            (loadedSummary) => {
+              setSummary(
+                loadedSummary,
+              );
+            },
+          )
+          .catch(
+            (caughtError) => {
+              console.error(
+                "Unable to load unified teacher assignments:",
+                caughtError,
+              );
 
-          setError(
-            caughtError instanceof
-              Error
-              ? caughtError.message
-              : "Your assignments could not be loaded.",
-          );
-        } finally {
-          setLoading(false);
-        }
+              setSummary(
+                emptySummary,
+              );
+
+              setError(
+                caughtError instanceof
+                  Error
+                  ? caughtError.message
+                  : "Your assignments could not be loaded.",
+              );
+            },
+          )
+          .finally(() => {
+            setLoading(false);
+          });
       },
-      [user?.uid],
+      [user],
     );
 
   useEffect(() => {

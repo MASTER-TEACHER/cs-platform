@@ -203,16 +203,18 @@ export default function BinarySearchSimulator() {
    * MIDDLE=0 state after changing difficulty or creating a new question.
    */
   useEffect(() => {
-    setLow(0);
-    setHigh(question.values.length - 1);
-    setSelectedIndex(null);
-    setProcedureComplete(false);
-    setFoundProcedurally(false);
-    setProcedureCorrectSteps(0);
-    setProcedureMistakes(0);
-    setDiscardCount(0);
-    setProcedureFeedback("");
-    setProcedureFeedbackType(null);
+    void Promise.resolve().then(() => {
+      setLow(0);
+      setHigh(question.values.length - 1);
+      setSelectedIndex(null);
+      setProcedureComplete(false);
+      setFoundProcedurally(false);
+      setProcedureCorrectSteps(0);
+      setProcedureMistakes(0);
+      setDiscardCount(0);
+      setProcedureFeedback("");
+      setProcedureFeedbackType(null);
+    });
   }, [question]);
 
   const safeHigh =

@@ -26,52 +26,45 @@ export function useStudentAdaptiveAnalytics() {
     }
 
     if (!user?.uid) {
-      setAnalytics(emptyStudentAdaptiveAnalytics);
-      setLoading(false);
       return;
     }
 
+    const studentId = user.uid;
     let cancelled = false;
 
-    async function load() {
-      try {
-        setLoading(true);
+    void getStudentAdaptiveAnalytics(studentId)
+      .then((loaded) => {
+        if (cancelled) return;
+
+        setAnalytics(loaded);
         setError("");
-
-        const loaded = await getStudentAdaptiveAnalytics(user!.uid);
-
-        if (!cancelled) {
-          setAnalytics(loaded);
-        }
-      } catch (caughtError) {
+      })
+      .catch((caughtError) => {
         console.error("Student adaptive analytics error:", caughtError);
 
-        if (!cancelled) {
-          setAnalytics(emptyStudentAdaptiveAnalytics);
+        if (cancelled) return;
 
-          setError(
-            caughtError instanceof Error
-              ? caughtError.message
-              : "Assessment analytics could not be loaded.",
-          );
-        }
-      } finally {
+        setAnalytics(emptyStudentAdaptiveAnalytics);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Assessment analytics could not be loaded.",
+        );
+      })
+      .finally(() => {
         if (!cancelled) {
           setLoading(false);
         }
-      }
-    }
-
-    void load();
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user?.uid]);
+  }, [authLoading, user]);
 
   return {
-    analytics,
-    loading: authLoading || loading,
-    error,
+    analytics: user?.uid ? analytics : emptyStudentAdaptiveAnalytics,
+    loading: authLoading || (Boolean(user?.uid) && loading),
+    error: user?.uid ? error : "",
   };
 }

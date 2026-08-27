@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { AlertTriangle, ShieldCheck } from "lucide-react";
@@ -199,10 +199,7 @@ export default function QuizPlayer({ quiz }: Props) {
    * Integrity-terminated assessment attempts retain their raw score for
    * teacher evidence, but do not award XP.
    */
-  const awardedXP =
-    integrityTerminated || integrityTerminatedRef.current
-      ? 0
-      : earnedXP;
+  const awardedXP = integrityTerminated ? 0 : earnedXP;
 
   const strengths = quiz.questions
     .filter((question) => {
@@ -287,7 +284,9 @@ export default function QuizPlayer({ quiz }: Props) {
   }, [assignmentId, quiz.topicId]);
 
   useEffect(() => {
-    setTimeLeft(quizDurationSeconds);
+    void Promise.resolve().then(() => {
+      setTimeLeft(quizDurationSeconds);
+    });
   }, [quiz.id, quizDurationSeconds]);
 
   useEffect(() => {
@@ -360,6 +359,12 @@ export default function QuizPlayer({ quiz }: Props) {
     setShowResults(true);
   }
 
+  const finishQuizFromTimer = useEffectEvent(
+    (options: { terminated?: boolean; reason?: string }) => {
+      void finishQuiz(options);
+    },
+  );
+
   useEffect(() => {
     if (
       showResults ||
@@ -374,7 +379,7 @@ export default function QuizPlayer({ quiz }: Props) {
         if (previousTime <= 1) {
           window.clearInterval(timer);
 
-          void finishQuiz({
+          finishQuizFromTimer({
             terminated: assessmentMode,
             reason: assessmentMode
               ? "The assessment timer expired and the quiz was automatically submitted."
@@ -457,6 +462,43 @@ export default function QuizPlayer({ quiz }: Props) {
     );
   }
 
+  const handleFullscreenChange = useEffectEvent(() => {
+    if (finishingRef.current) {
+      return;
+    }
+
+    if (
+      document.fullscreenElement ===
+      assessmentRootRef.current
+    ) {
+      resolveFullscreenExit();
+    } else {
+      beginFullscreenCountdown();
+    }
+  });
+
+  const handleVisibilityChange = useEffectEvent(() => {
+    if (finishingRef.current) {
+      return;
+    }
+
+    if (document.visibilityState === "hidden") {
+      appendIntegrityIncident(
+        "page_hidden",
+        "The assessment page became hidden.",
+      );
+
+      setIntegrityWarning(
+        "The assessment page was hidden. This incident has been recorded.",
+      );
+    } else {
+      appendIntegrityIncident(
+        "page_visible",
+        "The assessment page became visible again.",
+      );
+    }
+  });
+
   useEffect(() => {
     if (
       !assessmentMode ||
@@ -467,40 +509,11 @@ export default function QuizPlayer({ quiz }: Props) {
     }
 
     function onFullscreenChange() {
-      if (finishingRef.current) {
-        return;
-      }
-
-      if (
-        document.fullscreenElement ===
-        assessmentRootRef.current
-      ) {
-        resolveFullscreenExit();
-      } else {
-        beginFullscreenCountdown();
-      }
+      handleFullscreenChange();
     }
 
     function onVisibilityChange() {
-      if (finishingRef.current) {
-        return;
-      }
-
-      if (document.visibilityState === "hidden") {
-        appendIntegrityIncident(
-          "page_hidden",
-          "The assessment page became hidden.",
-        );
-
-        setIntegrityWarning(
-          "The assessment page was hidden. This incident has been recorded.",
-        );
-      } else {
-        appendIntegrityIncident(
-          "page_visible",
-          "The assessment page became visible again.",
-        );
-      }
+      handleVisibilityChange();
     }
 
     document.addEventListener(
@@ -526,7 +539,6 @@ export default function QuizPlayer({ quiz }: Props) {
     assessmentMode,
     integrityStarted,
     showResults,
-    currentIndex,
   ]);
 
   async function enterAssessmentMode() {

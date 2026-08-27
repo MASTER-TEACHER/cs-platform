@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import SimulatorControls from "@/components/Simulators/common/SimulatorControls";
 import SimulatorDifficulty from "@/components/Simulators/common/SimulatorDifficulty";

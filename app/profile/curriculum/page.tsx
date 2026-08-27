@@ -74,20 +74,50 @@ export default function CurriculumSettingsPage() {
       return;
     }
 
-    if (
-      profile?.qualification === "GCSE" ||
-      profile?.qualification === "A_LEVEL"
-    ) {
-      setQualification(profile.qualification);
-    }
+    void Promise.resolve().then(() => {
 
-    if (
-      profile?.examBoard === "AQA" ||
-      profile?.examBoard === "OCR" ||
-      profile?.examBoard === "EDEXCEL"
-    ) {
-      setExamBoard(profile.examBoard);
-    }
+
+      if (
+
+
+        profile?.qualification === "GCSE" ||
+
+
+        profile?.qualification === "A_LEVEL"
+
+
+      ) {
+
+
+        setQualification(profile.qualification);
+
+
+      }
+
+
+
+      if (
+
+
+        profile?.examBoard === "AQA" ||
+
+
+        profile?.examBoard === "OCR" ||
+
+
+        profile?.examBoard === "EDEXCEL"
+
+
+      ) {
+
+
+        setExamBoard(profile.examBoard);
+
+
+      }
+
+
+    });
   }, [loading, user, profileReady, profile, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {

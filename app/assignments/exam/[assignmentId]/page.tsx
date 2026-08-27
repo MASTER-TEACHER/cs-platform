@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useEffect,
+  useEffectEvent,
   useMemo,
   useRef,
   useState,
@@ -525,6 +526,75 @@ export default function StudentExamPlayerPage() {
     );
   }
 
+  const handleExamFullscreenChange = useEffectEvent(() => {
+    if (
+      finishingRef.current
+    ) {
+      return;
+    }
+
+    if (
+      document.fullscreenElement ===
+      examRootRef.current
+    ) {
+      resolveFullscreenExit();
+    } else {
+      beginFullscreenCountdown();
+    }
+  });
+
+  const handleExamVisibilityChange = useEffectEvent(() => {
+    if (
+      finishingRef.current ||
+      !assignment
+        ?.integrityPolicy
+        .monitorPageVisibility
+    ) {
+      return;
+    }
+
+    if (
+      document.visibilityState ===
+      "hidden"
+    ) {
+      void logIncident(
+        "page_hidden",
+        "The exam page became hidden.",
+      );
+
+      const action =
+        assignment
+          .integrityPolicy
+          .visibilityAction;
+
+      if (
+        action ===
+        "auto_submit"
+      ) {
+        void terminateForIntegrity(
+          "The exam page became hidden and the teacher configured immediate automatic submission.",
+        );
+
+        return;
+      }
+
+      if (action === "pause") {
+        setIntegrityPaused(
+          true,
+        );
+      } else {
+        setIntegrityWarning(
+          "The exam page was hidden. This incident has been recorded.",
+        );
+      }
+    } else {
+      void logIncident(
+        "page_visible",
+        "The exam page became visible again.",
+      );
+    }
+  });
+
   useEffect(() => {
     if (
       !assignment ||
@@ -538,72 +608,11 @@ export default function StudentExamPlayerPage() {
     }
 
     function onFullscreenChange() {
-      if (
-        finishingRef.current
-      ) {
-        return;
-      }
-
-      if (
-        document.fullscreenElement ===
-        examRootRef.current
-      ) {
-        resolveFullscreenExit();
-      } else {
-        beginFullscreenCountdown();
-      }
+      handleExamFullscreenChange();
     }
 
-    async function onVisibilityChange() {
-      if (
-        finishingRef.current ||
-        !assignment
-          ?.integrityPolicy
-          .monitorPageVisibility
-      ) {
-        return;
-      }
-
-      if (
-        document.visibilityState ===
-        "hidden"
-      ) {
-        void logIncident(
-          "page_hidden",
-          "The exam page became hidden.",
-        );
-
-        const action =
-          assignment
-            .integrityPolicy
-            .visibilityAction;
-
-        if (
-          action ===
-          "auto_submit"
-        ) {
-          void terminateForIntegrity(
-            "The exam page became hidden and the teacher configured immediate automatic submission.",
-          );
-
-          return;
-        }
-
-        if (action === "pause") {
-          setIntegrityPaused(
-            true,
-          );
-        } else {
-          setIntegrityWarning(
-            "The exam page was hidden. This incident has been recorded.",
-          );
-        }
-      } else {
-        void logIncident(
-          "page_visible",
-          "The exam page became visible again.",
-        );
-      }
+    function onVisibilityChange() {
+      handleExamVisibilityChange();
     }
 
     document.addEventListener(
@@ -628,7 +637,6 @@ export default function StudentExamPlayerPage() {
       );
     };
   }, [
-    activeQuestionNumber,
     assignment,
     integrityStarted,
     locked,
@@ -986,7 +994,7 @@ export default function StudentExamPlayerPage() {
               </h1>
 
               <p className="mt-3 text-indigo-100">
-                {assignment.questionCount} questions ·{" "}
+                {assignment.questionCount} questions Â·{" "}
                 {assignment.totalMarks} marks
               </p>
             </div>
@@ -1007,23 +1015,23 @@ export default function StudentExamPlayerPage() {
               {assignment.integrityPolicy.enabled ? (
                 <div className="space-y-3 text-sm leading-6 text-slate-700">
                   <p>
-                    • The exam will enter fullscreen and normal CS Master
+                    â€¢ The exam will enter fullscreen and normal CS Master
                     navigation will be hidden.
                   </p>
 
                   <p>
-                    • Leaving fullscreen starts a visible 5-second countdown.
+                    â€¢ Leaving fullscreen starts a visible 5-second countdown.
                   </p>
 
                   <p>
-                    • If fullscreen is not restored before the countdown ends,
+                    â€¢ If fullscreen is not restored before the countdown ends,
                     the exam is automatically terminated and submitted.
                   </p>
 
                   {assignment.integrityPolicy.monitorPageVisibility && (
                     <p>
-                      • Switching away from the exam page is recorded and the
-                      teacher's configured visibility rule is applied.
+                      â€¢ Switching away from the exam page is recorded and the
+                      teacher&apos;s configured visibility rule is applied.
                     </p>
                   )}
                 </div>
@@ -1133,7 +1141,7 @@ export default function StudentExamPlayerPage() {
               </h1>
 
               <p className="mt-2 text-sm text-indigo-100">
-                {answeredCount}/{assignment.questionCount} answered ·{" "}
+                {answeredCount}/{assignment.questionCount} answered Â·{" "}
                 {assignment.totalMarks} marks
               </p>
             </div>
@@ -1141,7 +1149,7 @@ export default function StudentExamPlayerPage() {
             {!locked && (
               <div className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white/80">
                 Question{" "}
-                {activeQuestionNumber ?? "—"}
+                {activeQuestionNumber ?? "â€”"}
               </div>
             )}
           </div>
@@ -1332,7 +1340,7 @@ export default function StudentExamPlayerPage() {
                                   point.id
                                 }
                               >
-                                •{" "}
+                                â€¢{" "}
                                 {
                                   point.description
                                 }{" "}
@@ -1363,7 +1371,7 @@ export default function StudentExamPlayerPage() {
                                   item
                                 }
                               >
-                                •{" "}
+                                â€¢{" "}
                                 {
                                   item
                                 }
@@ -1389,7 +1397,7 @@ export default function StudentExamPlayerPage() {
                                   item
                                 }
                               >
-                                •{" "}
+                                â€¢{" "}
                                 {
                                   item
                                 }

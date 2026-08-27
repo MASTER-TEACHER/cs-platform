@@ -10,7 +10,7 @@ import {
   RefreshCcw,
   Target,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Card from "@/components/ui/Card";
 import {
@@ -56,61 +56,67 @@ export default function InterventionEffectivenessOverview({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(() => {
     if (!teacherId.trim() || interventions.length === 0) {
-      setItems([]);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setItems([]);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
 
-      const results = await Promise.all(
-        interventions.map(async (intervention) => {
-          try {
-            const impact = await getInterventionImpact({
-              interventionId: intervention.id,
-              teacherId,
-            });
+        return Promise.all(
+          interventions.map(async (intervention) => {
+            try {
+              const impact = await getInterventionImpact({
+                interventionId: intervention.id,
+                teacherId,
+              });
 
-            if (!impact) return null;
+              if (!impact) return null;
 
-            return buildInterventionEffectivenessItem({
-              source: intervention,
-              impact,
-            });
-          } catch (caughtError) {
-            console.error(
-              `Unable to load intervention effectiveness for ${intervention.id}:`,
-              caughtError,
-            );
+              return buildInterventionEffectivenessItem({
+                source: intervention,
+                impact,
+              });
+            } catch (caughtError) {
+              console.error(
+                `Unable to load intervention effectiveness for ${intervention.id}:`,
+                caughtError,
+              );
 
-            return null;
-          }
-        }),
-      );
-
-      setItems(
-        results.filter(
-          (item): item is InterventionEffectivenessItem => Boolean(item),
-        ),
-      );
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Intervention effectiveness could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+              return null;
+            }
+          }),
+        );
+      })
+      .then((results) => {
+        setItems(
+          results.filter(
+            (item): item is InterventionEffectivenessItem => Boolean(item),
+          ),
+        );
+      })
+      .catch((caughtError) => {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Intervention effectiveness could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [teacherId, interventions]);
 
   useEffect(() => {
     void load();
-  }, [teacherId, interventions]);
+  }, [load]);
 
   const summary = useMemo(
     () => buildInterventionEffectivenessSummary(items),

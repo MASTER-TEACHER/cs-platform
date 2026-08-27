@@ -89,68 +89,72 @@ export default function StudentAssignmentDetailPage() {
     useState("");
 
   const loadAssignment =
-    useCallback(async () => {
+    useCallback(() => {
       const studentId =
         user?.uid;
 
       if (!studentId || !assignmentId) {
-        setLoading(false);
-        return;
+        return Promise.resolve().then(() => {
+          setLoading(false);
+        });
       }
 
-      try {
-        setLoading(true);
-        setError("");
+      return Promise.resolve()
+        .then(() => {
+          setLoading(true);
+          setError("");
 
-        const assignmentData =
-          await getAssignmentById(
+          return getAssignmentById(
             assignmentId,
           );
+        })
+        .then(async (assignmentData) => {
+          const progressData =
+            await getStudentAssignmentProgress(
+              assignmentId,
+              studentId,
+            );
 
-        const progressData =
-          await getStudentAssignmentProgress(
-            assignmentId,
-            studentId,
+          if (!assignmentData) {
+            setError(
+              "This assignment could not be found.",
+            );
+            setAssignment(null);
+            return;
+          }
+
+          if (
+            !assignmentData.studentIds.includes(
+              studentId,
+            )
+          ) {
+            setError(
+              "You do not have access to this assignment.",
+            );
+            setAssignment(null);
+            return;
+          }
+
+          setAssignment(
+            assignmentData,
+          );
+          setProgress(progressData);
+        })
+        .catch((loadError) => {
+          console.error(
+            "Unable to load assignment:",
+            loadError,
           );
 
-        if (!assignmentData) {
           setError(
-            "This assignment could not be found.",
+            loadError instanceof Error
+              ? loadError.message
+              : "The assignment could not be loaded.",
           );
-          setAssignment(null);
-          return;
-        }
-
-        if (
-          !assignmentData.studentIds.includes(
-            studentId,
-          )
-        ) {
-          setError(
-            "You do not have access to this assignment.",
-          );
-          setAssignment(null);
-          return;
-        }
-
-        setAssignment(
-          assignmentData,
-        );
-        setProgress(progressData);
-      } catch (loadError) {
-        console.error(
-          "Unable to load assignment:",
-          loadError,
-        );
-
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "The assignment could not be loaded.",
-        );
-      } finally {
-        setLoading(false);
-      }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
     }, [
       assignmentId,
       user?.uid,

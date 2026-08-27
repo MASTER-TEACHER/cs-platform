@@ -1,0 +1,34 @@
+CS MASTER - P1 LINT REMEDIATION PASS 4G
+Generated: 2026-08-27 07:06:35
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass4g-backup-20260827-070504
+
+Applied source changes: 3
+
+BEFORE
+------
+Problem files: 36
+Errors: 39
+Warnings: 11
+
+AFTER
+-----
+Problem files: 35
+Errors: 37
+Warnings: 11
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 36
+react-hooks/exhaustive-deps: 8
+@typescript-eslint/no-unused-vars: 3
+react-hooks/purity: 1
+
+PASS 4G SCOPE
+-------------
+Continued conservative remediation of non-integrity effect-triggered
+loaders and localStorage hydration using deferred Promise callbacks.
+Exam/quiz integrity, fullscreen, visibility, countdown and auto-submit
+logic was not modified.
+ReviewSchedule purity was deliberately left for a dedicated fix.
+No ESLint rules or warnings were disabled.

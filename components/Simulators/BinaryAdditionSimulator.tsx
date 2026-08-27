@@ -52,7 +52,7 @@ function createQuestion(difficulty: DifficultyLevel): Question {
    * Avoid generating 0 + 0 too frequently because it is not
    * particularly useful practice.
    */
-  let left = Math.floor(Math.random() * (maximum + 1));
+  const left = Math.floor(Math.random() * (maximum + 1));
   let right = Math.floor(Math.random() * (maximum + 1));
 
   if (left === 0 && right === 0) {

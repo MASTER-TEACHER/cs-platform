@@ -672,7 +672,13 @@ export async function getTeacherDashboardData(
     .filter((student) => student.hasResults && student.averageScore < 50)
     .sort((first, second) => first.averageScore - second.averageScore)
     .slice(0, 5)
-    .map(({ hasResults: _hasResults, ...student }) => student);
+    .map((student) => ({
+      id: student.id,
+      name: student.name,
+      weakTopic: student.weakTopic,
+      averageScore: student.averageScore,
+      recommendedAction: student.recommendedAction,
+    }));
 
   const topicGroups = new Map<string, number[]>();
 

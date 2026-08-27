@@ -217,11 +217,13 @@ export default function QuizPage() {
     }
 
     if (!topicParam) {
-      setGeneratedQuiz(null);
-      setSelectedQuizId(
-        null,
-      );
-      setLoadError("");
+      void Promise.resolve().then(() => {
+        setGeneratedQuiz(null);
+        setSelectedQuizId(
+          null,
+        );
+        setLoadError("");
+      });
       return;
     }
 
@@ -251,15 +253,17 @@ export default function QuizPage() {
         );
 
       if (curriculumQuiz) {
-        setSelectedQuizId(
-          resolvedTopicId,
-        );
+        void Promise.resolve().then(() => {
+          setSelectedQuizId(
+            resolvedTopicId,
+          );
 
-        setGeneratedQuiz(
-          null,
-        );
+          setGeneratedQuiz(
+            null,
+          );
 
-        setLoadError("");
+          setLoadError("");
+        });
 
         return;
       }

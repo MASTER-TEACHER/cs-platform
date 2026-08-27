@@ -1,21 +1,5 @@
 "use client";
-import {
-  AlertCircle,
-  ArrowLeft,
-  BookOpen,
-  CheckCircle2,
-  Clock3,
-  FileQuestion,
-  GraduationCap,
-  Lightbulb,
-  Loader2,
-  Pencil,
-  RefreshCcw,
-  Send,
-  Tag,
-  Target,
-  Users,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, BookOpen, CheckCircle2, Clock3, FileQuestion, GraduationCap, Lightbulb, Pencil, RefreshCcw, Send, Tag, Target, Users } from "lucide-react";
 
 import { onAuthStateChanged, User } from "firebase/auth";
 
@@ -199,62 +183,70 @@ export default function TeacherResourceViewerPage() {
     return unsubscribe;
   }, []);
 
-  const loadResource = useCallback(async () => {
+  const loadResource = useCallback(() => {
     if (!currentUser || !resourceId) {
-      setResource(null);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const resourceReference = doc(db, "teacherResources", resourceId);
-
-      const resourceSnapshot = await getDoc(resourceReference);
-
-      if (!resourceSnapshot.exists()) {
+      return Promise.resolve().then(() => {
         setResource(null);
-        setError("This teaching resource could not be found.");
-        return;
-      }
-
-      const data = resourceSnapshot.data() as FirestoreTeacherResource;
-
-      if (data.teacherId !== currentUser.uid) {
-        setResource(null);
-        setError("You do not have permission to view this resource.");
-        return;
-      }
-
-      setResource({
-        id: resourceSnapshot.id,
-        teacherId: data.teacherId,
-        sourceResourceId: data.sourceResourceId,
-        title: data.title,
-        topic: data.topic,
-        resourceType: data.resourceType,
-        yearGroup: data.yearGroup,
-        examBoard: data.examBoard,
-        duration: data.duration,
-        difficulty: data.difficulty,
-        content: data.content,
-        status: data.status,
-        createdAt: convertTimestamp(data.createdAt),
-        updatedAt: convertTimestamp(data.updatedAt),
+        setError(null);
+        setLoading(false);
       });
-    } catch (caughtError) {
-      console.error("Failed to load teacher resource:", caughtError);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "The teaching resource could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
     }
+
+    const teacherId = currentUser.uid;
+
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+
+        const resourceReference = doc(db, "teacherResources", resourceId);
+
+        return getDoc(resourceReference);
+      })
+      .then((resourceSnapshot) => {
+        if (!resourceSnapshot.exists()) {
+          setResource(null);
+          setError("This teaching resource could not be found.");
+          return;
+        }
+
+        const data = resourceSnapshot.data() as FirestoreTeacherResource;
+
+        if (data.teacherId !== teacherId) {
+          setResource(null);
+          setError("You do not have permission to view this resource.");
+          return;
+        }
+
+        setResource({
+          id: resourceSnapshot.id,
+          teacherId: data.teacherId,
+          sourceResourceId: data.sourceResourceId,
+          title: data.title,
+          topic: data.topic,
+          resourceType: data.resourceType,
+          yearGroup: data.yearGroup,
+          examBoard: data.examBoard,
+          duration: data.duration,
+          difficulty: data.difficulty,
+          content: data.content,
+          status: data.status,
+          createdAt: convertTimestamp(data.createdAt),
+          updatedAt: convertTimestamp(data.updatedAt),
+        });
+      })
+      .catch((caughtError) => {
+        console.error("Failed to load teacher resource:", caughtError);
+
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The teaching resource could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [currentUser, resourceId]);
 
   useEffect(() => {

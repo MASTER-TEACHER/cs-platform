@@ -456,14 +456,16 @@ export default function TeacherStudentsPage() {
       !user?.uid ||
       !schoolId
     ) {
-      setMembers([]);
-      setProfiles(
-        new Map(),
-      );
-      setPortfolio(
-        null,
-      );
-      setLoading(false);
+      void Promise.resolve().then(() => {
+        setMembers([]);
+        setProfiles(
+          new Map(),
+        );
+        setPortfolio(
+          null,
+        );
+        setLoading(false);
+      });
       return;
     }
 

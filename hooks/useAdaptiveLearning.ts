@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAdaptiveLearningPlan } from "@/services/adaptiveLearningService";
 import type { AdaptiveLearningPlan } from "@/types/adaptiveLearning";
@@ -11,33 +11,42 @@ export function useAdaptiveLearning() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function refresh() {
+  const refresh = useCallback(() => {
     if (!user?.uid) {
-      setPlan(null);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setPlan(null);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    setLoading(true);
-    setError("");
+    const userId = user.uid;
 
-    try {
-      setPlan(await getAdaptiveLearningPlan(user.uid));
-    } catch (caughtError) {
-      console.error("Adaptive learning error:", caughtError);
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "The adaptive learning plan could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getAdaptiveLearningPlan(userId);
+      })
+      .then((loadedPlan) => {
+        setPlan(loadedPlan);
+      })
+      .catch((caughtError) => {
+        console.error("Adaptive learning error:", caughtError);
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "The adaptive learning plan could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [user]);
 
   useEffect(() => {
     if (!authLoading) void refresh();
-  }, [authLoading, user?.uid]);
+  }, [authLoading, refresh]);
 
   return {
     plan,

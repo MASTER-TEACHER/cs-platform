@@ -50,8 +50,11 @@ export default function TeacherQuizLibraryPage() {
     }
 
     if (!user) {
-      setQuizzes([]);
-      setLoadingQuizzes(false);
+      void Promise.resolve().then(() => {
+        setQuizzes([]);
+        setLoadingQuizzes(false);
+      });
+
       return;
     }
 

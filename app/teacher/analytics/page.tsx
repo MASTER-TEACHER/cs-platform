@@ -7,20 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  AlertTriangle,
-  ArrowRight,
-  BarChart3,
-  BookOpenCheck,
-  CheckCircle2,
-  ClipboardList,
-  Gauge,
-  Search,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, CheckCircle2, ClipboardList, Gauge, Search, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
@@ -126,8 +113,11 @@ export default function TeacherAnalyticsPage() {
     }
 
     if (!user?.uid) {
-      setCentre(emptyActionCentre);
-      setLoading(false);
+      void Promise.resolve().then(() => {
+        setCentre(emptyActionCentre);
+        setError("");
+        setLoading(false);
+      });
       return;
     }
 

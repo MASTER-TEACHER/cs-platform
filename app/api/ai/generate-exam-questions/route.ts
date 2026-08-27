@@ -1430,10 +1430,6 @@ function specificDefinition(topic: string): string {
   return resolveTopicProfile(topic).definition;
 }
 
-function specificExplanation(topic: string): string {
-  return resolveTopicProfile(topic).explanation;
-}
-
 function specificExtendedAnswer(topic: string, contextLabel: string): string {
   const profile = resolveTopicProfile(topic);
 
@@ -1456,10 +1452,6 @@ Overall, ${topic} should be used when its benefits clearly match the needs of ${
 
 function definitionForTopic(topic: string): string {
   return specificDefinition(topic);
-}
-
-function explanationForTopic(topic: string): string {
-  return specificExplanation(topic);
 }
 
 

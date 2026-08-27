@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback } from "react";
+
 import {
   type FormEvent,
   useEffect,
@@ -151,55 +153,58 @@ export default function TeacherClassesPage() {
       "active",
     );
 
-  async function loadClasses() {
+  const loadClasses = useCallback(() => {
     if (!user?.uid) {
-      setClasses([]);
-      setLoadingClasses(
-        false,
-      );
-
-      return;
+      return Promise.resolve().then(() => {
+        setClasses([]);
+        setUnifiedAssignments([]);
+        setLoadingClasses(false);
+      });
     }
 
-    try {
-      setLoadingClasses(
-        true,
-      );
+    const teacherId = user.uid;
 
-      const [
+    return Promise.resolve()
+      .then(() => {
+        setLoadingClasses(true);
+
+        return Promise.all([
+          getTeacherClasses(
+            teacherId,
+          ),
+          getUnifiedTeacherAssignments(
+            teacherId,
+          ),
+        ]);
+      })
+      .then(([
         loaded,
         assignmentSummary,
-      ] = await Promise.all([
-        getTeacherClasses(
-          user.uid,
-        ),
-        getUnifiedTeacherAssignments(
-          user.uid,
-        ),
-      ]);
+      ]) => {
+        setClasses(
+          loaded,
+        );
 
-      setClasses(
-        loaded,
-      );
+        setUnifiedAssignments(
+          assignmentSummary.assignments,
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "Failed to load classes:",
+          error,
+        );
 
-      setUnifiedAssignments(
-        assignmentSummary.assignments,
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load classes:",
-        error,
-      );
-
-      toast.error(
-        "Could not load your classes.",
-      );
-    } finally {
-      setLoadingClasses(
-        false,
-      );
-    }
-  }
+        toast.error(
+          "Could not load your classes.",
+        );
+      })
+      .finally(() => {
+        setLoadingClasses(
+          false,
+        );
+      });
+  }, [user]);
 
   useEffect(() => {
     if (
@@ -213,7 +218,7 @@ export default function TeacherClassesPage() {
   }, [
     authLoading,
     profileReady,
-    user?.uid,
+    loadClasses,
   ]);
 
   const visibleClasses =
@@ -779,7 +784,7 @@ export default function TeacherClassesPage() {
                       <p className="mt-1 text-sm text-slate-500">
                         {classItem.subject ||
                           "Computer Science"}{" "}
-                        ·{" "}
+                        Ã‚Â·{" "}
                         {classItem.academicYear ||
                           "Academic year not set"}
                       </p>

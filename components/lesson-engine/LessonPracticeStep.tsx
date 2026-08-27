@@ -65,7 +65,9 @@ export default function LessonPracticeStep({
   );
 
   useEffect(() => {
-    setResponses(createInitialResponses(questions, initialResponses));
+    void Promise.resolve().then(() => {
+      setResponses(createInitialResponses(questions, initialResponses));
+    });
   }, [questions, initialResponses]);
 
   function updateResponse(

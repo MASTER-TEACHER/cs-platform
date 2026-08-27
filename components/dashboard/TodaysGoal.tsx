@@ -5,7 +5,7 @@ export default function TodaysGoal() {
   return (
     <Card>
       <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-        Today's Goal
+        Today&apos;s Goal
       </p>
 
       <h2 className="mt-3 text-2xl font-bold text-slate-900">
@@ -13,12 +13,12 @@ export default function TodaysGoal() {
       </h2>
 
       <p className="mt-3 text-slate-600">
-        Finish today's goal to earn an extra
+        Finish today&apos;s goal to earn an extra
         <span className="font-semibold text-blue-600"> +100 XP</span>.
       </p>
 
       <div className="mt-6">
-        <Button>Start Learning →</Button>
+        <Button>Start Learning â†’</Button>
       </div>
     </Card>
   );

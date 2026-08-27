@@ -1,0 +1,32 @@
+CS MASTER - P1 LINT REMEDIATION PASS 5G
+Generated: 2026-08-27 10:57:17
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass5g-backup-20260827-105554
+
+Applied source changes: 2
+
+BEFORE
+------
+Problem files: 12
+Errors: 11
+Warnings: 3
+
+AFTER
+-----
+Problem files: 11
+Errors: 11
+Warnings: 2
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 11
+react-hooks/exhaustive-deps: 1
+@typescript-eslint/no-unused-vars: 1
+
+PASS 5G SCOPE
+-------------
+Refactored written-exam fullscreen and visibility listener callbacks using
+React Effect Events while preserving the existing integrity policy.
+Five-second countdown, pause/warn rules, incident logging and automatic
+submission remain implemented by the same underlying functions.
+No ESLint rule or warning was disabled.

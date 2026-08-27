@@ -33,8 +33,6 @@ export function useStudentAssignmentResults(): UseStudentAssignmentResultsReturn
     }
 
     if (!user) {
-      setResults([]);
-      setLoading(false);
       return;
     }
 
@@ -84,7 +82,7 @@ export function useStudentAssignmentResults(): UseStudentAssignmentResultsReturn
   }, [authLoading, user]);
 
   return {
-    results,
-    loading: authLoading || loading,
+    results: user ? results : [],
+    loading: authLoading || (Boolean(user) && loading),
   };
 }

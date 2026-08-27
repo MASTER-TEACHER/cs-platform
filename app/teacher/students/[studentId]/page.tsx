@@ -1,28 +1,6 @@
 "use client";
 
-import {
-  AlertCircle,
-  ArrowLeft,
-  Award,
-  BarChart3,
-  BookOpen,
-  Brain,
-  CalendarDays,
-  CheckCircle2,
-  Clock3,
-  Flame,
-  FileText,
-  GraduationCap,
-  Lightbulb,
-  School,
-  Sparkles,
-  Star,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  UserRound,
-  XCircle,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Award, BarChart3, BookOpen, Brain, CalendarDays, CheckCircle2, Clock3, Flame, FileText, GraduationCap, Lightbulb, Sparkles, Star, Target, TrendingDown, TrendingUp, UserRound, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -116,42 +94,47 @@ export default function TeacherStudentAnalyticsPage() {
 
   const [error, setError] = useState("");
 
-  const loadAnalytics = useCallback(async () => {
+  const loadAnalytics = useCallback(() => {
     if (!studentId || !user?.uid) {
-      return;
+      return Promise.resolve();
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    const teacherId = user.uid;
 
-      const loadedAnalytics = await getStudentAnalytics(studentId, user.uid);
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getStudentAnalytics(studentId, teacherId);
+      })
+      .then((loadedAnalytics) => {
+        if (!loadedAnalytics) {
+          setAnalytics(null);
 
-      if (!loadedAnalytics) {
+          setError(
+            "This student could not be found or is not enrolled in one of your classes.",
+          );
+
+          return;
+        }
+
+        setAnalytics(loadedAnalytics);
+      })
+      .catch((caughtError) => {
+        console.error("Failed to load student analytics:", caughtError);
+
         setAnalytics(null);
 
         setError(
-          "This student could not be found or is not enrolled in one of your classes.",
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Student analytics could not be loaded.",
         );
-
-        return;
-      }
-
-      setAnalytics(loadedAnalytics);
-    } catch (caughtError) {
-      console.error("Failed to load student analytics:", caughtError);
-
-      setAnalytics(null);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Student analytics could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [studentId, user?.uid]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [studentId, user]);
 
   useEffect(() => {
     void loadAnalytics();

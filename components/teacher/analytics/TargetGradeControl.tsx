@@ -7,7 +7,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  useEffect,
   useState,
 } from "react";
 import toast from "react-hot-toast";
@@ -56,11 +55,13 @@ export default function TargetGradeControl({
     setSaving,
   ] = useState(false);
 
-  useEffect(() => {
+  function beginEditing() {
     setSelected(
       value || "",
     );
-  }, [value]);
+
+    setEditing(true);
+  }
 
   function cancel() {
     setSelected(
@@ -126,9 +127,7 @@ export default function TargetGradeControl({
 
         <button
           type="button"
-          onClick={() =>
-            setEditing(true)
-          }
+          onClick={beginEditing}
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-teal-600 px-3 text-xs font-black text-white transition hover:bg-teal-700"
         >
           {value ? (

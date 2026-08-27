@@ -17,10 +17,10 @@ export default function DailyMission({ mission }: Props) {
   if (!mission) {
     return (
       <Card>
-        <h2 className="text-2xl font-bold">🎉 All missions complete!</h2>
+        <h2 className="text-2xl font-bold">ðŸŽ‰ All missions complete!</h2>
 
         <p className="mt-3 text-slate-600">
-          You've completed everything available.
+          You&apos;ve completed everything available.
         </p>
       </Card>
     );
@@ -29,7 +29,7 @@ export default function DailyMission({ mission }: Props) {
   return (
     <Card className="border-0 bg-gradient-to-r from-indigo-600 to-blue-600 text-white">
       <p className="text-sm uppercase tracking-wider font-semibold">
-        🎯 Today's Mission
+        ðŸŽ¯Today&apos;s Mission
       </p>
 
       <h2 className="mt-4 text-3xl font-bold">{mission.lesson}</h2>
@@ -40,7 +40,7 @@ export default function DailyMission({ mission }: Props) {
         <div>
           <p className="text-xs uppercase">Reward</p>
 
-          <p className="mt-1 font-bold">⭐ {mission.xp} XP</p>
+          <p className="mt-1 font-bold">â­ {mission.xp} XP</p>
         </div>
 
         <div>
@@ -57,7 +57,7 @@ export default function DailyMission({ mission }: Props) {
       </div>
 
       <div className="mt-8">
-        <Button>Start Mission →</Button>
+        <Button>Start Mission â†’</Button>
       </div>
     </Card>
   );

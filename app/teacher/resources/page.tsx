@@ -260,31 +260,38 @@ export default function TeacherResourcesPage() {
     return unsubscribe;
   }, []);
 
-  const loadResources = useCallback(async () => {
+  const loadResources = useCallback(() => {
     if (!currentUser) {
-      setResources([]);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setResources([]);
+        setError(null);
+        setLoading(false);
+      });
     }
 
-    setLoading(true);
-    setError(null);
+    const teacherId = currentUser.uid;
 
-    try {
-      const savedResources = await getTeacherResources(currentUser.uid);
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError(null);
+        return getTeacherResources(teacherId);
+      })
+      .then((savedResources) => {
+        setResources(savedResources);
+      })
+      .catch((caughtError) => {
+        console.error("Failed to load teacher resources:", caughtError);
 
-      setResources(savedResources);
-    } catch (caughtError) {
-      console.error("Failed to load teacher resources:", caughtError);
-
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Your resource library could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Your resource library could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [currentUser]);
 
   useEffect(() => {

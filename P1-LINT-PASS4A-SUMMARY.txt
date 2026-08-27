@@ -1,0 +1,32 @@
+CS MASTER - P1 LINT REMEDIATION PASS 4A
+Generated: 2026-08-26 20:29:32
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-p1-lint-pass4a-backup-20260826-202707
+
+Applied source changes: 14
+
+BEFORE
+------
+Problem files: 58
+Errors: 61
+Warnings: 12
+
+AFTER
+-----
+Problem files: 52
+Errors: 55
+Warnings: 12
+
+REMAINING RULE COUNTS
+---------------------
+react-hooks/set-state-in-effect: 54
+react-hooks/exhaustive-deps: 9
+@typescript-eslint/no-unused-vars: 3
+react-hooks/purity: 1
+
+PASS 4A SCOPE
+-------------
+Handled low-risk derived/reset state effects only.
+Did not modify exam integrity, fullscreen, visibility, countdown,
+auto-submit, quiz timer, or incident logging behaviour.
+No ESLint rules or warnings were disabled.

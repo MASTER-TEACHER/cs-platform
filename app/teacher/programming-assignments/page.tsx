@@ -27,30 +27,37 @@ export default function TeacherProgrammingAssignmentsPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  const loadAssignments = useCallback(async () => {
+  const loadAssignments = useCallback(() => {
     if (!user?.uid) {
-      setAssignments([]);
-      setLoading(false);
-      return;
+      return Promise.resolve().then(() => {
+        setAssignments([]);
+        setError("");
+        setLoading(false);
+      });
     }
 
-    try {
-      setLoading(true);
-      setError("");
+    const teacherId = user.uid;
 
-      setAssignments(
-        await getTeacherProgrammingAssignments(user.uid),
-      );
-    } catch (caughtError) {
-      setError(
-        caughtError instanceof Error
-          ? caughtError.message
-          : "Programming assignments could not be loaded.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.uid]);
+    return Promise.resolve()
+      .then(() => {
+        setLoading(true);
+        setError("");
+        return getTeacherProgrammingAssignments(teacherId);
+      })
+      .then((loadedAssignments) => {
+        setAssignments(loadedAssignments);
+      })
+      .catch((caughtError) => {
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Programming assignments could not be loaded.",
+        );
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [user]);
 
   useEffect(() => {
     void loadAssignments();

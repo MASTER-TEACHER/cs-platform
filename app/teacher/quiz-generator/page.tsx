@@ -279,22 +279,24 @@ export default function QuizGeneratorPage() {
       return;
     }
 
-    setSettings({
-      topic: topic.trim(),
-      qualification:
-        searchParams.get("qualification")?.trim() ||
-        initialSettings.qualification,
-      examBoard:
-        searchParams.get("examBoard")?.trim() || initialSettings.examBoard,
-      difficulty: normaliseDifficulty(searchParams.get("difficulty")),
-      questionCount: normaliseQuestionCount(searchParams.get("questionCount")),
-    });
+    void Promise.resolve().then(() => {
+      setSettings({
+        topic: topic.trim(),
+        qualification:
+          searchParams.get("qualification")?.trim() ||
+          initialSettings.qualification,
+        examBoard:
+          searchParams.get("examBoard")?.trim() || initialSettings.examBoard,
+        difficulty: normaliseDifficulty(searchParams.get("difficulty")),
+        questionCount: normaliseQuestionCount(searchParams.get("questionCount")),
+      });
 
-    setQuiz(null);
-    setSavedQuizId(null);
-    setGenerationMode(null);
-    setQuotaUnavailable(false);
-    setCopilotPrefilled(true);
+      setQuiz(null);
+      setSavedQuizId(null);
+      setGenerationMode(null);
+      setQuotaUnavailable(false);
+      setCopilotPrefilled(true);
+    });
   }, [searchParams]);
 
   const developmentMode =
