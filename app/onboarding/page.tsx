@@ -8,6 +8,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { getCurriculumDefinition } from "@/data/curriculum/curriculumMap";
+import { getSupportedExamBoards } from "@/data/curriculum/supportedCurriculumOptions";
 import { updateUserCourseSelection } from "@/services/userService";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -91,7 +92,31 @@ export default function OnboardingPage() {
   const [examBoard, setExamBoard] =
     useState<ExamBoard>("AQA");
 
-  const [submitting, setSubmitting] =
+  
+  function selectQualification(
+    nextQualification: Qualification,
+  ) {
+    const supportedBoards =
+      getSupportedExamBoards(
+        nextQualification,
+      );
+
+    setQualification(
+      nextQualification,
+    );
+
+    if (
+      !supportedBoards.includes(
+        examBoard,
+      )
+    ) {
+      setExamBoard(
+        supportedBoards[0] ||
+          "AQA",
+      );
+    }
+  }
+const [submitting, setSubmitting] =
     useState(false);
 
   const [error, setError] =
@@ -302,11 +327,7 @@ export default function OnboardingPage() {
                           checked={
                             selected
                           }
-                          onChange={() =>
-                            setQualification(
-                              option.value,
-                            )
-                          }
+                          onChange={() => selectQualification(option.value)}
                           className="sr-only"
                         />
 
@@ -347,7 +368,7 @@ export default function OnboardingPage() {
               </legend>
 
               <div className="mt-5 grid gap-4 md:grid-cols-3">
-                {examBoardOptions.map(
+                {examBoardOptions.filter((option) => getSupportedExamBoards(qualification).includes(option.value)).map(
                   (option) => {
                     const selected =
                       examBoard ===

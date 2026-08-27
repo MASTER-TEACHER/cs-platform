@@ -4,6 +4,8 @@ import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
+import SchoolSubscriptionGate from "@/components/billing/SchoolSubscriptionGate";
+import IndividualPremiumGate from "@/components/billing/IndividualPremiumGate";
 
 export default function StudentAccessGate({
   children,
@@ -134,5 +136,11 @@ export default function StudentAccessGate({
     );
   }
 
-  return <>{children}</>;
+  return (
+    <IndividualPremiumGate>
+      <SchoolSubscriptionGate>
+        {children}
+      </SchoolSubscriptionGate>
+    </IndividualPremiumGate>
+  );
 }

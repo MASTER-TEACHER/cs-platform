@@ -1,0 +1,27 @@
+CS MASTER - T-FINAL-1B TEACHER UI ENCODING POLISH
+Generated: 2026-08-27 14:33:25
+Project: C:\Users\cr7ri\cs-platform-clean
+Backup: C:\Users\cr7ri\cs-platform-clean-t-final-1b-backup-20260827-143051
+
+CHANGE
+------
+Normalised targeted corrupted teacher-facing UTF-8 character sequences.
+This pass changes display text only.
+No Firestore schema, tenancy, assignment, intervention or enrolment logic changed.
+
+Changed files: 0
+Normalised sequences: 0
+
+ESLINT
+------
+Status: PASS
+Exit code: 0
+
+PRODUCTION BUILD
+----------------
+Status: PASS
+Exit code: 0
+
+T-FINAL-1B STATUS
+-----------------
+PASS

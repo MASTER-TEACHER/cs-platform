@@ -1,7 +1,15 @@
-import { NextRequest, NextResponse } from "next/server";
+import {
+  NextRequest,
+  NextResponse,
+} from "next/server";
 
-import { adminAuth, adminDb } from "@/lib/firebaseAdmin";
+import {
+  adminAuth,
+  adminDb,
+} from "@/lib/firebaseAdmin";
+
 export const runtime = "nodejs";
+
 type RouteContext = {
   params: Promise<{
     requestedId: string;
@@ -10,108 +18,261 @@ type RouteContext = {
 
 type TeacherRequestAction = {
   action: "approve" | "reject";
-  adminIdToken: string;
 };
 
-function isValidBody(value: unknown): value is TeacherRequestAction {
-  if (!value || typeof value !== "object") {
+function readBearerToken(
+  request: NextRequest,
+): string {
+  const authorization =
+    request.headers.get(
+      "authorization",
+    ) || "";
+
+  if (
+    !authorization.startsWith(
+      "Bearer ",
+    )
+  ) {
+    return "";
+  }
+
+  return authorization
+    .slice("Bearer ".length)
+    .trim();
+}
+
+function isValidBody(
+  value: unknown,
+): value is TeacherRequestAction {
+  if (
+    !value ||
+    typeof value !== "object"
+  ) {
     return false;
   }
 
-  const body = value as Partial<TeacherRequestAction>;
+  const body =
+    value as Partial<TeacherRequestAction>;
 
   return (
-    (body.action === "approve" || body.action === "reject") &&
-    typeof body.adminIdToken === "string" &&
-    body.adminIdToken.length > 0
+    body.action === "approve" ||
+    body.action === "reject"
   );
 }
 
-export async function POST(request: NextRequest, context: RouteContext) {
+export async function POST(
+  request: NextRequest,
+  context: RouteContext,
+) {
   try {
-    const { requestedId } = await context.params;
-    const body: unknown = await request.json();
+    const { requestedId } =
+      await context.params;
+
+    const adminIdToken =
+      readBearerToken(request);
+
+    if (!adminIdToken) {
+      return NextResponse.json(
+        {
+          error:
+            "Administrator authentication is required.",
+        },
+        { status: 401 },
+      );
+    }
+
+    const body: unknown =
+      await request.json();
 
     if (!isValidBody(body)) {
-      return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-    }
-
-    const decodedToken = await adminAuth.verifyIdToken(body.adminIdToken);
-
-    const adminUserSnapshot = await adminDb
-      .collection("users")
-      .doc(decodedToken.uid)
-      .get();
-
-    if (!adminUserSnapshot.exists) {
       return NextResponse.json(
-        { error: "Admin profile not found." },
-        { status: 403 },
-      );
-    }
-
-    const adminUser = adminUserSnapshot.data();
-
-    if (adminUser?.role !== "admin") {
-      return NextResponse.json(
-        { error: "Admin access required." },
-        { status: 403 },
-      );
-    }
-
-    const teacherRequestReference = adminDb
-      .collection("teacherRequests")
-      .doc(requestedId);
-
-    const teacherRequestSnapshot = await teacherRequestReference.get();
-
-    if (!teacherRequestSnapshot.exists) {
-      return NextResponse.json(
-        { error: "Teacher request not found." },
-        { status: 404 },
-      );
-    }
-
-    const teacherRequest = teacherRequestSnapshot.data();
-
-    if (!teacherRequest?.userId) {
-      return NextResponse.json(
-        { error: "Teacher request is missing a user ID." },
+        {
+          error:
+            "Invalid request.",
+        },
         { status: 400 },
       );
     }
 
-    if (teacherRequest.status !== "pending") {
+    const decodedToken =
+      await adminAuth.verifyIdToken(
+        adminIdToken,
+      );
+
+    const adminUserSnapshot =
+      await adminDb
+        .collection("users")
+        .doc(decodedToken.uid)
+        .get();
+
+    if (!adminUserSnapshot.exists) {
       return NextResponse.json(
-        { error: "This request has already been reviewed." },
+        {
+          error:
+            "Admin profile not found.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const adminUser =
+      adminUserSnapshot.data();
+
+    if (
+      adminUser?.role !==
+      "admin"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Admin access required.",
+        },
+        { status: 403 },
+      );
+    }
+
+    const teacherRequestReference =
+      adminDb
+        .collection(
+          "teacherRequests",
+        )
+        .doc(requestedId);
+
+    const teacherRequestSnapshot =
+      await teacherRequestReference.get();
+
+    if (
+      !teacherRequestSnapshot.exists
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Teacher request not found.",
+        },
+        { status: 404 },
+      );
+    }
+
+    const teacherRequest =
+      teacherRequestSnapshot.data();
+
+    if (
+      !teacherRequest?.userId
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Teacher request is missing a user ID.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      teacherRequest.status !==
+      "pending"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This request has already been reviewed.",
+        },
         { status: 409 },
       );
     }
 
-    const requestedUserId = teacherRequest.userId as string;
+    const requestedUserId =
+      String(
+        teacherRequest.userId,
+      ).trim();
 
-    if (body.action === "approve") {
-      await adminAuth.setCustomUserClaims(requestedUserId, {
-        role: "teacher",
-      });
+    if (!requestedUserId) {
+      return NextResponse.json(
+        {
+          error:
+            "Teacher request has an invalid user ID.",
+        },
+        { status: 400 },
+      );
+    }
 
-      await adminDb.runTransaction(async (transaction) => {
-        const userReference = adminDb.collection("users").doc(requestedUserId);
+    const userReference =
+      adminDb
+        .collection("users")
+        .doc(requestedUserId);
 
-        transaction.update(userReference, {
+    const requestedUserSnapshot =
+      await userReference.get();
+
+    if (
+      !requestedUserSnapshot.exists
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Requested user profile not found.",
+        },
+        { status: 404 },
+      );
+    }
+
+    const requestedUser =
+      requestedUserSnapshot.data();
+
+    if (
+      requestedUser?.role ===
+      "admin"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Administrator accounts cannot be converted through teacher access requests.",
+        },
+        { status: 409 },
+      );
+    }
+
+    if (
+      body.action ===
+      "approve"
+    ) {
+      await adminAuth.setCustomUserClaims(
+        requestedUserId,
+        {
           role: "teacher",
-          teacherApprovedAt: new Date(),
-          teacherApprovedBy: decodedToken.uid,
-          updatedAt: new Date(),
-        });
+        },
+      );
 
-        transaction.update(teacherRequestReference, {
-          status: "approved",
-          reviewedBy: decodedToken.uid,
-          reviewedAt: new Date(),
-          updatedAt: new Date(),
-        });
-      });
+      await adminDb.runTransaction(
+        async (transaction) => {
+          transaction.update(
+            userReference,
+            {
+              role: "teacher",
+              teacherApprovedAt:
+                new Date(),
+              teacherApprovedBy:
+                decodedToken.uid,
+              updatedAt:
+                new Date(),
+            },
+          );
+
+          transaction.update(
+            teacherRequestReference,
+            {
+              status:
+                "approved",
+              reviewedBy:
+                decodedToken.uid,
+              reviewedAt:
+                new Date(),
+              updatedAt:
+                new Date(),
+            },
+          );
+        },
+      );
 
       return NextResponse.json({
         success: true,
@@ -119,19 +280,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
       });
     }
 
-    await teacherRequestReference.update({
-      status: "rejected",
-      reviewedBy: decodedToken.uid,
-      reviewedAt: new Date(),
-      updatedAt: new Date(),
-    });
+    await teacherRequestReference.update(
+      {
+        status: "rejected",
+        reviewedBy:
+          decodedToken.uid,
+        reviewedAt:
+          new Date(),
+        updatedAt:
+          new Date(),
+      },
+    );
 
     return NextResponse.json({
       success: true,
       status: "rejected",
     });
   } catch (error) {
-    console.error("Teacher request review error:", error);
+    console.error(
+      "Teacher request review error:",
+      error,
+    );
 
     return NextResponse.json(
       {

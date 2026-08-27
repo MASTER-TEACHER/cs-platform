@@ -7,9 +7,7 @@ import toast from "react-hot-toast";
 import Card from "@/components/ui/Card";
 import { useAuth } from "@/contexts/AuthContext";
 
-import {
-  acceptSchoolInvite,
-} from "@/services/schoolInvitationService";
+import { acceptSchoolInviteWithBilling } from "@/services/billingClientService";
 
 export default function JoinSchoolPage() {
   const router = useRouter();
@@ -38,10 +36,9 @@ export default function JoinSchoolPage() {
       setJoining(true);
 
       const result =
-        await acceptSchoolInvite({
+        await acceptSchoolInviteWithBilling(
           code,
-          userId: user.uid,
-        });
+        );
 
       const refreshed =
         await refreshProfile();

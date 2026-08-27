@@ -10,6 +10,8 @@ import {
   getDoc,
   onSnapshot,
   query,
+  serverTimestamp,
+  updateDoc,
   where,
 } from "firebase/firestore";
 
@@ -49,6 +51,16 @@ export default function AssignmentWizardPage() {
   const quizId = searchParams.get("quizId");
   const contentType = searchParams.get("contentType");
   const contentId = searchParams.get("contentId");
+
+  const assignmentSource = searchParams.get("source");
+  const interventionStudentId = searchParams.get("studentId");
+  const interventionTopic = searchParams.get("topic");
+  const interventionId = searchParams.get("interventionId");
+
+  const isInterventionReassessment =
+    assignmentSource === "intervention-review" &&
+    Boolean(interventionStudentId) &&
+    Boolean(interventionId);
 
   const [step, setStep] =
     useState<AssignmentWizardStep>(
@@ -117,6 +129,49 @@ export default function AssignmentWizardPage() {
           ),
         );
 
+        if (
+          isInterventionReassessment &&
+          interventionStudentId
+        ) {
+          const matchingClassIds =
+            snapshot.docs
+              .filter((classDocument) => {
+                const data =
+                  classDocument.data();
+
+                return (
+                  Array.isArray(
+                    data.studentIds,
+                  ) &&
+                  data.studentIds.some(
+                    (value) =>
+                      typeof value ===
+                        "string" &&
+                      value ===
+                        interventionStudentId,
+                  )
+                );
+              })
+              .map(
+                (classDocument) =>
+                  classDocument.id,
+              );
+
+          setWizardData((current) => ({
+            ...current,
+            selectedClassIds:
+              current.selectedClassIds
+                .length > 0
+                ? current.selectedClassIds
+                : matchingClassIds,
+            instructions:
+              current.instructions ||
+              (interventionTopic
+                ? `Complete a focused reassessment on ${interventionTopic}. Use the result to review the current intervention.`
+                : "Complete this focused reassessment. Use the result to review the current intervention."),
+          }));
+        }
+
         setClasses(loadedClasses);
         setLoadingClasses(false);
       },
@@ -134,7 +189,13 @@ export default function AssignmentWizardPage() {
     );
 
     return unsubscribe;
-  }, [authLoading, user]);
+  }, [
+    authLoading,
+    user,
+    isInterventionReassessment,
+    interventionStudentId,
+    interventionTopic,
+  ]);
 
   useEffect(() => {
     if (!quizId || !user) return;
@@ -449,6 +510,95 @@ export default function AssignmentWizardPage() {
     setSubmitting(true);
 
     try {
+      /*
+       * Production preflight:
+       * verify every selected class still exists, belongs to this teacher,
+       * and has at least one enrolled student before creating any assignment.
+       *
+       * This protects every assignment path (lesson, quiz, AI quiz,
+       * exam paper, teaching resource and programming challenge) from
+       * producing empty or stale class assignments.
+       */
+      const selectedClassSnapshots =
+        await Promise.all(
+          wizardData.selectedClassIds.map(
+            (selectedClassId) =>
+              getDoc(
+                doc(
+                  db,
+                  "classes",
+                  selectedClassId,
+                ),
+              ),
+          ),
+        );
+
+      selectedClassSnapshots.forEach(
+        (classSnapshot, index) => {
+          const selectedClassId =
+            wizardData.selectedClassIds[
+              index
+            ];
+
+          if (
+            !classSnapshot.exists()
+          ) {
+            throw new Error(
+              "A selected class could not be found. Refresh the page and choose the class again.",
+            );
+          }
+
+          const classData =
+            classSnapshot.data();
+
+          if (
+            typeof classData.teacherId ===
+              "string" &&
+            classData.teacherId &&
+            classData.teacherId !== user.uid
+          ) {
+            throw new Error(
+              "You cannot assign work to another teacher's class.",
+            );
+          }
+
+          const studentIds =
+            Array.isArray(
+              classData.studentIds,
+            )
+              ? classData.studentIds.filter(
+                  (
+                    value,
+                  ): value is string =>
+                    typeof value ===
+                      "string" &&
+                    Boolean(
+                      value.trim(),
+                    ),
+                )
+              : [];
+
+          if (
+            studentIds.length === 0
+          ) {
+            const className =
+              classes.find(
+                (item) =>
+                  item.id ===
+                  selectedClassId,
+              )?.name ||
+              (typeof classData.name ===
+                "string"
+                ? classData.name
+                : "A selected class");
+
+            throw new Error(
+              `${className} has no enrolled students. Add at least one student before assigning work.`,
+            );
+          }
+        },
+      );
+
       if (
         wizardData.resource.resourceType ===
         "programming-challenge"
@@ -732,6 +882,40 @@ export default function AssignmentWizardPage() {
         );
       }
 
+      if (
+        isInterventionReassessment &&
+        interventionId
+      ) {
+        await updateDoc(
+          doc(
+            db,
+            "interventions",
+            interventionId,
+          ),
+          {
+            reassessmentAssignedAt:
+              serverTimestamp(),
+            reassessmentAssignedBy:
+              user.uid,
+            reassessmentTopic:
+              interventionTopic || "",
+            reassessmentResourceType:
+              wizardData.resource
+                .resourceType,
+            reassessmentResourceId:
+              wizardData.resource
+                .resourceId,
+            reassessmentDueDate:
+              wizardData.dueDate,
+            reassessmentClassIds:
+              wizardData
+                .selectedClassIds,
+            updatedAt:
+              serverTimestamp(),
+          },
+        );
+      }
+
       toast.success(
         `${
           wizardData.resource.resourceType ===
@@ -827,6 +1011,28 @@ export default function AssignmentWizardPage() {
           </Link>
         </div>
       </Card>
+
+      {isInterventionReassessment && (
+        <Card className="border border-indigo-200 bg-indigo-50">
+          <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
+            Intervention reassessment
+          </p>
+
+          <h2 className="mt-2 text-xl font-black text-indigo-950">
+            Focused follow-up assessment
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-indigo-800">
+            {interventionTopic
+              ? `Choose an appropriate task for ${interventionTopic}. The class containing the intervention student has been preselected where possible.`
+              : "Choose an appropriate reassessment task. The class containing the intervention student has been preselected where possible."}
+          </p>
+
+          <p className="mt-2 text-xs font-semibold text-indigo-700">
+            This remains a class assignment. Return to the intervention impact review after new evidence is available.
+          </p>
+        </Card>
+      )}
 
       <WizardProgress
         currentStep={step}
@@ -940,9 +1146,8 @@ export default function AssignmentWizardPage() {
 
               {wizardData.deliveryMode === "assessment" && (
                 <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                  This assignment will be stored as an assessment quiz. The next
-                  wiring step will route assessment quizzes through the existing
-                  Exam Mode integrity shell; practice quizzes remain unchanged.
+                  This assignment is stored as an assessment quiz for monitored
+                  Exam Mode delivery. Practice quizzes remain unchanged.
                 </div>
               )}
             </Card>

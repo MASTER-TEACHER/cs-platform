@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import { getCurriculumDefinition } from "@/data/curriculum/curriculumMap";
+import { getSupportedExamBoards } from "@/data/curriculum/supportedCurriculumOptions";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserCourseSelection } from "@/services/userService";
 import type { ExamBoard, Qualification } from "@/types/user";
@@ -59,7 +60,31 @@ export default function CurriculumSettingsPage() {
 
   const [examBoard, setExamBoard] = useState<ExamBoard>("AQA");
 
-  const [submitting, setSubmitting] = useState(false);
+  
+  function selectQualification(
+    nextQualification: Qualification,
+  ) {
+    const supportedBoards =
+      getSupportedExamBoards(
+        nextQualification,
+      );
+
+    setQualification(
+      nextQualification,
+    );
+
+    if (
+      !supportedBoards.includes(
+        examBoard,
+      )
+    ) {
+      setExamBoard(
+        supportedBoards[0] ||
+          "AQA",
+      );
+    }
+  }
+const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
@@ -262,7 +287,7 @@ export default function CurriculumSettingsPage() {
                       name="qualification"
                       value={option.value}
                       checked={selected}
-                      onChange={() => setQualification(option.value)}
+                      onChange={() => selectQualification(option.value)}
                       className="sr-only"
                     />
 
@@ -297,7 +322,7 @@ export default function CurriculumSettingsPage() {
             </legend>
 
             <div className="mt-5 grid gap-4 md:grid-cols-3">
-              {examBoardOptions.map((option) => {
+              {examBoardOptions.filter((option) => getSupportedExamBoards(qualification).includes(option.value)).map((option) => {
                 const selected = examBoard === option.value;
 
                 return (

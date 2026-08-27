@@ -7,7 +7,7 @@ import {
   Timestamp,
   updateDoc,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import type {
   TutorConversation,
   TutorMessage,
@@ -105,12 +105,32 @@ export async function requestTutorResponse(input: {
   history: { role: "student" | "assistant"; content: string }[];
   context: TutorStudentContext;
 }): Promise<TutorResponse> {
+  const currentUser = auth.currentUser;
+
+  if (!currentUser || currentUser.uid !== input.studentId) {
+    throw new Error(
+      "Sign in with the student account using the AI Tutor.",
+    );
+  }
+
+  const idToken = await currentUser.getIdToken();
+
   const r = await fetch("/api/ai/student-tutor", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
     body: JSON.stringify(input),
   });
+
   const j = await r.json();
-  if (!r.ok) throw new Error(j.error || "The tutor could not respond.");
+
+  if (!r.ok) {
+    throw new Error(
+      j.error || "The tutor could not respond.",
+    );
+  }
+
   return j as TutorResponse;
 }

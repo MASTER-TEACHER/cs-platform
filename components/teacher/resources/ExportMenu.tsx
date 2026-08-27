@@ -162,7 +162,7 @@ export default function ExportMenu({ resource }: ExportMenuProps) {
                 <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
                   PDF
                   <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                    Coming soon
+                    Unavailable
                   </span>
                 </span>
 

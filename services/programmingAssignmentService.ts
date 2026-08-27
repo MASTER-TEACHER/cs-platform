@@ -381,6 +381,36 @@ export async function recordProgrammingAssignmentAttempt({
     );
   }
 
+  if (assignment.status !== "active") {
+    throw new Error(
+      "This programming assignment is no longer accepting attempts.",
+    );
+  }
+
+  if (!code.trim()) {
+    throw new Error(
+      "Enter some Python code before checking the assignment.",
+    );
+  }
+
+  if (
+    !Number.isFinite(passedCount) ||
+    !Number.isFinite(totalTests) ||
+    passedCount < 0 ||
+    totalTests <= 0 ||
+    passedCount > totalTests
+  ) {
+    throw new Error(
+      "The programming test result is invalid.",
+    );
+  }
+
+  if (passed && passedCount !== totalTests) {
+    throw new Error(
+      "A programming assignment can only complete when every test passes.",
+    );
+  }
+
   const id = progressId(assignmentId, studentId);
   const progressReference = doc(
     db,

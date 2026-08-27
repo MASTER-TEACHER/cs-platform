@@ -227,20 +227,35 @@ export default function QuizPlayer({ quiz }: Props) {
         return;
       }
 
+      if (!user?.uid) {
+        setLinkedAssignment(null);
+        setAssignmentError(
+          "Sign in with the student account that received this assignment.",
+        );
+        setAssignmentLoading(false);
+        return;
+      }
+
       try {
         setAssignmentLoading(true);
         setAssignmentError("");
 
-        const snapshot = await getDoc(doc(db, "assignments", assignmentId));
+        const snapshot = await getDoc(
+          doc(db, "assignments", assignmentId),
+        );
 
         if (!snapshot.exists()) {
-          throw new Error("The linked quiz assignment could not be found.");
+          throw new Error(
+            "The linked quiz assignment could not be found.",
+          );
         }
 
         const data = snapshot.data();
 
         if (data.type !== "quiz") {
-          throw new Error("This assignment is not a quiz assignment.");
+          throw new Error(
+            "This assignment is not a quiz assignment.",
+          );
         }
 
         if (!data.classId || !data.teacherId) {
@@ -249,20 +264,94 @@ export default function QuizPlayer({ quiz }: Props) {
           );
         }
 
+        if (data.status === "cancelled") {
+          throw new Error(
+            "This quiz assignment has been cancelled.",
+          );
+        }
+
+        const assignedResourceId =
+          typeof data.resourceId === "string"
+            ? data.resourceId.trim()
+            : "";
+
+        if (
+          !assignedResourceId ||
+          ![
+            quiz.id,
+            quiz.topicId,
+          ].includes(assignedResourceId)
+        ) {
+          throw new Error(
+            "This quiz does not match the linked assignment.",
+          );
+        }
+
+        const classSnapshot = await getDoc(
+          doc(
+            db,
+            "classes",
+            data.classId,
+          ),
+        );
+
+        if (!classSnapshot.exists()) {
+          throw new Error(
+            "The class linked to this assignment could not be found.",
+          );
+        }
+
+        const classData =
+          classSnapshot.data();
+
+        const studentIds =
+          Array.isArray(
+            classData.studentIds,
+          )
+            ? classData.studentIds.filter(
+                (
+                  value,
+                ): value is string =>
+                  typeof value ===
+                    "string" &&
+                  Boolean(
+                    value.trim(),
+                  ),
+              )
+            : [];
+
+        if (
+          !studentIds.includes(
+            user.uid,
+          )
+        ) {
+          throw new Error(
+            "You do not have access to this quiz assignment.",
+          );
+        }
+
         if (!cancelled) {
           setLinkedAssignment({
             id: snapshot.id,
             classId: data.classId,
             teacherId: data.teacherId,
-            resourceId: data.resourceId || quiz.topicId,
+            resourceId:
+              assignedResourceId,
             deliveryMode:
-              data.deliveryMode === "assessment" ? "assessment" : "practice",
+              data.deliveryMode ===
+              "assessment"
+                ? "assessment"
+                : "practice",
           });
         }
       } catch (error) {
-        console.error("Quiz assignment load error:", error);
+        console.error(
+          "Quiz assignment load error:",
+          error,
+        );
 
         if (!cancelled) {
+          setLinkedAssignment(null);
           setAssignmentError(
             error instanceof Error
               ? error.message
@@ -281,7 +370,12 @@ export default function QuizPlayer({ quiz }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [assignmentId, quiz.topicId]);
+  }, [
+    assignmentId,
+    quiz.id,
+    quiz.topicId,
+    user?.uid,
+  ]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {

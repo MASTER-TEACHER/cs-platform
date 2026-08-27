@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import LessonRenderer from "@/components/lesson/LessonRenderer";
 import LessonNavigation from "@/components/lesson/LessonNavigation";
+import CurriculumLessonGate from "@/components/lesson/CurriculumLessonGate";
 import { topicLibrary } from "@/data/curriculum/topics";
 import type { Lesson, Topic } from "@/types/curriculum";
 
@@ -42,21 +43,25 @@ export default async function LessonPage({ params, searchParams }: Props) {
   }
 
   return (
-    <div className="space-y-8">
-      <LessonNavigation
-        topicId={topicId}
-        currentIndex={lessonIndex}
-        totalLessons={topic.lessons.length}
-        previousLessonId={previousLesson?.id}
-        nextLessonId={nextLesson?.id}
-      />
+    <CurriculumLessonGate
+      topicId={topicId}
+    >
+      <div className="space-y-8">
+        <LessonNavigation
+          topicId={topicId}
+          currentIndex={lessonIndex}
+          totalLessons={topic.lessons.length}
+          previousLessonId={previousLesson?.id}
+          nextLessonId={nextLesson?.id}
+        />
 
-      <LessonRenderer
-        lesson={currentLesson}
-        topicId={topicId}
-        nextLessonId={nextLesson?.id}
-        topicSimulator={topic.simulator}
-      />
-    </div>
+        <LessonRenderer
+          lesson={currentLesson}
+          topicId={topicId}
+          nextLessonId={nextLesson?.id}
+          topicSimulator={topic.simulator}
+        />
+      </div>
+    </CurriculumLessonGate>
   );
 }

@@ -147,10 +147,10 @@ export default function AdminDashboardPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${adminIdToken}`,
         },
         body: JSON.stringify({
           action,
-          adminIdToken,
         }),
       });
 

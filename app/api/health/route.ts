@@ -27,6 +27,14 @@ export async function GET() {
     firebaseClient,
     firebaseAdmin,
     openAI: present("OPENAI_API_KEY"),
+    stripeBilling:
+      present("STRIPE_SECRET_KEY") &&
+      present("STRIPE_WEBHOOK_SECRET") &&
+      present("STRIPE_PRICE_INDIVIDUAL_PREMIUM_MONTHLY") &&
+      present("STRIPE_PRICE_INDIVIDUAL_PREMIUM_ANNUAL") &&
+      present("STRIPE_PRICE_SCHOOL_STARTER") &&
+      present("STRIPE_PRICE_SCHOOL_STANDARD") &&
+      present("STRIPE_PRICE_SCHOOL_PRO"),
   };
 
   const ready = Object.values(checks).every(Boolean);
