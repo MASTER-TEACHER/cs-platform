@@ -79,7 +79,7 @@ function getExaminerGuidance(value: unknown): string[] {
 }
 
 function normaliseAnswerText(value: string): string {
-  return value.trim().toLowerCase().replace(/[Ã¢â‚¬â„¢Ã¢â‚¬Ëœ]/g, "'").replace(/\s+/g, " ");
+  return value.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " ");
 }
 
 /**
@@ -377,7 +377,7 @@ function demoSuggestion(
     missedMarkPoints,
     evidenceFromResponse: matchedModelKeywords
       .slice(0, 4)
-      .map((keyword) => `The response uses the relevant term Ã¢â‚¬Å“${keyword}Ã¢â‚¬Â.`),
+      .map((keyword) => `The response uses the relevant term “${keyword}”.`),
     feedback:
       suggestedMarks === question.marks
         ? "The response appears to address the available marking points. Confirm the accuracy and development before accepting full marks."

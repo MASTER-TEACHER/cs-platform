@@ -244,81 +244,135 @@ export function useSimulator<TQuestion>({
    * =========================================================
    */
 
-  const saveCurrentQuestionResult = useCallback(
-    (eventuallyCorrect: boolean, awardedXP: number, answerChecks: number) => {
-      /*
-       * Replace an existing result for the current question
-       * rather than creating duplicate history entries.
-       */
-      setQuestionResults((current) => {
-        const result: SimulatorQuestionResult = {
-          questionId,
-          difficulty,
+ const saveCurrentQuestionResult = useCallback(
+  (
+    eventuallyCorrect: boolean,
+    awardedXP: number,
+    answerChecks: number,
+    firstAttemptCorrectOverride?: boolean,
+  ) => {
+    /*
+     * React state updates are asynchronous.
+     *
+     * When the learner submits the very first answer,
+     * markAnswer() may have just called setFirstAttemptCorrect().
+     * The state value visible inside this callback can therefore
+     * still be null during the same event.
+     *
+     * firstAttemptCorrectOverride lets markAnswer() provide the
+     * correct synchronous value for that submission.
+     */
+    const resolvedFirstAttemptCorrect =
+      firstAttemptCorrectOverride ??
+      firstAttemptCorrect ??
+      false;
 
-          firstAttemptCorrect: firstAttemptCorrect ?? false,
+    setQuestionResults((current) => {
+      const result: SimulatorQuestionResult = {
+        questionId,
+        difficulty,
 
-          eventuallyCorrect,
+        firstAttemptCorrect:
+          resolvedFirstAttemptCorrect,
 
-          answerChecks,
+        eventuallyCorrect,
 
-          xpAwarded: awardedXP,
+        answerChecks,
 
-          hintUsed: currentQuestionHintUsed,
+        xpAwarded: awardedXP,
 
-          workingViewed: currentQuestionWorkingViewed,
-        };
+        hintUsed:
+          currentQuestionHintUsed,
 
-        const existingIndex = current.findIndex(
-          (item) => item.questionId === questionId,
+        workingViewed:
+          currentQuestionWorkingViewed,
+      };
+
+      const existingIndex =
+        current.findIndex(
+          (item) =>
+            item.questionId ===
+            questionId,
         );
 
-        if (existingIndex === -1) {
-          return [...current, result];
-        }
+      if (existingIndex === -1) {
+        return [
+          ...current,
+          result,
+        ];
+      }
 
-        const updated = [...current];
+      const updated =
+        [...current];
 
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          ...result,
+      updated[existingIndex] = {
+        ...updated[
+          existingIndex
+        ],
+        ...result,
 
-          /*
-           * Never erase previously awarded XP.
-           */
-          xpAwarded: Math.max(
-            updated[existingIndex].xpAwarded,
+        /*
+         * First-attempt evidence must NEVER be rewritten by
+         * a later retry.
+         */
+        firstAttemptCorrect:
+          updated[
+            existingIndex
+          ].firstAttemptCorrect,
+
+        /*
+         * Never erase previously awarded XP.
+         */
+        xpAwarded:
+          Math.max(
+            updated[
+              existingIndex
+            ].xpAwarded,
             result.xpAwarded,
           ),
 
-          /*
-           * Once true, these remain true.
-           */
-          eventuallyCorrect:
-            updated[existingIndex].eventuallyCorrect ||
-            result.eventuallyCorrect,
+        /*
+         * Once eventual mastery has been achieved,
+         * preserve it.
+         */
+        eventuallyCorrect:
+          updated[
+            existingIndex
+          ].eventuallyCorrect ||
+          result.eventuallyCorrect,
 
-          hintUsed: updated[existingIndex].hintUsed || result.hintUsed,
+        hintUsed:
+          updated[
+            existingIndex
+          ].hintUsed ||
+          result.hintUsed,
 
-          workingViewed:
-            updated[existingIndex].workingViewed || result.workingViewed,
+        workingViewed:
+          updated[
+            existingIndex
+          ].workingViewed ||
+          result.workingViewed,
 
-          answerChecks: Math.max(
-            updated[existingIndex].answerChecks,
+        answerChecks:
+          Math.max(
+            updated[
+              existingIndex
+            ].answerChecks,
             result.answerChecks,
           ),
-        };
+      };
 
-        return updated;
-      });
-    },
-    [
-      questionId,
-      difficulty,
-      firstAttemptCorrect,
-      currentQuestionHintUsed,
-      currentQuestionWorkingViewed,
-    ],
-  );
+      return updated;
+    });
+  },
+  [
+    questionId,
+    difficulty,
+    firstAttemptCorrect,
+    currentQuestionHintUsed,
+    currentQuestionWorkingViewed,
+  ],
+);
 
   /*
    * =========================================================
@@ -377,21 +431,39 @@ export function useSimulator<TQuestion>({
         return;
       }
 
-      const nextAnswerChecks = questionAnswerChecks + 1;
+      const nextAnswerChecks =
+  questionAnswerChecks + 1;
 
-      setQuestionAnswerChecks(nextAnswerChecks);
+setQuestionAnswerChecks(
+  nextAnswerChecks,
+);
 
-      setChecked(true);
+setChecked(true);
 
-      setCorrect(isCorrect);
+setCorrect(isCorrect);
 
-      /*
-       * Record first-attempt performance once only.
-       */
-      if (firstAttemptCorrect === null) {
-        setFirstAttemptCorrect(isCorrect);
-      }
+/*
+ * Resolve the first-attempt value synchronously.
+ *
+ * Do not rely on the immediately updated React state because
+ * setFirstAttemptCorrect() does not update firstAttemptCorrect
+ * until the next render.
+ */
+const resolvedFirstAttemptCorrect =
+  firstAttemptCorrect ??
+  isCorrect;
 
+/*
+ * Record first-attempt performance once only.
+ */
+if (
+  firstAttemptCorrect ===
+  null
+) {
+  setFirstAttemptCorrect(
+    isCorrect,
+  );
+}
       /*
        * -----------------------------------------------------
        * QUESTIONS
@@ -423,8 +495,12 @@ export function useSimulator<TQuestion>({
        */
 
       if (!isCorrect) {
-        saveCurrentQuestionResult(false, 0, nextAnswerChecks);
-
+       saveCurrentQuestionResult(
+  false,
+  0,
+  nextAnswerChecks,
+  resolvedFirstAttemptCorrect,
+);
         return;
       }
 
@@ -478,7 +554,12 @@ export function useSimulator<TQuestion>({
         }
       }
 
-      saveCurrentQuestionResult(true, awardedXP, nextAnswerChecks);
+     saveCurrentQuestionResult(
+  true,
+  awardedXP,
+  nextAnswerChecks,
+  resolvedFirstAttemptCorrect,
+);
     },
     [
       checked,

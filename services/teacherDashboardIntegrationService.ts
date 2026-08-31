@@ -20,6 +20,13 @@ function primaryFocus({
   averageScore,
   activeAssignmentCount,
 }: TeacherDashboardIntegrationInput): TeacherDashboardFocus {
+  /*
+   * This service is intentionally operational only.
+   *
+   * Formal learner priority is owned by Teacher Intelligence. A simple
+   * score threshold can prompt a review, but it must never create a formal
+   * intervention recommendation on its own.
+   */
   if (atRiskCount > 0) return "student_support";
   if (completionRate < 70) return "completion";
   if (activeAssignmentCount === 0 || averageScore < 50) return "assessment";
@@ -27,26 +34,35 @@ function primaryFocus({
 }
 
 function headlineForFocus(focus: TeacherDashboardFocus): string {
-  if (focus === "student_support") return "Start with learners requiring support";
-  if (focus === "completion") return "Start with assignment completion";
-  if (focus === "assessment") return "Collect the next useful assessment evidence";
+  if (focus === "student_support") {
+    return "Review the current score snapshot in Teacher Intelligence";
+  }
+
+  if (focus === "completion") {
+    return "Review assignment completion before drawing conclusions";
+  }
+
+  if (focus === "assessment") {
+    return "Collect the next useful assessment evidence";
+  }
+
   return "Review current evidence and keep the cycle moving";
 }
 
 function summaryForFocus(focus: TeacherDashboardFocus): string {
   if (focus === "student_support") {
-    return "Review the highest-priority learners first, then move into intervention planning or targeted reassessment.";
+    return "Some learners are below the dashboard score threshold. Open Teacher Intelligence to confirm evidence-weighted priority before creating any formal intervention.";
   }
 
   if (focus === "completion") {
-    return "Outstanding work may be weakening the reliability of current attainment conclusions. Review completion before escalating curriculum concerns.";
+    return "Outstanding work may be weakening the reliability of the current evidence picture. Review completion before escalating curriculum concerns.";
   }
 
   if (focus === "assessment") {
-    return "Use the assessment tools to collect stronger evidence, then return to analytics and reports to interpret the results.";
+    return "Use the assessment tools to collect stronger evidence, then return to Teacher Intelligence, analytics and reports to interpret the results.";
   }
 
-  return "The dashboard is in a monitoring state. Use analytics, reports and the assessment centre to maintain the review cycle.";
+  return "The dashboard is in a monitoring state. Use Teacher Intelligence, analytics, reports and the assessment centre to maintain the review cycle.";
 }
 
 export function buildTeacherDashboardIntegration(
@@ -57,16 +73,16 @@ export function buildTeacherDashboardIntegration(
   const signals: TeacherDashboardSignal[] = [
     {
       id: "support",
-      label: "Learners requiring support",
+      label: "Below 50% score snapshot",
       value: String(input.atRiskCount),
       detail:
         input.atRiskCount > 0
-          ? "Open the priority workflow before assigning broad follow-up work."
-          : "No current dashboard intervention alerts.",
+          ? "Open Teacher Intelligence to confirm learner priority and evidence confidence before intervention."
+          : "No learners are currently below the dashboard score threshold.",
       focus: "student_support",
-      href: "#teacher-actions",
-      actionLabel: "Review actions",
-      severity: input.atRiskCount > 0 ? "high" : "positive",
+      href: "/teacher/analytics",
+      actionLabel: "Open Teacher Intelligence",
+      severity: input.atRiskCount > 0 ? "medium" : "positive",
     },
     {
       id: "completion",
@@ -92,7 +108,7 @@ export function buildTeacherDashboardIntegration(
       value: `${input.averageScore}%`,
       detail:
         input.averageScore < 50
-          ? "Use class analytics to separate curriculum gaps from individual learner issues."
+          ? "Use Teacher Intelligence and class analytics to separate curriculum gaps from individual learner issues."
           : "Review class analytics for topic-level strengths and weaknesses.",
       focus: "monitoring",
       href: "/teacher/analytics",

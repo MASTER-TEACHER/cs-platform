@@ -1,0 +1,39 @@
+﻿CS MASTER - V1 DEPENDENCY SECURITY DISPOSITION
+Generated: 2026-08-27 19:19:37
+
+HIGH SEVERITY
+-------------
+0 remaining.
+
+MODERATE SEVERITY
+-----------------
+5 npm audit findings remain.
+
+ROOT CAUSE
+----------
+Optional transitive dependency chain:
+
+firebase-admin@14.3.0
+ -> @google-cloud/storage@7.22.0
+ -> teeny-request@9.0.0
+ -> uuid@9.0.1
+
+DISPOSITION
+-----------
+ACCEPTED TEMPORARY UPSTREAM DEPENDENCY EXCEPTION.
+
+CS Master does not directly depend on or invoke uuid.
+firebase-admin is already upgraded to 14.3.0.
+The vulnerable uuid package is an optional transitive dependency.
+Available newer Google dependency versions require major-version changes.
+npm audit fix --force proposes firebase-admin@10.3.0 and is therefore rejected.
+No unsafe dependency override has been applied.
+
+RELEASE REQUIREMENT
+-------------------
+Recheck this dependency chain before production launch and after future
+firebase-admin / @google-cloud/storage releases.
+
+SECURITY STATUS
+---------------
+PASS WITH DOCUMENTED MODERATE TRANSITIVE DEPENDENCY EXCEPTION.

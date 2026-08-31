@@ -133,28 +133,75 @@ function getAdminDb(): Firestore {
  * are required only when a route actually performs an Admin SDK
  * operation at request time.
  */
-export const adminAuth = new Proxy(
-  {} as Auth,
-  {
-    get(_target, property, receiver) {
-      return Reflect.get(
-        getAdminAuth(),
+export const adminAuth =
+  new Proxy(
+    {} as Auth,
+    {
+      get(
+        _target,
         property,
-        receiver,
-      );
-    },
-  },
-);
+      ) {
+        const auth =
+          getAdminAuth();
 
-export const adminDb = new Proxy(
-  {} as Firestore,
-  {
-    get(_target, property, receiver) {
-      return Reflect.get(
-        getAdminDb(),
-        property,
-        receiver,
-      );
+        const value =
+          Reflect.get(
+            auth,
+            property,
+            auth,
+          );
+
+        if (
+          typeof value ===
+          "function"
+        ) {
+          return value.bind(
+            auth,
+          );
+        }
+
+        return value;
+      },
     },
-  },
-);
+  );
+
+export const adminDb =
+  new Proxy(
+    {} as Firestore,
+    {
+      get(
+        _target,
+        property,
+      ) {
+        const db =
+          getAdminDb();
+
+        const value =
+          Reflect.get(
+            db,
+            property,
+            db,
+          );
+
+        /*
+         * Firebase Admin methods depend on the real
+         * Firestore instance as `this`.
+         *
+         * Returning an unbound method through a Proxy can
+         * cause internal Admin SDK state errors such as:
+         *
+         * "Client is not yet ready to issue requests."
+         */
+        if (
+          typeof value ===
+          "function"
+        ) {
+          return value.bind(
+            db,
+          );
+        }
+
+        return value;
+      },
+    },
+  );

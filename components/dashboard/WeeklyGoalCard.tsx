@@ -2,39 +2,39 @@ import Card from "@/components/ui/Card";
 import ProgressBar from "@/components/ui/ProgressBar";
 
 type Props = {
-  completedThisWeek: number;
-  weeklyTarget?: number;
+  completedLessons: number;
+  totalLessons: number;
+  progressPercentage: number;
 };
 
 export default function WeeklyGoalCard({
-  completedThisWeek,
-  weeklyTarget = 10,
+  completedLessons,
+  totalLessons,
+  progressPercentage,
 }: Props) {
-  const progress = Math.min(
-    100,
-    Math.round((completedThisWeek / weeklyTarget) * 100),
-  );
-
   return (
     <Card>
       <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
-        Weekly Goal
+        Curriculum Progress
       </p>
 
       <h2 className="mt-3 text-2xl font-bold text-slate-900">
-        {completedThisWeek} / {weeklyTarget} Lessons
+        {completedLessons} / {totalLessons} Lessons
       </h2>
 
       <p className="mt-2 text-slate-600">
-        Complete {weeklyTarget} lessons this week to stay on track.
+        Progress is calculated only from lessons available in your
+        selected qualification and exam board.
       </p>
 
       <div className="mt-6">
-        <ProgressBar value={progress} />
+        <ProgressBar
+          value={progressPercentage}
+        />
       </div>
 
       <p className="mt-3 text-sm font-semibold text-slate-500">
-        {progress}% complete
+        {progressPercentage}% complete
       </p>
     </Card>
   );

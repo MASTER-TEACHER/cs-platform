@@ -1,0 +1,35 @@
+CS Master - Final Mojibake Cleanup v2
+=====================================
+
+This replaces the previous faulty ZIP.
+
+IMPORTANT
+---------
+The previous ZIP accidentally copied the inspection separator line:
+################################################################
+into line 1 of each project source file.
+
+This v2 correctly strips all BEGIN FILE / END FILE wrapper separators.
+
+REPLACE
+-------
+Copy the app and components folders from this ZIP into:
+
+C:\Users\cr7ri\cs-platform-clean
+
+Allow Windows to replace matching files.
+
+THEN RUN
+--------
+npx tsc --noEmit
+
+npm run build
+
+Only after both pass, rerun the mojibake scan.
+
+VALIDATION
+----------
+27/27 source files parsed.
+Inspection wrapper lines included: 0.
+Leading/trailing #### separators included: 0.
+Residual mojibake signatures in these corrected files: 0.

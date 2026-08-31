@@ -10,27 +10,59 @@ import {
   useRouter,
 } from "next/navigation";
 
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
 
 type RequireCourseProps = {
   children: ReactNode;
 };
 
-const publicRoutes = new Set([
-  "/",
-  "/landing",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/auth-test",
-  "/teacher-access",
-]);
+const publicRoutes =
+  new Set([
+    "/",
+    "/landing",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/auth-test",
+    "/teacher-access",
+    "/teacher-verification",
+    "/cookies",
+    "/terms",
+    "/privacy",
+    "/help",
+    "/contact",
+    "/about",
+  ]);
+
+const accountSetupRoutes =
+  new Set([
+    "/",
+    "/landing",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/auth-test",
+  ]);
+
+const externallyAccessibleRoutes =
+  new Set([
+    "/teacher-verification",
+    "/cookies",
+    "/terms",
+    "/privacy",
+    "/help",
+    "/contact",
+    "/about",
+  ]);
 
 function isTeacherRoute(
   pathname: string,
 ): boolean {
   return (
-    pathname === "/teacher" ||
+    pathname ===
+      "/teacher" ||
     pathname.startsWith(
       "/teacher/",
     )
@@ -41,7 +73,8 @@ function isAdminRoute(
   pathname: string,
 ): boolean {
   return (
-    pathname === "/admin" ||
+    pathname ===
+      "/admin" ||
     pathname.startsWith(
       "/admin/",
     )
@@ -51,8 +84,11 @@ function isAdminRoute(
 export default function RequireCourse({
   children,
 }: RequireCourseProps) {
-  const router = useRouter();
-  const pathname = usePathname();
+  const router =
+    useRouter();
+
+  const pathname =
+    usePathname();
 
   const {
     user,
@@ -60,31 +96,55 @@ export default function RequireCourse({
     loading,
     profileReady,
     profileError,
-  } = useAuth();
+  } =
+    useAuth();
 
   const isPublicRoute =
-    publicRoutes.has(pathname);
+    publicRoutes.has(
+      pathname,
+    );
+
+  const isAccountSetupRoute =
+    accountSetupRoutes.has(
+      pathname,
+    );
+
+  const isExternallyAccessibleRoute =
+    externallyAccessibleRoutes.has(
+      pathname,
+    );
 
   const teacherRoute =
-    isTeacherRoute(pathname);
+    isTeacherRoute(
+      pathname,
+    );
 
   const adminRoute =
-    isAdminRoute(pathname);
+    isAdminRoute(
+      pathname,
+    );
 
   const teacherAccessRoute =
-    pathname === "/teacher-access";
+    pathname ===
+    "/teacher-access";
 
   const onboardingRoute =
-    pathname === "/onboarding";
+    pathname ===
+    "/onboarding";
 
   const curriculumComplete =
     profile?.onboardingComplete ===
       true &&
-    Boolean(profile.qualification) &&
-    Boolean(profile.examBoard);
+    Boolean(
+      profile.qualification,
+    ) &&
+    Boolean(
+      profile.examBoard,
+    );
 
   const isTeacherApplicant =
-    profile?.role === "student" &&
+    profile?.role ===
+      "student" &&
     profile.accountIntent ===
       "teacher";
 
@@ -93,141 +153,98 @@ export default function RequireCourse({
     | null = null;
 
   /*
-   * ---------------------------------------------------------
-   * SIGNED OUT
-   * ---------------------------------------------------------
+   * Token-authenticated routes must remain independent from
+   * whichever CS Master account happens to be signed in.
    */
-
   if (
-    !loading &&
-    !user &&
-    !isPublicRoute
+    !isExternallyAccessibleRoute
   ) {
-    redirectTarget = "/login";
-  }
+    if (
+      !loading &&
+      !user &&
+      !isPublicRoute
+    ) {
+      redirectTarget =
+        "/login";
+    }
 
-  /*
-   * ---------------------------------------------------------
-   * SIGNED IN + PROFILE READY
-   * ---------------------------------------------------------
-   */
-
-  if (
-    !loading &&
-    user &&
-    profileReady &&
-    profile
-  ) {
-    /*
-     * -------------------------------------------------------
-     * ADMIN
-     * -------------------------------------------------------
-     */
-
-    if (profile.role === "admin") {
-      if (!adminRoute) {
-        redirectTarget = "/admin";
-      }
-
-      /*
-       * -----------------------------------------------------
-       * APPROVED TEACHER
-       * -----------------------------------------------------
-       */
-    } else if (
-      profile.role === "teacher"
+    if (
+      !loading &&
+      user &&
+      profileReady &&
+      profile
     ) {
       if (
-        isPublicRoute ||
-        onboardingRoute ||
-        adminRoute
+        profile.role ===
+        "admin"
       ) {
-        redirectTarget =
-          "/teacher";
-      }
-
-      /*
-       * -----------------------------------------------------
-       * TEACHER APPLICANT
-       *
-       * SECURITY:
-       *
-       * A teacher applicant deliberately keeps role="student"
-       * until an administrator approves the request.
-       *
-       * accountIntent="teacher" therefore takes precedence
-       * over normal student curriculum routing.
-       *
-       * This prevents teacher applicants from ever being
-       * forced through GCSE/A-level student onboarding.
-       * -----------------------------------------------------
-       */
-    } else if (
-      isTeacherApplicant
-    ) {
-      if (!teacherAccessRoute) {
-        redirectTarget =
-          "/teacher-access";
-      }
-
-      /*
-       * -----------------------------------------------------
-       * STANDARD STUDENT
-       * -----------------------------------------------------
-       */
-    } else {
-      /*
-       * A normal student is never allowed into protected
-       * teacher or admin routes.
-       */
-      if (
-        teacherRoute ||
-        adminRoute
-      ) {
-        redirectTarget =
-          "/dashboard";
-
-        /*
-         * Keep /teacher-access available to an existing
-         * student who deliberately wants to request a
-         * teacher-account upgrade.
-         */
+        if (!adminRoute) {
+          redirectTarget =
+            "/admin";
+        }
       } else if (
-        teacherAccessRoute
+        profile.role ===
+        "teacher"
       ) {
-        redirectTarget = null;
-
+        if (
+          isAccountSetupRoute ||
+          onboardingRoute ||
+          adminRoute ||
+          teacherAccessRoute
+        ) {
+          redirectTarget =
+            "/teacher";
+        }
+      } else if (
+        isTeacherApplicant
+      ) {
         /*
-         * Other public authentication/setup routes should
-         * return a signed-in student to the appropriate
-         * student destination.
+         * All teacher-applicant states are deliberately
+         * rendered by /teacher-access:
+         *
+         * not_submitted
+         * pending
+         * platform review
+         * rejected
          */
-      } else if (isPublicRoute) {
-        redirectTarget =
+        if (
+          !teacherAccessRoute
+        ) {
+          redirectTarget =
+            "/teacher-access";
+        }
+      } else {
+        if (
+          teacherRoute ||
+          adminRoute
+        ) {
+          redirectTarget =
+            "/dashboard";
+        } else if (
+          teacherAccessRoute
+        ) {
+          redirectTarget =
+            null;
+        } else if (
+          isAccountSetupRoute
+        ) {
+          redirectTarget =
+            curriculumComplete
+              ? "/dashboard"
+              : "/onboarding";
+        } else if (
+          onboardingRoute &&
           curriculumComplete
-            ? "/dashboard"
-            : "/onboarding";
-
-        /*
-         * Completed students no longer need onboarding.
-         */
-      } else if (
-        onboardingRoute &&
-        curriculumComplete
-      ) {
-        redirectTarget =
-          "/dashboard";
-
-        /*
-         * Incomplete students must complete curriculum setup
-         * before using the main student application.
-         */
-      } else if (
-        !onboardingRoute &&
-        !curriculumComplete
-      ) {
-        redirectTarget =
-          "/onboarding";
+        ) {
+          redirectTarget =
+            "/dashboard";
+        } else if (
+          !onboardingRoute &&
+          !curriculumComplete
+        ) {
+          redirectTarget =
+            "/onboarding";
+        }
       }
     }
   }
@@ -243,6 +260,12 @@ export default function RequireCourse({
     router,
   ]);
 
+  if (
+    isExternallyAccessibleRoute
+  ) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <LoadingScreen message="Loading CS Master..." />
@@ -254,8 +277,7 @@ export default function RequireCourse({
       <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
         <section className="w-full max-w-xl rounded-3xl border border-red-200 bg-red-50 p-8">
           <h1 className="text-2xl font-black text-red-950">
-            Your account could
-            not be loaded
+            Your account could not be loaded
           </h1>
 
           <p className="mt-3 text-red-800">
@@ -268,17 +290,16 @@ export default function RequireCourse({
 
   if (
     user &&
-    (!profileReady || !profile)
+    (
+      !profileReady ||
+      !profile
+    )
   ) {
     return (
       <LoadingScreen message="Preparing your account..." />
     );
   }
 
-  /*
-   * Never briefly render content belonging to the wrong
-   * portal while Next.js completes the redirect.
-   */
   if (redirectTarget) {
     return (
       <LoadingScreen message="Opening the correct portal..." />

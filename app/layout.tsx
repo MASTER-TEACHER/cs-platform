@@ -5,9 +5,12 @@ import AppShell from "@/components/layout/AppShell";
 import { ProgressProvider } from "@/contexts/ProgressContext";
 import { Toaster } from "react-hot-toast";
 import RequireCourse from "@/components/auth/RequireCourse";
+import CookieBanner from "@/components/legal/CookieBanner";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://cs-platform-5cgp.vercel.app"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://cs-platform-5cgp.vercel.app",
+  ),
   title: {
     default: "CS Master",
     template: "%s | CS Master",
@@ -56,6 +59,8 @@ export default function RootLayout({
             </RequireCourse>
           </ProgressProvider>
         </AuthProvider>
+
+        <CookieBanner />
 
         <Toaster
           position="top-right"

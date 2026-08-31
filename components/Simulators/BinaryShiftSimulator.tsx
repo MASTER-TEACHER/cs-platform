@@ -321,11 +321,12 @@ Overflow occurs because ${rawResult} cannot be represented using only ${question
         <article className="rounded-2xl border border-slate-200 p-5">
           <p className="font-black">Operation</p>
 
-          <p className="mt-2 text-2xl font-black text-blue-700">
-            {question.direction === "left"
-              ? `× ${2 ** question.places}`
-              : `÷ ${2 ** question.places}`}
-          </p>
+          <p className="mt-2 text-2xl font-black text-blue-700"> </p>
+           <p>
+  {question.direction === "left"
+    ? `× ${2 ** question.places}`
+    : `÷ ${2 ** question.places}`}
+</p>
         </article>
       </div>
 
@@ -394,11 +395,12 @@ Overflow occurs because ${rawResult} cannot be represented using only ${question
           <div>
             <p className="text-sm text-slate-600">Operation</p>
 
-            <p className="text-2xl font-black">
-              {question.direction === "left"
-                ? `× ${2 ** question.places}`
-                : `÷ ${2 ** question.places}`}
-            </p>
+            <p className="text-2xl font-black"></p>
+             <p>
+  {question.direction === "left"
+    ? `× ${2 ** question.places}`
+    : `÷ ${2 ** question.places}`}
+</p>
           </div>
 
           <div>

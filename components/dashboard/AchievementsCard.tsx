@@ -85,7 +85,7 @@ export default function AchievementsCard({
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="text-5xl">
-                  {unlocked ? achievement.icon : "Ã°Å¸â€â€™"}
+                  {unlocked ? achievement.icon : "🔒"}
                 </div>
 
                 <span

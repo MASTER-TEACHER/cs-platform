@@ -24,6 +24,13 @@ export default function AppShell({
     "/register",
     "/forgot-password",
     "/onboarding",
+    "/teacher-verification",
+    "/cookies",
+    "/terms",
+    "/privacy",
+    "/help",
+    "/contact",
+    "/about",
 
     /*
      * Teacher applicants use this route before receiving

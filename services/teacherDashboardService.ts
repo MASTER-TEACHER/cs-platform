@@ -296,10 +296,26 @@ export async function getTeacherDashboardData(
     });
   });
 
-  const studentSnapshots = await Promise.all(
+  /*
+   * Some classes can contain legacy/demo learner IDs that no longer map to
+   * a readable user profile. A single denied/missing profile must not make
+   * the entire teacher dashboard fail.
+   *
+   * Firestore continues to enforce tenant isolation. We deliberately do not
+   * broaden the security rule here; instead we retain only profile reads that
+   * the signed-in teacher is actually authorised to resolve.
+   */
+  const studentSnapshotResults = await Promise.allSettled(
     Array.from(teacherStudentIds).map((studentId) =>
       getDoc(doc(db, "users", studentId)),
     ),
+  );
+
+  const studentSnapshots = studentSnapshotResults.flatMap(
+    (result) =>
+      result.status === "fulfilled"
+        ? [result.value]
+        : [],
   );
 
   const relevantStudents: UserRecord[] = studentSnapshots

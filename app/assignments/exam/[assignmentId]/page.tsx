@@ -994,7 +994,7 @@ export default function StudentExamPlayerPage() {
               </h1>
 
               <p className="mt-3 text-indigo-100">
-                {assignment.questionCount} questions Â·{" "}
+                {assignment.questionCount} questions ·{" "}
                 {assignment.totalMarks} marks
               </p>
             </div>
@@ -1015,22 +1015,22 @@ export default function StudentExamPlayerPage() {
               {assignment.integrityPolicy.enabled ? (
                 <div className="space-y-3 text-sm leading-6 text-slate-700">
                   <p>
-                    â€¢ The exam will enter fullscreen and normal CS Master
+                    • The exam will enter fullscreen and normal CS Master
                     navigation will be hidden.
                   </p>
 
                   <p>
-                    â€¢ Leaving fullscreen starts a visible 5-second countdown.
+                    • Leaving fullscreen starts a visible 5-second countdown.
                   </p>
 
                   <p>
-                    â€¢ If fullscreen is not restored before the countdown ends,
+                    • If fullscreen is not restored before the countdown ends,
                     the exam is automatically terminated and submitted.
                   </p>
 
                   {assignment.integrityPolicy.monitorPageVisibility && (
                     <p>
-                      â€¢ Switching away from the exam page is recorded and the
+                      • Switching away from the exam page is recorded and the
                       teacher&apos;s configured visibility rule is applied.
                     </p>
                   )}
@@ -1141,7 +1141,7 @@ export default function StudentExamPlayerPage() {
               </h1>
 
               <p className="mt-2 text-sm text-indigo-100">
-                {answeredCount}/{assignment.questionCount} answered Â·{" "}
+                {answeredCount}/{assignment.questionCount} answered ·{" "}
                 {assignment.totalMarks} marks
               </p>
             </div>
@@ -1149,7 +1149,7 @@ export default function StudentExamPlayerPage() {
             {!locked && (
               <div className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white/80">
                 Question{" "}
-                {activeQuestionNumber ?? "â€”"}
+                {activeQuestionNumber ?? "—"}
               </div>
             )}
           </div>
@@ -1340,7 +1340,7 @@ export default function StudentExamPlayerPage() {
                                   point.id
                                 }
                               >
-                                â€¢{" "}
+                                •{" "}
                                 {
                                   point.description
                                 }{" "}
@@ -1371,7 +1371,7 @@ export default function StudentExamPlayerPage() {
                                   item
                                 }
                               >
-                                â€¢{" "}
+                                •{" "}
                                 {
                                   item
                                 }
@@ -1397,7 +1397,7 @@ export default function StudentExamPlayerPage() {
                                   item
                                 }
                               >
-                                â€¢{" "}
+                                •{" "}
                                 {
                                   item
                                 }

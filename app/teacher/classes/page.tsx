@@ -784,7 +784,7 @@ export default function TeacherClassesPage() {
                       <p className="mt-1 text-sm text-slate-500">
                         {classItem.subject ||
                           "Computer Science"}{" "}
-                        Ã‚Â·{" "}
+                        ·{" "}
                         {classItem.academicYear ||
                           "Academic year not set"}
                       </p>

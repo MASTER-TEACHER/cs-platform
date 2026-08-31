@@ -32,7 +32,6 @@ Version: 1.0 Public Beta
 - [ ] Environment variables configured
 
 ---
-
 # 🌍 Deployment
 
 - [ ] GitHub repository updated

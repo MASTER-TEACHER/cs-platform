@@ -9,14 +9,41 @@ import {
 } from "firebase/auth";
 
 import {
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
+  auth,
+} from "@/lib/firebase";
 
-import { auth, db } from "@/lib/firebase";
+export type RegistrationAccountType =
+  | "student"
+  | "teacher";
 
-export type RegistrationAccountType = "student" | "teacher";
+export type TeacherRegistrationDetails = {
+  schoolName: string;
+  schoolAdminEmail: string;
+};
+
+type CreateProfileResponse = {
+  success?: boolean;
+  alreadyExists?: boolean;
+  uid?: string;
+  accountIntent?: string;
+  error?: string;
+};
+
+function cleanEmail(
+  value: string,
+): string {
+  return value
+    .trim()
+    .toLowerCase();
+}
+
+function isValidEmail(
+  value: string,
+): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    value,
+  );
+}
 
 function validateRegistration(
   name: string,
@@ -24,16 +51,178 @@ function validateRegistration(
   password: string,
 ): void {
   if (!name.trim()) {
-    throw new Error("Please enter your full name.");
+    throw new Error(
+      "Please enter your full name.",
+    );
   }
 
   if (!email.trim()) {
-    throw new Error("Please enter your email address.");
+    throw new Error(
+      "Please enter your email address.",
+    );
   }
 
-  if (password.length < 6) {
+  if (
+    !isValidEmail(
+      cleanEmail(
+        email,
+      ),
+    )
+  ) {
+    throw new Error(
+      "Please enter a valid email address.",
+    );
+  }
+
+  if (
+    password.length <
+    6
+  ) {
     throw new Error(
       "Your password must contain at least 6 characters.",
+    );
+  }
+}
+
+function validateTeacherRegistration(
+  teacherEmail: string,
+  details:
+    | TeacherRegistrationDetails
+    | undefined,
+): TeacherRegistrationDetails {
+  if (!details) {
+    throw new Error(
+      "School details are required for teacher registration.",
+    );
+  }
+
+  const schoolName =
+    details.schoolName.trim();
+
+  const schoolAdminEmail =
+    cleanEmail(
+      details.schoolAdminEmail,
+    );
+
+  if (!schoolName) {
+    throw new Error(
+      "Please enter your school name.",
+    );
+  }
+
+  if (
+    !schoolAdminEmail
+  ) {
+    throw new Error(
+      "Please enter a school administrator email address.",
+    );
+  }
+
+  if (
+    !isValidEmail(
+      schoolAdminEmail,
+    )
+  ) {
+    throw new Error(
+      "Please enter a valid school administrator email address.",
+    );
+  }
+
+  if (
+    schoolAdminEmail ===
+    cleanEmail(
+      teacherEmail,
+    )
+  ) {
+    throw new Error(
+      "The school administrator email must be different from your own email address.",
+    );
+  }
+
+  return {
+    schoolName,
+    schoolAdminEmail,
+  };
+}
+
+async function createServerProfile({
+  credential,
+  name,
+  accountType,
+  teacherDetails,
+}: {
+  credential: UserCredential;
+  name: string;
+  accountType: RegistrationAccountType;
+  teacherDetails:
+    | TeacherRegistrationDetails
+    | null;
+}): Promise<void> {
+  /*
+   * Force-refresh so the server receives a token belonging
+   * to the newly created Firebase Authentication account.
+   */
+  const idToken =
+    await credential.user.getIdToken(
+      true,
+    );
+
+  const response =
+    await fetch(
+      "/api/auth/create-profile",
+      {
+        method:
+          "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${idToken}`,
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            name,
+
+            accountType,
+
+            ...(accountType ===
+              "teacher" &&
+            teacherDetails
+              ? {
+                  schoolName:
+                    teacherDetails.schoolName,
+
+                  schoolAdminEmail:
+                    teacherDetails.schoolAdminEmail,
+                }
+              : {}),
+          }),
+      },
+    );
+
+  let result:
+    CreateProfileResponse;
+
+  try {
+    result =
+      (await response.json()) as
+        CreateProfileResponse;
+  } catch {
+    throw new Error(
+      "CS Master could not read the profile-creation response.",
+    );
+  }
+
+  if (
+    !response.ok ||
+    !result.success
+  ) {
+    throw new Error(
+      result.error ||
+        "Your CS Master profile could not be created.",
     );
   }
 }
@@ -43,15 +232,30 @@ export async function registerAccount(
   email: string,
   password: string,
   accountType: RegistrationAccountType,
+  teacherDetails?: TeacherRegistrationDetails,
 ): Promise<UserCredential> {
-  const cleanedName = name.trim();
-  const cleanedEmail = email.trim().toLowerCase();
+  const cleanedName =
+    name.trim();
+
+  const cleanedEmail =
+    cleanEmail(
+      email,
+    );
 
   validateRegistration(
     cleanedName,
     cleanedEmail,
     password,
   );
+
+  const resolvedTeacherDetails =
+    accountType ===
+    "teacher"
+      ? validateTeacherRegistration(
+          cleanedEmail,
+          teacherDetails,
+        )
+      : null;
 
   const userCredential =
     await createUserWithEmailAndPassword(
@@ -61,44 +265,34 @@ export async function registerAccount(
     );
 
   try {
-    await updateProfile(userCredential.user, {
-      displayName: cleanedName,
-    });
-
-    /*
-     * SECURITY:
-     *
-     * Teacher applicants do NOT receive the teacher role here.
-     *
-     * They remain at the normal low-privilege student-level role
-     * until an administrator approves the teacher request.
-     *
-     * accountIntent tells the UI which onboarding journey to use.
-     */
-    await setDoc(
-      doc(db, "users", userCredential.user.uid),
+    await updateProfile(
+      userCredential.user,
       {
-        uid: userCredential.user.uid,
-        name: cleanedName,
-        email: cleanedEmail,
-
-        role: "student",
-
-        accountIntent: accountType,
-
-        teacherAccessStatus:
-          accountType === "teacher"
-            ? "not_submitted"
-            : null,
-
-        qualification: null,
-        examBoard: null,
-        onboardingComplete: false,
-
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        displayName:
+          cleanedName,
       },
     );
+
+    /*
+     * IMPORTANT:
+     *
+     * Firestore profile creation is deliberately server-side.
+     *
+     * The browser can authenticate, but it cannot decide its
+     * own role, plan, approval state or tenant membership.
+     */
+    await createServerProfile({
+      credential:
+        userCredential,
+
+      name:
+        cleanedName,
+
+      accountType,
+
+      teacherDetails:
+        resolvedTeacherDetails,
+    });
 
     return userCredential;
   } catch (error) {
@@ -107,15 +301,35 @@ export async function registerAccount(
       error,
     );
 
+    /*
+     * If profile creation fails, remove the newly-created
+     * Authentication account so we do not leave an orphaned
+     * login behind.
+     */
     try {
-      await deleteUser(userCredential.user);
-    } catch (cleanupError) {
+      await deleteUser(
+        userCredential.user,
+      );
+    } catch (
+      cleanupError
+    ) {
       console.error(
         "Unable to remove the incomplete Authentication account:",
         cleanupError,
       );
 
-      await signOut(auth);
+      try {
+        await signOut(
+          auth,
+        );
+      } catch (
+        signOutError
+      ) {
+        console.error(
+          "Unable to sign out after incomplete registration:",
+          signOutError,
+        );
+      }
     }
 
     throw error;
@@ -123,8 +337,7 @@ export async function registerAccount(
 }
 
 /*
- * Keep this function because existing parts of CS Master may
- * already import registerStudent().
+ * Compatibility helper used by older CS Master code.
  */
 export async function registerStudent(
   name: string,
@@ -144,7 +357,9 @@ export async function loginUser(
   password: string,
 ): Promise<UserCredential> {
   const cleanedEmail =
-    email.trim().toLowerCase();
+    cleanEmail(
+      email,
+    );
 
   return signInWithEmailAndPassword(
     auth,
@@ -154,14 +369,18 @@ export async function loginUser(
 }
 
 export async function logoutUser(): Promise<void> {
-  await signOut(auth);
+  await signOut(
+    auth,
+  );
 }
 
 export async function resetPassword(
   email: string,
 ): Promise<void> {
   const cleanedEmail =
-    email.trim().toLowerCase();
+    cleanEmail(
+      email,
+    );
 
   if (!cleanedEmail) {
     throw new Error(

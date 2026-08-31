@@ -249,7 +249,7 @@ export default function ExamPaperAssignmentSelector({
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-black uppercase tracking-wide text-indigo-700">
-                        {content.examBoard} Â·{" "}
+                        {content.examBoard} ·{" "}
                         {cleanLabel(
                           content.qualification,
                         )}
@@ -278,7 +278,7 @@ export default function ExamPaperAssignmentSelector({
                           : "border-slate-300 text-transparent"
                       }`}
                     >
-                      âœ“
+                      ✓
                     </div>
                   </div>
 

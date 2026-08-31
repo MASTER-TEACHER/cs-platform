@@ -189,7 +189,7 @@ export default function VisualisersPage() {
             </p>
 
             <p className="mt-1 font-black">
-              {profile?.examBoard} Â·{" "}
+              {profile?.examBoard} ·{" "}
               {profile?.qualification ===
               "A_LEVEL"
                 ? "A-level"
@@ -227,7 +227,7 @@ export default function VisualisersPage() {
                   href={entry.href}
                   className="inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-5 py-3 font-black text-white transition hover:bg-blue-700"
                 >
-                  Open interactive lesson â†’
+                  Open interactive lesson →
                 </Link>
               </div>
             </article>

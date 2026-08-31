@@ -34,26 +34,73 @@ type FirestoreUserProfile = Omit<
   | "examBoard"
   | "accountIntent"
   | "teacherAccessStatus"
+  | "teacherVerificationReviewStatus"
+  | "teacherVerificationRisk"
+  | "teacherVerificationRequestedAt"
+  | "teacherSchoolVerifiedAt"
+  | "teacherVerificationApprovedAt"
+  | "teacherVerificationRejectedAt"
   | "accountType"
   | "plan"
   | "personalPlan"
   | "schoolId"
 > & {
-  qualification?: string | null;
-  examBoard?: string | null;
+  qualification?:
+    string | null;
 
-  accountIntent?: string | null;
-  teacherAccessStatus?: string | null;
+  examBoard?:
+    string | null;
 
-  accountType?: string | null;
-  plan?: string | null;
-  personalPlan?: string | null;
-  schoolId?: string | null;
+  accountIntent?:
+    string | null;
 
-  onboardingComplete?: boolean;
+  teacherAccessStatus?:
+    string | null;
 
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  schoolName?:
+    string | null;
+
+  schoolAdminEmail?:
+    string | null;
+
+  teacherVerificationReviewStatus?:
+    string | null;
+
+  teacherVerificationRisk?:
+    string | null;
+
+  teacherVerificationRequestedAt?:
+    Timestamp | null;
+
+  teacherSchoolVerifiedAt?:
+    Timestamp | null;
+
+  teacherVerificationApprovedAt?:
+    Timestamp | null;
+
+  teacherVerificationRejectedAt?:
+    Timestamp | null;
+
+  accountType?:
+    string | null;
+
+  plan?:
+    string | null;
+
+  personalPlan?:
+    string | null;
+
+  schoolId?:
+    string | null;
+
+  onboardingComplete?:
+    boolean;
+
+  createdAt?:
+    Timestamp;
+
+  updatedAt?:
+    Timestamp;
 };
 
 export type CreateUserProfileInput = {
@@ -263,6 +310,62 @@ function normaliseTeacherAccessStatus(
   return "";
 }
 
+function normaliseTeacherVerificationReviewStatus(
+  value: unknown,
+):
+  | "school_verification_pending"
+  | "platform_review_required"
+  | "approved"
+  | "rejected"
+  | "" {
+  if (
+    value ===
+      "school_verification_pending" ||
+    value ===
+      "platform_review_required" ||
+    value ===
+      "approved" ||
+    value ===
+      "rejected"
+  ) {
+    return value;
+  }
+
+  return "";
+}
+
+function normaliseTeacherVerificationRisk(
+  value: unknown,
+):
+  | "same_organisation_domain"
+  | "domain_mismatch"
+  | "personal_email_domain"
+  | "invalid_email_domain"
+  | "" {
+  if (
+    value ===
+      "same_organisation_domain" ||
+    value ===
+      "domain_mismatch" ||
+    value ===
+      "personal_email_domain" ||
+    value ===
+      "invalid_email_domain"
+  ) {
+    return value;
+  }
+
+  return "";
+}
+
+function timestampToNullableDate(
+  value: unknown,
+): Date | null {
+  return value instanceof Timestamp
+    ? value.toDate()
+    : null;
+}
+
 function convertUserProfile(
   documentId: string,
   data: Partial<FirestoreUserProfile>,
@@ -298,6 +401,16 @@ function convertUserProfile(
       role,
       accountIntent,
     );
+
+    const teacherVerificationReviewStatus =
+  normaliseTeacherVerificationReviewStatus(
+    data.teacherVerificationReviewStatus,
+  );
+
+const teacherVerificationRisk =
+  normaliseTeacherVerificationRisk(
+    data.teacherVerificationRisk,
+  );
 
   const schoolId =
     normaliseString(
@@ -341,6 +454,40 @@ function convertUserProfile(
     accountIntent,
 
     teacherAccessStatus,
+
+    schoolName:
+  normaliseString(
+    data.schoolName,
+  ),
+
+schoolAdminEmail:
+  normaliseEmail(
+    data.schoolAdminEmail,
+  ),
+
+teacherVerificationReviewStatus,
+
+teacherVerificationRisk,
+
+teacherVerificationRequestedAt:
+  timestampToNullableDate(
+    data.teacherVerificationRequestedAt,
+  ),
+
+teacherSchoolVerifiedAt:
+  timestampToNullableDate(
+    data.teacherSchoolVerifiedAt,
+  ),
+
+teacherVerificationApprovedAt:
+  timestampToNullableDate(
+    data.teacherVerificationApprovedAt,
+  ),
+
+teacherVerificationRejectedAt:
+  timestampToNullableDate(
+    data.teacherVerificationRejectedAt,
+  ),
 
     accountType,
 
@@ -486,6 +633,33 @@ export async function createUserProfile({
               "teacher"
             ? "not_submitted"
             : null,
+
+            schoolName:
+  null,
+
+schoolAdminEmail:
+  null,
+
+teacherVerificationReviewStatus:
+  null,
+
+teacherVerificationRisk:
+  null,
+
+teacherVerificationRequestedAt:
+  null,
+
+teacherSchoolVerifiedAt:
+  null,
+
+teacherVerificationApprovedAt:
+  role === "teacher" ||
+  role === "admin"
+    ? serverTimestamp()
+    : null,
+
+teacherVerificationRejectedAt:
+  null,
 
       accountType: "individual",
       plan: "free",

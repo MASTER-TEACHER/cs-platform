@@ -18,14 +18,22 @@ export default function DashboardStats({
       <StatCard title="Current XP" value={xp.toString()} icon="⭐" />
 
       <StatCard
-        title="Lessons Completed"
+        title="Current Curriculum Lessons"
         value={completedLessons.toString()}
         icon="📚"
       />
 
-      <StatCard title="Current Streak" value={streak.toString()} icon="🔥" />
+      <StatCard
+        title="Current Streak"
+        value={streak.toString()}
+        icon="🔥"
+      />
 
-      <StatCard title="Badges" value={badges.toString()} icon="🏆" />
+      <StatCard
+        title="Badges"
+        value={badges.toString()}
+        icon="🏆"
+      />
     </div>
   );
 }

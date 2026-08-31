@@ -5,6 +5,7 @@ type DashboardHeroProps = {
   xp: number;
   streak: number;
   badges: number;
+  curriculum: string;
 };
 
 export default function DashboardHero({
@@ -12,37 +13,56 @@ export default function DashboardHero({
   xp,
   streak,
   badges,
+  curriculum,
 }: DashboardHeroProps) {
   return (
     <Card className="border-0 bg-gradient-to-r from-slate-900 via-blue-800 to-indigo-700 text-white">
       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-blue-200 font-semibold">Welcome back 👋</p>
+          <p className="font-semibold text-blue-200">
+            Welcome back 👋
+          </p>
 
-          <h1 className="mt-2 text-4xl font-extrabold">{name}</h1>
+          <h1 className="mt-2 text-4xl font-extrabold">
+            {name}
+          </h1>
 
           <p className="mt-3 max-w-xl text-blue-100">
-            Continue your Computer Science journey and keep building your XP.
+            Continue your {curriculum} Computer Science journey.
+            Your dashboard recommendations are aligned to the
+            curriculum stored in your profile.
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="rounded-2xl bg-white/10 p-5 text-center">
-            <p className="text-sm text-blue-200">⭐ XP</p>
+            <p className="text-sm text-blue-200">
+              ⭐ XP
+            </p>
 
-            <p className="mt-2 text-3xl font-bold">{xp}</p>
+            <p className="mt-2 text-3xl font-bold">
+              {xp}
+            </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-5 text-center">
-            <p className="text-sm text-blue-200">🔥 Streak</p>
+            <p className="text-sm text-blue-200">
+              🔥 Streak
+            </p>
 
-            <p className="mt-2 text-3xl font-bold">{streak}</p>
+            <p className="mt-2 text-3xl font-bold">
+              {streak}
+            </p>
           </div>
 
           <div className="rounded-2xl bg-white/10 p-5 text-center">
-            <p className="text-sm text-blue-200">🏆 Badges</p>
+            <p className="text-sm text-blue-200">
+              🏆 Badges
+            </p>
 
-            <p className="mt-2 text-3xl font-bold">{badges}</p>
+            <p className="mt-2 text-3xl font-bold">
+              {badges}
+            </p>
           </div>
         </div>
       </div>

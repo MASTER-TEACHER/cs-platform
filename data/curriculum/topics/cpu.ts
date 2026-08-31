@@ -1,11 +1,12 @@
-import type { Topic } from "@/types/curriculum";
+﻿import type { Topic } from "@/types/curriculum";
 
 export const cpuTopic: Topic = {
   id: "cpu",
   title: "CPU Architecture",
   description:
     "Explore processor components, registers, the fetch–decode–execute cycle, performance and embedded systems.",
-  difficulty: "⭐⭐☆",
+  difficulty:
+  "\u2B50\u2B50\u2606",
   estimatedTime: "75 mins",
   simulator: "cpu",
 
@@ -356,3 +357,4 @@ export const cpuTopic: Topic = {
     },
   ],
 };
+

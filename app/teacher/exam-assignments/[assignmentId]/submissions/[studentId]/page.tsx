@@ -376,7 +376,7 @@ export default function MarkExamSubmissionPage() {
               href={`/teacher/exam-assignments/${assignment.id}`}
               className="rounded-xl border border-white/20 px-5 py-3 font-bold text-white"
             >
-              â† Markbook
+              ← Markbook
             </Link>
 
             <Link
@@ -469,7 +469,7 @@ export default function MarkExamSubmissionPage() {
               disabled={aiMarking || saving}
               className="rounded-xl bg-violet-700 px-5 py-3 font-bold text-white disabled:bg-slate-300"
             >
-              {aiMarking ? "AI is marking..." : "âœ¨ AI Mark Submission"}
+              {aiMarking ? "AI is marking..." : "✨ AI Mark Submission"}
             </button>
 
             {aiResult && (
@@ -504,7 +504,7 @@ export default function MarkExamSubmissionPage() {
 
                 <ul className="mt-2 space-y-1 text-sm text-slate-700">
                   {aiResult.strengths.map((item) => (
-                    <li key={item}>â€¢ {item}</li>
+                    <li key={item}>• {item}</li>
                   ))}
                 </ul>
               </div>
@@ -516,7 +516,7 @@ export default function MarkExamSubmissionPage() {
 
                 <ul className="mt-2 space-y-1 text-sm text-slate-700">
                   {aiResult.priorities.map((item) => (
-                    <li key={item}>â€¢ {item}</li>
+                    <li key={item}>• {item}</li>
                   ))}
                 </ul>
               </div>
@@ -569,7 +569,7 @@ export default function MarkExamSubmissionPage() {
                 <ul className="mt-3 space-y-2 text-sm text-emerald-900">
                   {question.markScheme.map((point) => (
                     <li key={point.id}>
-                      â€¢ {point.description} ({point.marks})
+                      • {point.description} ({point.marks})
                     </li>
                   ))}
                 </ul>
@@ -590,7 +590,7 @@ export default function MarkExamSubmissionPage() {
 
                 <ul className="mt-3 space-y-2 text-sm text-amber-900">
                   {extras.examinerGuidance.map((item) => (
-                    <li key={item}>â€¢ {item}</li>
+                    <li key={item}>• {item}</li>
                   ))}
                 </ul>
               </div>
@@ -761,7 +761,7 @@ function SuggestionList({
       {items.length > 0 ? (
         <ul className="mt-2 space-y-1 text-sm text-slate-700">
           {items.map((item) => (
-            <li key={item}>â€¢ {item}</li>
+            <li key={item}>• {item}</li>
           ))}
         </ul>
       ) : (

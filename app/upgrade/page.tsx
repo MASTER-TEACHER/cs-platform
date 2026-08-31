@@ -176,7 +176,7 @@ export default function UpgradePage() {
                       key={item}
                       className="flex gap-2"
                     >
-                      <span>âœ“</span>
+                      <span>✓</span>
                       <span>{item}</span>
                     </li>
                   ),

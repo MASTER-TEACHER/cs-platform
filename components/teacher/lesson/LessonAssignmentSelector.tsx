@@ -35,9 +35,21 @@ const examBoards: ExamBoard[] = [
 function difficultyLabel(
   difficulty: Topic["difficulty"],
 ): string {
-  if (difficulty === "⭐⭐⭐") return "Advanced";
-  if (difficulty === "⭐⭐☆") return "Intermediate";
-  return "Foundation";
+  if (
+  difficulty ===
+  "\u2B50\u2B50\u2B50"
+) {
+  return "Advanced";
+}
+
+if (
+  difficulty ===
+  "\u2B50\u2B50\u2606"
+) {
+  return "Intermediate";
+}
+
+return "Foundation";
 }
 
 export default function LessonAssignmentSelector({

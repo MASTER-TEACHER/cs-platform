@@ -74,15 +74,15 @@ Students can monitor:
 
 ## 🛠️ Tech Stack
 
-| Technology              | Purpose             |
-| ----------------------- | ------------------- |
-| Next.js 16              | Frontend Framework  |
-| TypeScript              | Type Safety         |
-| Tailwind CSS            | UI Styling          |
+| Technology | Purpose |
+| --- | --- |
+| Next.js 16 | Frontend Framework |
+| TypeScript | Type Safety |
+| Tailwind CSS | UI Styling |
 | Firebase Authentication | User Authentication |
-| Firestore               | Database            |
-| Vercel                  | Hosting             |
-| GitHub                  | Version Control     |
+| Firestore | Database |
+| Vercel | Hosting |
+| GitHub | Version Control |
 
 ---
 
@@ -97,122 +97,3 @@ lib/
 services/
 types/
 public/
-
-```
-
----
-
-# 📸 Screenshots
-
-_(To be added in Version 1.0.1)_
-
-- Landing Page
-- Dashboard
-- Login
-- Register
-- Binary Simulator
-- Hex Simulator
-- Student Profile
-
----
-
-# 🚀 Getting Started
-
-Clone the repository
-
-```bash
-git clone https://github.com/MASTER-TEACHER/cs-platform.git
-```
-
-Install dependencies
-
-```bash
-npm install
-```
-
-Run the development server
-
-```bash
-npm run dev
-```
-
-Build for production
-
-```bash
-npm run build
-```
-
----
-
-# 🎯 Roadmap
-
-## ✅ Version 1.0
-
-- Landing Page
-- Student Dashboard
-- Authentication
-- Binary Simulator
-- Hex Simulator
-- XP System
-- Badges
-- Daily Missions
-- Weekly Goals
-- Responsive Design
-- Live Deployment
-
----
-
-## 🚀 Version 1.1
-
-- Quiz Engine
-- Quiz Results
-- Leaderboards
-- Certificates
-- Additional GCSE Topics
-
----
-
-## 🌟 Version 2.0
-
-- AI Tutor
-- Teacher Dashboard
-- Student Analytics
-- Adaptive Learning
-- School Accounts
-- Classroom Management
-
----
-
-# 👨‍💻 About the Developer
-
-**Chris Brown**
-
-Computer Science Teacher | Head of Computer Science | Educational Technology Enthusiast
-
-This project was created to provide an engaging and interactive platform for students studying GCSE Computer Science, combining evidence-informed teaching approaches with modern web technologies.
-
----
-
-# 🤝 Contributing
-
-Contributions, ideas and suggestions are welcome.
-
-Please open an Issue or submit a Pull Request.
-
----
-
-# 📄 License
-
-This project is licensed under the MIT License.
-
----
-
-# ⭐ Support
-
-If you found this project useful, please consider giving it a ⭐ on GitHub.
-
----
-
-**CS Master**
-
-**Learn • Practice • Master**

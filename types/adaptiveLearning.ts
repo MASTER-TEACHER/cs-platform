@@ -1,17 +1,34 @@
 export type AdaptiveTopicState =
-  "new" | "priority" | "developing" | "secure" | "forgetting-risk" | "mastered";
+  | "new"
+  | "priority"
+  | "developing"
+  | "secure"
+  | "forgetting-risk"
+  | "mastered";
 
 export type AdaptiveDifficulty = "foundation" | "standard" | "higher";
 
-export type AdaptiveActionType = "lesson" | "quiz" | "exam" | "review";
+export type AdaptiveActionType =
+  | "lesson"
+  | "quiz"
+  | "exam"
+  | "programming"
+  | "review";
 
 export type AdaptiveEvidenceSource =
-  "quiz" | "exam" | "lesson" | "intervention";
+  | "quiz"
+  | "exam"
+  | "lesson"
+  | "programming"
+  | "intervention";
+
+export type AdaptiveEvidenceMode = "independent" | "supported";
 
 export type AdaptiveEvidence = {
   id: string;
   topic: string;
   source: AdaptiveEvidenceSource;
+  mode: AdaptiveEvidenceMode;
   score: number | null;
   completedAt: Date | null;
   weight: number;
@@ -21,9 +38,13 @@ export type AdaptiveTopicMastery = {
   id: string;
   topic: string;
   masteryScore: number;
+  independentAverageScore: number;
+  supportedAverageScore: number;
   confidenceScore: number;
   priorityScore: number;
   attempts: number;
+  independentEvidenceCount: number;
+  supportedEvidenceCount: number;
   averageScore: number;
   latestScore: number;
   trend: number;
@@ -52,9 +73,14 @@ export type AdaptiveLearningAction = {
 export type AdaptiveLearningPlan = {
   studentId: string;
   generatedAt: Date;
+  qualification: string;
+  examBoard: string;
+  currentCourse: string;
   overallMastery: number;
   examReadiness: number;
   confidence: number;
+  independentEvidenceCount: number;
+  supportedEvidenceCount: number;
   currentGrade: string;
   predictedGrade: string;
   dueForReviewCount: number;

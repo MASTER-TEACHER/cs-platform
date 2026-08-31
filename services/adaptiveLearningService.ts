@@ -10,8 +10,8 @@ import {
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
-
 import { buildTopicMastery } from "@/services/adaptiveMasteryService";
+import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
 import { buildAdaptiveActions } from "@/services/adaptiveRecommendationService";
 import { getStudentExamAssignments } from "@/services/examAssignmentService";
 import { getExamSubmission } from "@/services/examSubmissionService";
@@ -25,75 +25,50 @@ import type {
   AdaptiveLearningPlan,
 } from "@/types/adaptiveLearning";
 
-const safeString = (
-  value: unknown,
-  fallback = "",
-): string =>
-  typeof value === "string" &&
-  value.trim()
-    ? value.trim()
-    : fallback;
+const safeString = (value: unknown, fallback = ""): string =>
+  typeof value === "string" && value.trim() ? value.trim() : fallback;
 
-const safeNumber = (
-  value: unknown,
-): number =>
-  typeof value === "number" &&
-  Number.isFinite(value)
-    ? value
-    : 0;
+const safeNumber = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value) ? value : 0;
 
-const average = (
-  values: number[],
-): number =>
+const average = (values: number[]): number =>
   values.length
-    ? Math.round(
-        values.reduce(
-          (sum, value) =>
-            sum + value,
-          0,
-        ) / values.length,
-      )
+    ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
     : 0;
 
-function groupEvidence(
-  evidence: AdaptiveEvidence[],
-) {
-  const groups =
-    new Map<
-      string,
-      AdaptiveEvidence[]
-    >();
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (value instanceof Timestamp) return value.toDate();
+
+  if (
+    value &&
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+
+  return null;
+}
+
+function groupEvidence(evidence: AdaptiveEvidence[]) {
+  const groups = new Map<string, AdaptiveEvidence[]>();
 
   evidence.forEach((item) => {
-    const normalised =
-      normaliseTopic(item.topic);
+    const normalised = normaliseTopic(item.topic);
+    const existing = groups.get(normalised.topicTitle) || [];
 
-    const existing =
-      groups.get(
-        normalised.topicTitle,
-      ) || [];
-
-    groups.set(
-      normalised.topicTitle,
-      [
-        ...existing,
-        {
-          ...item,
-          topic:
-            normalised.topicTitle,
-        },
-      ],
-    );
+    groups.set(normalised.topicTitle, [
+      ...existing,
+      { ...item, topic: normalised.topicTitle },
+    ]);
   });
 
-  return Array.from(
-    groups.entries(),
-  ).map(
-    ([topic, items]) => ({
-      topic,
-      evidence: items,
-    }),
-  );
+  return Array.from(groups.entries()).map(([topic, items]) => ({
+    topic,
+    evidence: items,
+  }));
 }
 
 function resolveRawTopic(
@@ -101,34 +76,16 @@ function resolveRawTopic(
   fallback = "",
 ): string {
   return (
-    safeString(
-      data.topicTitle,
-    ) ||
-    safeString(
-      data.topic,
-    ) ||
-    safeString(
-      data.curriculumTopic,
-    ) ||
-    safeString(
-      data.quizTitle,
-    ) ||
-    safeString(
-      data.title,
-      fallback,
-    )
+    safeString(data.topicTitle) ||
+    safeString(data.topic) ||
+    safeString(data.curriculumTopic) ||
+    safeString(data.quizTitle) ||
+    safeString(data.resourceTopic) ||
+    safeString(data.title, fallback)
   );
 }
 
-/*
- * Generic labels describe an assessment type rather than
- * an actual Computer Science curriculum topic.
- *
- * These must never become mastery topics.
- */
-function isGenericAssessmentTopic(
-  value: string,
-): boolean {
+function isGenericAssessmentTopic(value: string): boolean {
   const normalised = value
     .trim()
     .toLowerCase()
@@ -145,37 +102,18 @@ function isGenericAssessmentTopic(
     "practice quiz",
     "exam",
     "written exam",
+    "programming challenge",
+    "lesson",
   ].includes(normalised);
 }
 
-/*
- * Assignment titles frequently contain presentational suffixes,
- * for example:
- *
- * "character encoding Demo Quiz"
- * "memory and storage Demo Quiz"
- * "merge sort Demo Quiz"
- *
- * Removing those suffixes gives topicNormalisationService a much
- * cleaner curriculum phrase to resolve.
- */
-function cleanAssignmentTitle(
-  value: string,
-): string {
+function cleanAssignmentTitle(value: string): string {
   return value
     .trim()
-    .replace(
-      /\s+(demo\s+)?quiz$/i,
-      "",
-    )
-    .replace(
-      /\s+practice\s+quiz$/i,
-      "",
-    )
-    .replace(
-      /\s+assessment$/i,
-      "",
-    )
+    .replace(/\s+(demo\s+)?quiz$/i, "")
+    .replace(/\s+practice\s+quiz$/i, "")
+    .replace(/\s+assessment$/i, "")
+    .replace(/\s+programming\s+challenge$/i, "")
     .trim();
 }
 
@@ -186,90 +124,99 @@ type AssignmentTopicMetadata = {
 
 async function loadAssignmentTopicMetadata(
   assignmentIds: string[],
-): Promise<
-  Map<
-    string,
-    AssignmentTopicMetadata
-  >
-> {
-  const uniqueIds =
-    Array.from(
-      new Set(
-        assignmentIds
-          .map((id) =>
-            id.trim(),
-          )
-          .filter(Boolean),
-      ),
-    );
+): Promise<Map<string, AssignmentTopicMetadata>> {
+  const uniqueIds = Array.from(
+    new Set(assignmentIds.map((id) => id.trim()).filter(Boolean)),
+  );
 
-  const entries =
-    await Promise.all(
-      uniqueIds.map(
-        async (
+  const entries = await Promise.all(
+    uniqueIds.map(async (assignmentId) => {
+      try {
+        const snapshot = await getDoc(
+          doc(db, "assignments", assignmentId),
+        );
+
+        if (!snapshot.exists()) {
+          return [assignmentId, { topic: "", title: "" }] as const;
+        }
+
+        const data = snapshot.data();
+
+        return [
           assignmentId,
-        ) => {
-          try {
-            const snapshot =
-              await getDoc(
-                doc(
-                  db,
-                  "assignments",
-                  assignmentId,
-                ),
-              );
+          {
+            topic: resolveRawTopic(data),
+            title: safeString(data.title),
+          },
+        ] as const;
+      } catch (error) {
+        console.warn(
+          `Unable to resolve adaptive topic for assignment ${assignmentId}:`,
+          error,
+        );
 
-            if (
-              !snapshot.exists()
-            ) {
-              return [
-                assignmentId,
-                {
-                  topic: "",
-                  title: "",
-                },
-              ] as const;
-            }
+        return [assignmentId, { topic: "", title: "" }] as const;
+      }
+    }),
+  );
 
-            const data =
-              snapshot.data();
+  return new Map(entries);
+}
 
-            return [
-              assignmentId,
-              {
-                topic:
-                  resolveRawTopic(
-                    data,
-                  ),
-                title:
-                  safeString(
-                    data.title,
-                  ),
-              },
-            ] as const;
-          } catch (
-            caughtError
-          ) {
-            /*
-             * A missing/legacy assignment should not prevent the
-             * rest of the student's adaptive plan from loading.
-             */
-            console.warn(
-              `Unable to resolve adaptive topic for assignment ${assignmentId}:`,
-              caughtError,
-            );
+type ProgrammingAssignmentMetadata = {
+  topic: string;
+  title: string;
+  resourceType: string;
+};
 
-            return [
-              assignmentId,
-              {
-                topic: "",
-                title: "",
-              },
-            ] as const;
-          }
-        },
-      ),
-    );
+async function loadProgrammingAssignmentMetadata(
+  assignmentIds: string[],
+): Promise<Map<string, ProgrammingAssignmentMetadata>> {
+  const uniqueIds = Array.from(
+    new Set(assignmentIds.map((id) => id.trim()).filter(Boolean)),
+  );
+
+  const entries = await Promise.all(
+    uniqueIds.map(async (assignmentId) => {
+      try {
+        const snapshot = await getDoc(
+          doc(db, "classAssignments", assignmentId),
+        );
+
+        if (!snapshot.exists()) {
+          return [
+            assignmentId,
+            { topic: "", title: "", resourceType: "" },
+          ] as const;
+        }
+
+        const data = snapshot.data();
+
+        return [
+          assignmentId,
+          {
+            topic:
+              safeString(data.resourceTopic) ||
+              resolveRawTopic(data),
+            title:
+              safeString(data.resourceTitle) ||
+              safeString(data.title),
+            resourceType: safeString(data.resourceType),
+          },
+        ] as const;
+      } catch (error) {
+        console.warn(
+          `Unable to resolve programming assignment ${assignmentId}:`,
+          error,
+        );
+
+        return [
+          assignmentId,
+          { topic: "", title: "", resourceType: "" },
+        ] as const;
+      }
+    }),
+  );
 
   return new Map(entries);
 }
@@ -278,108 +225,56 @@ function resolveAssignedQuizTopic({
   resultData,
   assignmentMetadata,
 }: {
-  resultData: Record<
-    string,
-    unknown
-  >;
-
-  assignmentMetadata:
-    AssignmentTopicMetadata | null;
+  resultData: Record<string, unknown>;
+  assignmentMetadata: AssignmentTopicMetadata | null;
 }): string | null {
-  /*
-   * First preference:
-   * explicit curriculum/topic metadata stored directly on
-   * the result.
-   */
-  const resultTopic =
-    resolveRawTopic(
-      resultData,
-    );
+  const resultTopic = resolveRawTopic(resultData);
 
   if (
     resultTopic &&
-    !isGenericAssessmentTopic(
-      resultTopic,
-    )
+    !isGenericAssessmentTopic(resultTopic)
   ) {
-    return cleanAssignmentTitle(
-      resultTopic,
-    );
+    return cleanAssignmentTitle(resultTopic);
   }
 
-  /*
-   * Second preference:
-   * topic metadata on the original assignment.
-   */
-  const assignmentTopic =
-    assignmentMetadata?.topic ||
-    "";
+  const assignmentTopic = assignmentMetadata?.topic || "";
 
   if (
     assignmentTopic &&
-    !isGenericAssessmentTopic(
-      assignmentTopic,
-    )
+    !isGenericAssessmentTopic(assignmentTopic)
   ) {
-    return cleanAssignmentTitle(
-      assignmentTopic,
-    );
+    return cleanAssignmentTitle(assignmentTopic);
   }
 
-  /*
-   * Third preference:
-   * derive the curriculum topic from the original assignment
-   * title.
-   *
-   * Example:
-   * "character encoding Demo Quiz"
-   *          Ã¢â€ â€œ
-   * "character encoding"
-   *          Ã¢â€ â€œ
-   * topicNormalisationService
-   */
-  const assignmentTitle =
-    cleanAssignmentTitle(
-      assignmentMetadata?.title ||
-        "",
-    );
+  const assignmentTitle = cleanAssignmentTitle(
+    assignmentMetadata?.title || "",
+  );
 
   if (
     assignmentTitle &&
-    !isGenericAssessmentTopic(
-      assignmentTitle,
-    )
+    !isGenericAssessmentTopic(assignmentTitle)
   ) {
     return assignmentTitle;
   }
 
-  /*
-   * Do NOT create fake mastery evidence such as "Assigned Quiz".
-   *
-   * The result remains stored normally in Firestore and can still
-   * contribute to assignment history/markbooks. It simply cannot
-   * be attributed to curriculum mastery until a real topic can be
-   * identified.
-   */
   return null;
 }
 
 export async function getAdaptiveLearningPlan(
   studentId: string,
 ): Promise<AdaptiveLearningPlan> {
-  const id =
-    studentId.trim();
+  const id = studentId.trim();
 
   if (!id) {
-    throw new Error(
-      "A valid student account is required.",
-    );
+    throw new Error("A valid student account is required.");
   }
 
   const [
     profile,
     quizSnapshot,
     assignedQuizSnapshot,
+    programmingProgressSnapshot,
+    lessonProgressSnapshot,
     examAssignments,
     interventions,
   ] = await Promise.all([
@@ -387,460 +282,402 @@ export async function getAdaptiveLearningPlan(
 
     getDocs(
       query(
-        collection(
-          db,
-          "users",
-          id,
-          "quizResults",
-        ),
-        orderBy(
-          "createdAt",
-          "desc",
-        ),
+        collection(db, "users", id, "quizResults"),
+        orderBy("createdAt", "desc"),
       ),
     ),
 
     getDocs(
       query(
-        collection(
-          db,
-          "assignmentResults",
-        ),
-        where(
-          "studentId",
-          "==",
-          id,
-        ),
+        collection(db, "assignmentResults"),
+        where("studentId", "==", id),
       ),
     ),
 
-    getStudentExamAssignments(
-      id,
+    getDocs(
+      query(
+        collection(db, "assignmentProgress"),
+        where("studentId", "==", id),
+      ),
     ),
 
-    getStudentInterventions(
-      id,
+    getDocs(
+      query(
+        collection(db, "lessonProgress"),
+        where("studentId", "==", id),
+      ),
     ),
+
+    getStudentExamAssignments(id),
+    getStudentInterventions(id),
   ]);
 
   if (!profile) {
-    throw new Error(
-      "The student profile could not be loaded.",
+    throw new Error("The student profile could not be loaded.");
+  }
+
+  const curriculumCoverage =
+    profile.qualification && profile.examBoard
+      ? getCurriculumCoverage(
+          profile.qualification,
+          profile.examBoard,
+        )
+      : null;
+
+  const allowedTopicKeys = new Set<string>();
+  const lessonTopicById = new Map<string, string>();
+
+  curriculumCoverage?.units.forEach((unitCoverage) => {
+    unitCoverage.topics.forEach((topic) => {
+      const fromId = normaliseTopic(topic.id);
+      const fromTitle = normaliseTopic(topic.title);
+
+      allowedTopicKeys.add(fromId.topicId);
+      allowedTopicKeys.add(fromTitle.topicId);
+
+      topic.lessons.forEach((lesson) => {
+        lessonTopicById.set(lesson.id, fromTitle.topicTitle);
+      });
+    });
+  });
+
+  function belongsToActiveCurriculum(topicValue: string): boolean {
+    if (allowedTopicKeys.size === 0) return false;
+
+    return allowedTopicKeys.has(
+      normaliseTopic(topicValue).topicId,
     );
   }
 
-  const evidence:
-    AdaptiveEvidence[] = [];
+  const evidence: AdaptiveEvidence[] = [];
 
-  /*
-   * ------------------------------------------------------------
-   * NORMAL QUIZ EVIDENCE
-   * ------------------------------------------------------------
-   */
-  quizSnapshot.docs.forEach(
-    (document) => {
-      const data =
-        document.data();
+  // Independent quiz evidence.
+  quizSnapshot.docs.forEach((document) => {
+    const data = document.data();
+    const topic = resolveRawTopic(data, "Quiz");
 
-      const topic =
-        resolveRawTopic(
-          data,
-          "Quiz",
-        );
+    if (isGenericAssessmentTopic(topic)) return;
 
-      /*
-       * Avoid producing a generic "Quiz" mastery topic.
-       */
-      if (
-        isGenericAssessmentTopic(
-          topic,
-        )
-      ) {
-        return;
-      }
+    evidence.push({
+      id: `quiz-${document.id}`,
+      topic: cleanAssignmentTitle(topic),
+      source: "quiz",
+      mode: "independent",
+      score: safeNumber(data.scorePercent),
+      completedAt:
+        toDate(data.completedAt) ||
+        toDate(data.createdAt),
+      weight: 1,
+    });
+  });
 
-      evidence.push({
-        id:
-          `quiz-${document.id}`,
-
-        topic:
-          cleanAssignmentTitle(
-            topic,
-          ),
-
-        source: "quiz",
-
-        score:
-          safeNumber(
-            data.scorePercent,
-          ),
-
-        completedAt:
-          data.createdAt instanceof
-          Timestamp
-            ? data.createdAt.toDate()
-            : null,
-
-        weight: 1,
-      });
-    },
-  );
-
-  /*
-   * ------------------------------------------------------------
-   * ASSIGNED QUIZ EVIDENCE
-   * ------------------------------------------------------------
-   *
-   * assignmentResults often contain score/result information but
-   * not enough curriculum metadata. Resolve the original assignment
-   * so its real topic/title can be used.
-   */
-  const assignedQuizAssignmentIds =
-    assignedQuizSnapshot.docs
-      .map((document) =>
-        safeString(
-          document.data()
-            .assignmentId,
-        ),
-      )
-      .filter(Boolean);
+  // Teacher-assigned quiz evidence.
+  const assignedQuizAssignmentIds = assignedQuizSnapshot.docs
+    .map((document) => safeString(document.data().assignmentId))
+    .filter(Boolean);
 
   const assignmentMetadata =
-    await loadAssignmentTopicMetadata(
-      assignedQuizAssignmentIds,
+    await loadAssignmentTopicMetadata(assignedQuizAssignmentIds);
+
+  assignedQuizSnapshot.docs.forEach((document) => {
+    const data = document.data();
+
+    const assignmentType = safeString(data.assignmentType);
+
+    if (
+      assignmentType &&
+      assignmentType !== "quiz"
+    ) {
+      return;
+    }
+
+    if (typeof data.percentage !== "number") return;
+
+    const assignmentId = safeString(data.assignmentId);
+
+    const topic = resolveAssignedQuizTopic({
+      resultData: data,
+      assignmentMetadata:
+        assignmentMetadata.get(assignmentId) || null,
+    });
+
+    if (!topic) {
+      console.warn(
+        `Assigned quiz result ${document.id} has no resolvable curriculum topic and was excluded from adaptive mastery.`,
+      );
+      return;
+    }
+
+    evidence.push({
+      id: `assigned-quiz-${document.id}`,
+      topic,
+      source: "quiz",
+      mode: "independent",
+      score: safeNumber(data.percentage),
+      completedAt: toDate(data.completedAt),
+      weight: 1.1,
+    });
+  });
+
+  // Independent programming evidence from teacher-assigned challenges.
+  const programmingAssignmentIds = programmingProgressSnapshot.docs
+    .filter(
+      (document) =>
+        typeof document.data().programmingPercentage === "number",
+    )
+    .map((document) => safeString(document.data().assignmentId))
+    .filter(Boolean);
+
+  const programmingMetadata =
+    await loadProgrammingAssignmentMetadata(programmingAssignmentIds);
+
+  programmingProgressSnapshot.docs.forEach((document) => {
+    const data = document.data();
+
+    if (typeof data.programmingPercentage !== "number") return;
+
+    const assignmentId = safeString(data.assignmentId);
+    const metadata = programmingMetadata.get(assignmentId);
+
+    if (
+      !metadata ||
+      metadata.resourceType !== "programming-challenge"
+    ) {
+      return;
+    }
+
+    const topic = cleanAssignmentTitle(
+      metadata.topic || metadata.title,
     );
 
-  assignedQuizSnapshot.docs.forEach(
-    (document) => {
-      const data =
-        document.data();
+    if (!topic || isGenericAssessmentTopic(topic)) return;
 
-      const assignmentId =
-        safeString(
-          data.assignmentId,
-        );
+    evidence.push({
+      id: `programming-${document.id}`,
+      topic,
+      source: "programming",
+      mode: "independent",
+      score: safeNumber(data.programmingPercentage),
+      completedAt:
+        toDate(data.completedAt) ||
+        toDate(data.updatedAt),
+      weight: 1.2,
+    });
+  });
 
-      const topic =
-        resolveAssignedQuizTopic({
-          resultData: data,
-
-          assignmentMetadata:
-            assignmentMetadata.get(
-              assignmentId,
-            ) || null,
-        });
-
-      if (!topic) {
-        console.warn(
-          `Assigned quiz result ${document.id} has no resolvable curriculum topic and was excluded from topic mastery.`,
-        );
-
-        return;
-      }
-
-      evidence.push({
-        id:
-          `assigned-quiz-${document.id}`,
-
-        topic,
-
-        source: "quiz",
-
-        score:
-          safeNumber(
-            data.percentage,
-          ),
-
-        completedAt:
-          data.completedAt instanceof
-          Timestamp
-            ? data.completedAt.toDate()
-            : null,
-
-        weight: 1.1,
-      });
-    },
+  // Written exam evidence.
+  const submissions = await Promise.all(
+    examAssignments.map((assignment) =>
+      getExamSubmission(assignment.id, id),
+    ),
   );
 
-  /*
-   * ------------------------------------------------------------
-   * WRITTEN EXAM EVIDENCE
-   * ------------------------------------------------------------
-   */
-  const submissions =
-    await Promise.all(
-      examAssignments.map(
-        (assignment) =>
-          getExamSubmission(
-            assignment.id,
-            id,
-          ),
-      ),
-    );
+  examAssignments.forEach((assignment, index) => {
+    const submission = submissions[index];
 
-  examAssignments.forEach(
-    (
-      assignment,
-      index,
-    ) => {
-      const submission =
-        submissions[index];
+    if (!submission || submission.status !== "marked") return;
 
-      if (
-        !submission ||
-        submission.status !==
-          "marked"
-      ) {
-        return;
-      }
+    const examTopic =
+      assignment.questionSetSnapshot.topic ||
+      assignment.questionSetTitle ||
+      assignment.title;
 
-      const examTopic =
-        assignment
-          .questionSetSnapshot
-          .topic ||
-        assignment
-          .questionSetTitle ||
-        assignment.title;
+    if (isGenericAssessmentTopic(examTopic)) return;
 
-      if (
-        isGenericAssessmentTopic(
-          examTopic,
-        )
-      ) {
-        return;
-      }
+    evidence.push({
+      id: `exam-${assignment.id}`,
+      topic: cleanAssignmentTitle(examTopic),
+      source: "exam",
+      mode: "independent",
+      score: submission.percentage,
+      completedAt: submission.markedAt,
+      weight: 1.4,
+    });
+  });
 
-      evidence.push({
-        id:
-          `exam-${assignment.id}`,
+  // Supported intervention evidence.
+  interventions.forEach((intervention) => {
+    const completedSteps = intervention.steps.filter(
+      (step) => step.status === "completed",
+    ).length;
 
-        topic:
-          cleanAssignmentTitle(
-            examTopic,
-          ),
+    if (!completedSteps) return;
+    if (isGenericAssessmentTopic(intervention.topic)) return;
 
-        source: "exam",
+    const score =
+      typeof intervention.currentScore === "number"
+        ? intervention.currentScore
+        : intervention.baselineScore;
 
-        score:
-          submission.percentage,
+    evidence.push({
+      id: `intervention-${intervention.id}`,
+      topic: intervention.topic,
+      source: "intervention",
+      mode: "supported",
+      score: typeof score === "number" ? score : null,
+      completedAt:
+        intervention.updatedAt ||
+        intervention.completedAt,
+      weight: 0.5,
+    });
+  });
 
-        completedAt:
-          submission.markedAt,
+  // Supported interactive-lesson evidence.
+  lessonProgressSnapshot.docs.forEach((document) => {
+    const data = document.data();
+    const lessonId = safeString(data.lessonId);
 
-        weight: 1.4,
-      });
-    },
+    const rawTopic =
+      safeString(data.topicId) ||
+      lessonTopicById.get(lessonId) ||
+      "";
+
+    if (!rawTopic) return;
+
+    const topic =
+      lessonTopicById.get(lessonId) ||
+      normaliseTopic(rawTopic).topicTitle;
+
+    evidence.push({
+      id: `lesson-progress-${document.id}`,
+      topic,
+      source: "lesson",
+      mode: "supported",
+      score:
+        typeof data.overallAccuracy === "number"
+          ? data.overallAccuracy
+          : null,
+      completedAt:
+        toDate(data.completedAt) ||
+        toDate(data.updatedAt),
+      weight: 0.35,
+    });
+  });
+
+  // Legacy completedLessons: context only, never mastery.
+  const lessonProgressIds = new Set(
+    lessonProgressSnapshot.docs
+      .map((document) => safeString(document.data().lessonId))
+      .filter(Boolean),
   );
 
-  /*
-   * ------------------------------------------------------------
-   * INTERVENTION EVIDENCE
-   * ------------------------------------------------------------
-   */
-  interventions.forEach(
-    (intervention) => {
-      const completedSteps =
-        intervention.steps.filter(
-          (step) =>
-            step.status ===
-            "completed",
-        ).length;
+  profile.completedLessons.forEach((lessonId, index) => {
+    if (!lessonId.trim() || lessonProgressIds.has(lessonId)) return;
 
-      if (!completedSteps) {
-        return;
-      }
+    const topic = lessonTopicById.get(lessonId);
+    if (!topic) return;
 
-      if (
-        isGenericAssessmentTopic(
-          intervention.topic,
-        )
-      ) {
-        return;
-      }
+    evidence.push({
+      id: `legacy-lesson-${index}-${lessonId}`,
+      topic,
+      source: "lesson",
+      mode: "supported",
+      score: null,
+      completedAt: null,
+      weight: 0,
+    });
+  });
 
-      evidence.push({
-        id:
-          `intervention-${intervention.id}`,
-
-        topic:
-          intervention.topic,
-
-        source:
-          "intervention",
-
-        score:
-          intervention.currentScore ||
-          intervention.baselineScore,
-
-        completedAt:
-          intervention.updatedAt ||
-          intervention.completedAt,
-
-        weight: 0.8,
-      });
-    },
+  const activeCurriculumEvidence = evidence.filter((item) =>
+    belongsToActiveCurriculum(item.topic),
   );
 
-  /*
-   * ------------------------------------------------------------
-   * LESSON EVIDENCE
-   * ------------------------------------------------------------
-   */
-  profile.completedLessons.forEach(
-    (
-      lessonId,
-      index,
-    ) => {
-      if (
-        !lessonId.trim()
-      ) {
-        return;
-      }
-
-      evidence.push({
-        id:
-          `lesson-${index}-${lessonId}`,
-
-        topic: lessonId,
-
-        source: "lesson",
-
-        score: 60,
-
-        completedAt: null,
-
-        weight: 0.25,
-      });
-    },
+  const topics = buildTopicMastery(
+    groupEvidence(activeCurriculumEvidence),
   );
 
-  /*
-   * ------------------------------------------------------------
-   * MASTERY + RECOMMENDATIONS
-   * ------------------------------------------------------------
-   */
-  const topics =
-    buildTopicMastery(
-      groupEvidence(
-        evidence,
+  const actions = buildAdaptiveActions(topics);
+
+  const independentlyAssessedTopics = topics.filter(
+    (topic) => topic.independentEvidenceCount > 0,
+  );
+
+  const overallMastery = average(
+    independentlyAssessedTopics.map((topic) => topic.masteryScore),
+  );
+
+  const confidence = average(
+    independentlyAssessedTopics.map(
+      (topic) => topic.confidenceScore,
+    ),
+  );
+
+  const examReadiness = average(
+    independentlyAssessedTopics.map((topic) =>
+      Math.round(
+        topic.masteryScore * 0.8 +
+          topic.confidenceScore * 0.2,
       ),
-    );
+    ),
+  );
 
-  const actions =
-    buildAdaptiveActions(
-      topics,
-    );
+  const recentTrend = average(
+    independentlyAssessedTopics.map((topic) => topic.trend),
+  );
 
-  const assessedTopics =
-    topics.filter(
-      (topic) =>
-        topic.attempts > 0,
-    );
+  const predictedScore = Math.max(
+    0,
+    Math.min(
+      100,
+      examReadiness + Math.round(recentTrend * 0.2),
+    ),
+  );
 
-  const overallMastery =
-    average(
-      assessedTopics.map(
-        (topic) =>
-          topic.masteryScore,
-      ),
-    );
+  const independentEvidenceCount = topics.reduce(
+    (sum, topic) => sum + topic.independentEvidenceCount,
+    0,
+  );
 
-  const confidence =
-    average(
-      assessedTopics.map(
-        (topic) =>
-          topic.confidenceScore,
-      ),
-    );
-
-  const examReadiness =
-    average(
-      assessedTopics.map(
-        (topic) =>
-          Math.round(
-            topic.masteryScore *
-              0.75 +
-              topic.confidenceScore *
-                0.25,
-          ),
-      ),
-    );
-
-  const recentTrend =
-    average(
-      assessedTopics.map(
-        (topic) =>
-          topic.trend,
-      ),
-    );
-
-  const predictedScore =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        examReadiness +
-          Math.round(
-            recentTrend *
-              0.25,
-          ),
-      ),
-    );
+  const supportedEvidenceCount = topics.reduce(
+    (sum, topic) => sum + topic.supportedEvidenceCount,
+    0,
+  );
 
   return {
     studentId: id,
-
-    generatedAt:
-      new Date(),
+    generatedAt: new Date(),
+    qualification: profile.qualification || "GCSE",
+    examBoard: profile.examBoard || "General",
+    currentCourse: profile.currentCourse || "Computer Science",
 
     overallMastery,
-
     examReadiness,
-
     confidence,
+    independentEvidenceCount,
+    supportedEvidenceCount,
 
-    currentGrade:
-      indicativeGradeFromPercentage(
-        examReadiness,
-        profile?.qualification,
-      ),
+    currentGrade: independentlyAssessedTopics.length
+      ? indicativeGradeFromPercentage(
+          examReadiness,
+          profile.qualification,
+        )
+      : "U",
 
-    predictedGrade:
-      indicativeGradeFromPercentage(
-        predictedScore,
-        profile?.qualification,
-      ),
+    predictedGrade: independentlyAssessedTopics.length
+      ? indicativeGradeFromPercentage(
+          predictedScore,
+          profile.qualification,
+        )
+      : "U",
 
-    dueForReviewCount:
-      topics.filter(
-        (topic) =>
-          topic.nextReviewAt.getTime() <=
-          Date.now(),
-      ).length,
+    dueForReviewCount: topics.filter(
+      (topic) => topic.nextReviewAt.getTime() <= Date.now(),
+    ).length,
 
-    priorityTopicCount:
-      topics.filter(
-        (topic) =>
-          topic.state ===
-            "priority" ||
-          topic.state ===
-            "forgetting-risk",
-      ).length,
+    priorityTopicCount: topics.filter(
+      (topic) =>
+        topic.state === "priority" ||
+        topic.state === "forgetting-risk",
+    ).length,
 
-    secureTopicCount:
-      topics.filter(
-        (topic) =>
-          topic.state ===
-            "secure" ||
-          topic.state ===
-            "mastered",
-      ).length,
+    secureTopicCount: topics.filter(
+      (topic) =>
+        topic.state === "secure" ||
+        topic.state === "mastered",
+    ).length,
 
-    nextAction:
-      actions[0] || null,
-
+    nextAction: actions[0] || null,
     actions,
-
     topics,
   };
 }

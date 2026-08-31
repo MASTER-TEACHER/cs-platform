@@ -323,7 +323,7 @@ export default function ExamQuestionTrainer() {
             href="/exam-trainer/history"
             className="mt-6 inline-flex rounded-xl border border-white/30 px-5 py-3 font-black text-white"
           >
-            View exam history ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
+            View exam history →
           </Link>
         </Card>
 
@@ -337,7 +337,7 @@ export default function ExamQuestionTrainer() {
             </h2>
             <p className="mt-2 text-amber-900">
               Question {resumeAttempt.currentQuestionIndex + 1} of{" "}
-              {resumeAttempt.questions.length} Ãƒâ€šÃ‚Â·{" "}
+              {resumeAttempt.questions.length} ·{" "}
               {formatSeconds(resumeAttempt.secondsRemaining)} remaining
             </p>
             <button
@@ -345,7 +345,7 @@ export default function ExamQuestionTrainer() {
               onClick={resumeSavedAttempt}
               className="mt-5 rounded-xl bg-amber-600 px-5 py-3 font-black text-white"
             >
-              Resume exam ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
+              Resume exam →
             </button>
           </Card>
         )}
@@ -420,7 +420,7 @@ export default function ExamQuestionTrainer() {
             disabled={availableCount === 0}
             className="mt-7 rounded-xl bg-blue-600 px-6 py-4 font-black text-white disabled:bg-slate-300"
           >
-            Generate saved exam ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
+            Generate saved exam →
           </button>
         </Card>
       </div>
@@ -431,7 +431,7 @@ export default function ExamQuestionTrainer() {
     return (
       <Card>
         <div className="py-20 text-center">
-          <div className="text-6xl">ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â</div>
+          <div className="text-6xl">📝</div>
           <h1 className="mt-6 text-3xl font-black">
             Marking and saving your paper
           </h1>
@@ -477,7 +477,7 @@ export default function ExamQuestionTrainer() {
                 <div className="flex justify-between gap-4 font-bold">
                   <span>{item.topic}</span>
                   <span>
-                    {item.awardedMarks}/{item.availableMarks} Ãƒâ€šÃ‚Â·{" "}
+                    {item.awardedMarks}/{item.availableMarks} ·{" "}
                     {item.percentage}%
                   </span>
                 </div>
@@ -525,12 +525,12 @@ export default function ExamQuestionTrainer() {
               Question {currentIndex + 1} of {questions.length}
             </p>
             <p className="mt-1 font-bold text-slate-600">
-              {currentQuestion?.topic} Ãƒâ€šÃ‚Â· {currentQuestion?.marks} marks
+              {currentQuestion?.topic} · {currentQuestion?.marks} marks
             </p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-black">
-              ÃƒÂ¢Ã‚ÂÃ‚Â± {formatSeconds(secondsRemaining)}
+              ⏱ {formatSeconds(secondsRemaining)}
             </p>
             <p className="mt-1 text-xs font-bold text-emerald-700">
               Autosave enabled
@@ -542,7 +542,7 @@ export default function ExamQuestionTrainer() {
       {currentQuestion && (
         <Card>
           <p className="text-sm font-black uppercase tracking-wide text-indigo-600">
-            {currentQuestion.commandWord} Ãƒâ€šÃ‚Â· {currentQuestion.type}
+            {currentQuestion.commandWord} · {currentQuestion.type}
           </p>
           <h1 className="mt-3 whitespace-pre-wrap text-2xl font-black leading-9">
             {currentQuestion.question}
@@ -590,7 +590,7 @@ export default function ExamQuestionTrainer() {
           disabled={currentIndex === 0}
           className="rounded-xl border border-slate-300 px-5 py-3 font-black disabled:opacity-40"
         >
-          ÃƒÂ¢Ã¢â‚¬Â Ã‚Â Previous
+          ← Previous
         </button>
 
         {currentIndex < questions.length - 1 ? (
@@ -599,7 +599,7 @@ export default function ExamQuestionTrainer() {
             onClick={() => moveToQuestion(currentIndex + 1)}
             className="rounded-xl bg-blue-600 px-5 py-3 font-black text-white"
           >
-            Next question ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢
+            Next question →
           </button>
         ) : (
           <button

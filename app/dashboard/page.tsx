@@ -15,9 +15,7 @@ import StudentAnalyticsSnapshot from "@/components/dashboard/StudentAnalyticsSna
 import { useAuth } from "@/contexts/AuthContext";
 import { useRecentQuiz } from "@/hooks/useRecentQuiz";
 import { useAdaptiveLearning } from "@/hooks/useAdaptiveLearning";
-
-import { getDailyMission } from "@/lib/missionEngine";
-import { getTotalLessonCount } from "@/lib/curriculumProgress";
+import { buildStudentJourney } from "@/services/studentJourneyService";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -41,18 +39,14 @@ export default function DashboardPage() {
   } = useAdaptiveLearning();
 
   useEffect(() => {
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
     if (!user) {
       router.replace("/login");
       return;
     }
 
-    if (!profileReady || !profile) {
-      return;
-    }
+    if (!profileReady || !profile) return;
 
     if (
       profile.role === "teacher" ||
@@ -80,9 +74,7 @@ export default function DashboardPage() {
 
   if (
     loading ||
-    (user &&
-      !profileReady &&
-      !profileError)
+    (user && !profileReady && !profileError)
   ) {
     return (
       <div className="space-y-8">
@@ -136,28 +128,42 @@ export default function DashboardPage() {
     );
   }
 
-  const name =
-    profile.name || "Student";
+  const name = profile.name || "Student";
+  const xp = profile.xp || 0;
+  const streak = profile.streak || 0;
+  const badges = profile.badges || [];
+  const completedLessons = profile.completedLessons || [];
 
-  const xp =
-    profile.xp || 0;
+  const journey = buildStudentJourney({
+    qualification: profile.qualification,
+    examBoard: profile.examBoard,
+    completedLessons,
+  });
 
-  const streak =
-    profile.streak || 0;
+  if (!journey) {
+    return (
+      <section className="rounded-3xl border border-amber-200 bg-amber-50 p-8">
+        <h1 className="text-2xl font-black text-amber-950">
+          Your curriculum could not be resolved
+        </h1>
 
-  const badges =
-    profile.badges || [];
+        <p className="mt-3 text-amber-800">
+          Your account has a curriculum selection, but CS Master
+          could not map it to an available course.
+        </p>
 
-  const completedLessons =
-    profile.completedLessons || [];
-
-  const totalLessons =
-    getTotalLessonCount();
-
-  const mission =
-    getDailyMission(
-      completedLessons,
+        <button
+          type="button"
+          onClick={() =>
+            router.push("/profile/curriculum")
+          }
+          className="mt-6 rounded-xl bg-amber-600 px-6 py-3 font-black text-white hover:bg-amber-700"
+        >
+          Review curriculum selection
+        </button>
+      </section>
     );
+  }
 
   return (
     <div className="space-y-8">
@@ -166,62 +172,49 @@ export default function DashboardPage() {
         xp={xp}
         streak={streak}
         badges={badges.length}
+        curriculum={`${journey.examBoard} ${
+          journey.qualification === "A_LEVEL"
+            ? "A-level"
+            : "GCSE"
+        }`}
       />
 
       <DashboardStats
         xp={xp}
-        completedLessons={
-          completedLessons.length
-        }
+        completedLessons={journey.completedLessonCount}
         streak={streak}
         badges={badges.length}
       />
 
-      {/*
-       * Canonical attainment / grade intelligence.
-       *
-       * This uses the rich analytics pipeline rather than
-       * the older raw-average student analytics service.
-       */}
       <StudentAnalyticsSnapshot />
 
-      {/*
-       * Canonical adaptive-learning intelligence.
-       *
-       * This owns mastery, priority topics and next-action
-       * recommendations.
-       */}
       <AdaptiveLearningCard
         plan={adaptivePlan}
         loading={adaptiveLoading}
       />
 
       <DashboardLearning
-        mission={mission}
-        completedLessons={
-          completedLessons
-        }
-        totalLessons={totalLessons}
+        mission={journey.mission}
+        completedLessons={journey.completedLessonCount}
+        totalLessons={journey.totalLessonCount}
+        progressPercentage={journey.progressPercentage}
+        curriculumTitle={journey.curriculumTitle}
       />
 
       <DashboardQuiz
         recentQuiz={recentQuiz}
-        recentQuizLoading={
-          recentQuizLoading
-        }
+        recentQuizLoading={recentQuizLoading}
         unlockedBadges={badges}
         xp={xp}
-        completedLessons={
-          completedLessons
-        }
+        completedLessons={completedLessons}
       />
 
       <DashboardActivity
         unlockedBadges={badges}
         xp={xp}
-        completedLessons={
-          completedLessons
-        }
+        completedLessons={completedLessons}
+        mission={journey.mission}
+        recentQuiz={recentQuiz}
       />
     </div>
   );

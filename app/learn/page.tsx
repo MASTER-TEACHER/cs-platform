@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,13 +11,19 @@ import type { Topic } from "@/types/curriculum";
 function difficultyLabel(
   difficulty: Topic["difficulty"],
 ): string {
-  if (difficulty === "⭐⭐⭐") {
-    return "Advanced";
-  }
+  if (
+  difficulty ===
+  "\u2B50\u2B50\u2B50"
+) {
+  return "Advanced";
+}
 
-  if (difficulty === "⭐⭐☆") {
-    return "Intermediate";
-  }
+if (
+  difficulty ===
+  "\u2B50\u2B50\u2606"
+) {
+  return "Intermediate";
+}
 
   return "Foundation";
 }
@@ -402,3 +408,4 @@ function Metric({
     </div>
   );
 }
+

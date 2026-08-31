@@ -929,11 +929,11 @@ export default function ProgrammingWorkspace({
                     </p>
 
                     <p className="text-sm text-slate-500">
-                      {item.mode} Â·{" "}
+                      {item.mode} ·{" "}
                       {
                         item.difficulty
                       }{" "}
-                      Â·{" "}
+                      ·{" "}
                       {item.skills.join(
                         ", ",
                       )}

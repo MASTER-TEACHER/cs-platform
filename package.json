@@ -12,16 +12,16 @@
   },
   "dependencies": {
     "docx": "^9.7.1",
-    "dox": "^1.0.0",
     "file-saver": "^2.0.5",
     "firebase": "^12.15.0",
-    "firebase-admin": "^14.1.0",
+    "firebase-admin": "^14.3.0",
     "lucide-react": "^1.25.0",
     "next": "^16.2.9",
     "openai": "^6.48.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hot-toast": "^2.6.0",
+    "resend": "^6.24.0",
     "stripe": "^22.6.0"
   },
   "devDependencies": {

@@ -218,7 +218,7 @@ export default function TeacherBillingPage() {
                       key={item}
                       className="flex gap-2"
                     >
-                      <span>âœ“</span>
+                      <span>✓</span>
                       <span>{item}</span>
                     </li>
                   ),

@@ -2,11 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
 import {
   useState,
   type FormEvent,
 } from "react";
-import { useRouter } from "next/navigation";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 import {
   registerAccount,
@@ -16,13 +20,18 @@ import {
 function getRegistrationMessage(
   error: unknown,
 ): string {
-  if (!error || typeof error !== "object") {
+  if (
+    !error ||
+    typeof error !==
+      "object"
+  ) {
     return "Registration failed. Please check your details.";
   }
 
   const code =
     "code" in error &&
-    typeof error.code === "string"
+    typeof error.code ===
+      "string"
       ? error.code
       : "";
 
@@ -40,45 +49,114 @@ function getRegistrationMessage(
       return "The registration request could not reach Firebase. Check your connection and try again.";
 
     default:
-      return error instanceof Error
+      return error instanceof
+        Error
         ? error.message
         : "Registration failed. Please check your details.";
   }
 }
 
-export default function RegisterPage() {
-  const router = useRouter();
+function normaliseEmail(
+  value: string,
+): string {
+  return value
+    .trim()
+    .toLowerCase();
+}
 
-  const [accountType, setAccountType] =
+export default function RegisterPage() {
+  const router =
+    useRouter();
+
+  const [
+    accountType,
+    setAccountType,
+  ] =
     useState<RegistrationAccountType>(
       "student",
     );
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] =
+  const [
+    name,
+    setName,
+  ] =
     useState("");
 
-  const [submitting, setSubmitting] =
+  const [
+    email,
+    setEmail,
+  ] =
+    useState("");
+
+  const [
+    password,
+    setPassword,
+  ] =
+    useState("");
+
+  const [
+    schoolName,
+    setSchoolName,
+  ] =
+    useState("");
+
+  const [
+    schoolAdminEmail,
+    setSchoolAdminEmail,
+  ] =
+    useState("");
+
+  const [
+    submitting,
+    setSubmitting,
+  ] =
     useState(false);
 
-  const [error, setError] = useState("");
+  const [
+    error,
+    setError,
+  ] =
+    useState("");
+
+  function selectAccountType(
+    value: RegistrationAccountType,
+  ) {
+    setAccountType(
+      value,
+    );
+
+    setError("");
+  }
 
   async function handleRegister(
-    event: FormEvent<HTMLFormElement>,
+    event:
+      FormEvent<HTMLFormElement>,
   ) {
     event.preventDefault();
 
     setError("");
 
-    const cleanedName = name.trim();
+    const cleanedName =
+      name.trim();
+
     const cleanedEmail =
-      email.trim().toLowerCase();
+      normaliseEmail(
+        email,
+      );
+
+    const cleanedSchoolName =
+      schoolName.trim();
+
+    const cleanedAdminEmail =
+      normaliseEmail(
+        schoolAdminEmail,
+      );
 
     if (!cleanedName) {
       setError(
         "Please enter your full name.",
       );
+
       return;
     }
 
@@ -86,7 +164,44 @@ export default function RegisterPage() {
       setError(
         "Your password must contain at least 6 characters.",
       );
+
       return;
+    }
+
+    if (
+      accountType ===
+      "teacher"
+    ) {
+      if (
+        !cleanedSchoolName
+      ) {
+        setError(
+          "Please enter your school name.",
+        );
+
+        return;
+      }
+
+      if (
+        !cleanedAdminEmail
+      ) {
+        setError(
+          "Please enter a school administrator email address.",
+        );
+
+        return;
+      }
+
+      if (
+        cleanedAdminEmail ===
+        cleanedEmail
+      ) {
+        setError(
+          "The school administrator email must be different from your own email address.",
+        );
+
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -97,17 +212,35 @@ export default function RegisterPage() {
         cleanedEmail,
         password,
         accountType,
+        accountType ===
+          "teacher"
+          ? {
+              schoolName:
+                cleanedSchoolName,
+
+              schoolAdminEmail:
+                cleanedAdminEmail,
+            }
+          : undefined,
       );
 
-      if (accountType === "teacher") {
+      if (
+        accountType ===
+        "teacher"
+      ) {
         router.replace(
           "/teacher-access",
         );
+
         return;
       }
 
-      router.replace("/onboarding");
-    } catch (caughtError) {
+      router.replace(
+        "/onboarding",
+      );
+    } catch (
+      caughtError
+    ) {
       console.error(
         "Registration error:",
         caughtError,
@@ -142,8 +275,8 @@ export default function RegisterPage() {
         </h1>
 
         <p className="mt-2 text-center text-slate-600">
-          Choose how you will use CS
-          Master.
+          Choose how you will use
+          CS Master.
         </p>
 
         {error && (
@@ -156,7 +289,9 @@ export default function RegisterPage() {
         )}
 
         <form
-          onSubmit={handleRegister}
+          onSubmit={
+            handleRegister
+          }
           className="mt-8 space-y-5"
         >
           <fieldset>
@@ -169,10 +304,11 @@ export default function RegisterPage() {
                 title="Student"
                 description="I am learning Computer Science."
                 selected={
-                  accountType === "student"
+                  accountType ===
+                  "student"
                 }
                 onSelect={() =>
-                  setAccountType(
+                  selectAccountType(
                     "student",
                   )
                 }
@@ -182,10 +318,11 @@ export default function RegisterPage() {
                 title="Teacher"
                 description="I teach Computer Science."
                 selected={
-                  accountType === "teacher"
+                  accountType ===
+                  "teacher"
                 }
                 onSelect={() =>
-                  setAccountType(
+                  selectAccountType(
                     "teacher",
                   )
                 }
@@ -193,51 +330,203 @@ export default function RegisterPage() {
             </div>
           </fieldset>
 
-          <input
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
-            type="text"
-            placeholder="Full name"
-            value={name}
-            onChange={(event) =>
-              setName(event.target.value)
-            }
-            autoComplete="name"
-            disabled={submitting}
-            required
-          />
+          <div>
+            <label
+              htmlFor="registration-name"
+              className="mb-2 block text-sm font-bold text-slate-800"
+            >
+              Full name
+            </label>
 
-          <input
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(event) =>
-              setEmail(event.target.value)
-            }
-            autoComplete="email"
-            disabled={submitting}
-            required
-          />
+            <input
+              id="registration-name"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              type="text"
+              placeholder="Full name"
+              value={name}
+              onChange={(
+                event,
+              ) =>
+                setName(
+                  event.target
+                    .value,
+                )
+              }
+              autoComplete="name"
+              disabled={
+                submitting
+              }
+              required
+            />
+          </div>
 
-          <input
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) =>
-              setPassword(
-                event.target.value,
-              )
-            }
-            autoComplete="new-password"
-            minLength={6}
-            disabled={submitting}
-            required
-          />
+          <div>
+            <label
+              htmlFor="registration-email"
+              className="mb-2 block text-sm font-bold text-slate-800"
+            >
+              {accountType ===
+              "teacher"
+                ? "Your school email"
+                : "Email address"}
+            </label>
+
+            <input
+              id="registration-email"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              type="email"
+              placeholder={
+                accountType ===
+                "teacher"
+                  ? "you@school.org"
+                  : "Email address"
+              }
+              value={email}
+              onChange={(
+                event,
+              ) =>
+                setEmail(
+                  event.target
+                    .value,
+                )
+              }
+              autoComplete="email"
+              disabled={
+                submitting
+              }
+              required
+            />
+          </div>
+
+          {accountType ===
+            "teacher" && (
+            <div className="space-y-5 rounded-2xl border border-indigo-200 bg-indigo-50/70 p-5">
+              <div>
+                <p className="font-black text-indigo-950">
+                  School verification
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-indigo-800">
+                  Your school will
+                  confirm that you are
+                  authorised to use
+                  CS Master as a teacher.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="school-name"
+                  className="mb-2 block text-sm font-bold text-slate-800"
+                >
+                  School name
+                </label>
+
+                <input
+                  id="school-name"
+                  type="text"
+                  value={
+                    schoolName
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setSchoolName(
+                      event.target
+                        .value,
+                    )
+                  }
+                  placeholder="Example Secondary School"
+                  autoComplete="organization"
+                  disabled={
+                    submitting
+                  }
+                  required
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="school-admin-email"
+                  className="mb-2 block text-sm font-bold text-slate-800"
+                >
+                  School administrator
+                  email
+                </label>
+
+                <input
+                  id="school-admin-email"
+                  type="email"
+                  value={
+                    schoolAdminEmail
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    setSchoolAdminEmail(
+                      event.target
+                        .value,
+                    )
+                  }
+                  placeholder="admin@school.org"
+                  autoComplete="email"
+                  disabled={
+                    submitting
+                  }
+                  required
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 focus:border-indigo-500 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                />
+
+                <p className="mt-2 text-xs leading-5 text-slate-600">
+                  We will send a
+                  verification request
+                  to this address. You
+                  cannot use your own
+                  email as the verifier.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label
+              htmlFor="registration-password"
+              className="mb-2 block text-sm font-bold text-slate-800"
+            >
+              Password
+            </label>
+
+            <input
+              id="registration-password"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              type="password"
+              placeholder="Password"
+              value={
+                password
+              }
+              onChange={(
+                event,
+              ) =>
+                setPassword(
+                  event.target
+                    .value,
+                )
+              }
+              autoComplete="new-password"
+              minLength={6}
+              disabled={
+                submitting
+              }
+              required
+            />
+          </div>
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={
+              submitting
+            }
             className="w-full rounded-xl bg-blue-600 px-6 py-4 font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {submitting
@@ -249,26 +538,29 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {accountType === "teacher" && (
-          <div className="mt-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
-            <p className="font-bold text-indigo-950">
-              Teacher approval required
+        {accountType ===
+          "teacher" && (
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="font-bold text-amber-950">
+              Teacher verification
+              required
             </p>
 
-            <p className="mt-1 text-sm leading-6 text-indigo-800">
-              After creating your
-              account, you will provide
-              your school and job title.
-              An administrator must
-              approve your request before
-              teacher features become
-              available.
+            <p className="mt-1 text-sm leading-6 text-amber-900">
+              Creating the account does
+              not unlock teacher tools.
+              Your school administrator
+              must verify your request
+              before teacher access or
+              the 14-day School Trial
+              becomes available.
             </p>
           </div>
         )}
 
         <p className="mt-6 text-center text-sm text-slate-600">
-          Already have an account?{" "}
+          Already have an
+          account?{" "}
           <Link
             href="/login"
             className="font-bold text-blue-600"
@@ -303,8 +595,12 @@ function AccountTypeCard({
       <input
         type="radio"
         name="accountType"
-        checked={selected}
-        onChange={onSelect}
+        checked={
+          selected
+        }
+        onChange={
+          onSelect
+        }
         className="sr-only"
       />
 
@@ -315,7 +611,9 @@ function AccountTypeCard({
           </p>
 
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            {description}
+            {
+              description
+            }
           </p>
         </div>
 

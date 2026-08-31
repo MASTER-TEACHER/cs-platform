@@ -1,17 +1,18 @@
 "use client";
 
 import Link from "next/link";
+
 import {
   useEffect,
   useState,
   type ReactNode,
 } from "react";
+
 import {
   AlertTriangle,
   Download,
   FileText,
   Printer,
-  ShieldCheck,
   Target,
   TrendingUp,
 } from "lucide-react";
@@ -59,42 +60,79 @@ export default function StudentProgressReportPanel({
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(true);
 
   const [
     error,
     setError,
-  ] = useState("");
+  ] =
+    useState("");
 
   useEffect(() => {
-    let cancelled =
-      false;
+    let cancelled = false;
 
     async function load() {
       try {
         setLoading(true);
         setError("");
+        setReport(null);
 
         const next =
           await buildStudentProgressReport({
             teacherId,
             studentId,
+            classId:
+              selectedClassId,
           });
 
-        if (!cancelled) {
-          setReport(next);
+        if (cancelled) {
+          return;
         }
-      } catch (
-        caughtError
-      ) {
-        if (!cancelled) {
+
+        if (!next) {
+          setReport(null);
+
           setError(
-            caughtError instanceof
-              Error
-              ? caughtError.message
+            selectedClassId
+              ? "This learner could not be found in the selected reporting class."
               : "Student report could not be generated.",
           );
+
+          return;
         }
+
+        /*
+         * Do not display a report generated from a different
+         * class context.
+         */
+        if (
+          selectedClassId &&
+          next.classId !==
+            selectedClassId
+        ) {
+          setReport(null);
+
+          setError(
+            "The generated report does not match the selected reporting class. Refresh the reporting workspace and try again.",
+          );
+
+          return;
+        }
+
+        setReport(next);
+      } catch (caughtError) {
+        if (cancelled) {
+          return;
+        }
+
+        setReport(null);
+
+        setError(
+          caughtError instanceof Error
+            ? caughtError.message
+            : "Student report could not be generated.",
+        );
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -110,6 +148,7 @@ export default function StudentProgressReportPanel({
   }, [
     teacherId,
     studentId,
+    selectedClassId,
   ]);
 
   if (loading) {
@@ -125,19 +164,27 @@ export default function StudentProgressReportPanel({
     !report
   ) {
     return error ? (
-      <Card className="border border-amber-200 bg-amber-50">
-        {error}
+      <Card className="border border-amber-200 bg-amber-50 p-6 text-amber-900">
+        <p className="font-black">
+          Student report unavailable
+        </p>
+
+        <p className="mt-2 text-sm leading-6">
+          {error}
+        </p>
       </Card>
     ) : null;
   }
 
   const effectiveClassName =
-    selectedClassName?.trim() ||
     report.className?.trim() ||
+    selectedClassName?.trim() ||
     "student";
 
   const effectiveClassId =
-    selectedClassId?.trim() || "";
+    report.classId?.trim() ||
+    selectedClassId?.trim() ||
+    "";
 
   function exportCsv() {
     const blob =
@@ -148,7 +195,8 @@ export default function StudentProgressReportPanel({
           ),
         ],
         {
-          type: "text/csv;charset=utf-8",
+          type:
+            "text/csv;charset=utf-8",
         },
       );
 
@@ -226,26 +274,17 @@ export default function StudentProgressReportPanel({
     );
 
   const workingGrade =
-    classContext?.workingGrade ||
     report.workingGrade ||
+    classContext?.workingGrade ||
     "—";
 
   const targetGrade =
-    classContext?.targetGrade ||
     report.targetGrade ||
+    classContext?.targetGrade ||
     "Not set";
 
   const completionRate =
-    classContext?.completionRate ??
     report.completionRate;
-
-  const contextMismatch =
-    Boolean(
-      report.className &&
-        effectiveClassName &&
-        report.className !==
-          effectiveClassName,
-    );
 
   return (
     <>
@@ -282,15 +321,18 @@ export default function StudentProgressReportPanel({
               </p>
 
               <h2 className="mt-2 text-2xl font-black">
-                {
-                  report.studentName
-                }
+                {report.studentName}
               </h2>
 
               <p className="mt-2 text-sm text-white/70">
-                {
-                  effectiveClassName
-                }
+                {effectiveClassName}
+              </p>
+
+              <p className="mt-1 text-xs text-white/50">
+                Generated{" "}
+                {report.generatedAt.toLocaleString(
+                  "en-GB",
+                )}
               </p>
             </div>
 
@@ -375,16 +417,16 @@ export default function StudentProgressReportPanel({
 
           <div className="mx-6 mb-6 grid gap-3 rounded-2xl border border-violet-100 bg-violet-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <SmallMetric
-  label="Reporting class"
-  value={
-    effectiveClassName
-  }
-/>
+              label="Reporting class"
+              value={
+                effectiveClassName
+              }
+            />
 
             <SmallMetric
               label="Trend"
               value={
-                classContext?.trend ||
+                report.trend ||
                 "—"
               }
             />
@@ -403,29 +445,11 @@ export default function StudentProgressReportPanel({
               label="Evidence confidence"
               value={
                 String(
-                  classContext?.confidence ??
-                    report.confidence,
+                  report.confidence,
                 )
               }
             />
           </div>
-
-          {contextMismatch && (
-            <div className="mx-6 mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <p className="flex items-center gap-2 font-black text-amber-950">
-                <ShieldCheck className="h-4 w-4" />
-                Multi-class reporting context
-              </p>
-
-              <p className="mt-2 text-sm leading-6 text-amber-900">
-                The learner belongs to more than one teaching group. The headline attainment and completion above are anchored to{" "}
-                <strong>
-                  {effectiveClassName}
-                </strong>
-                . Supporting evidence below comes from the existing learner intelligence service and should be interpreted alongside this selected class context.
-              </p>
-            </div>
-          )}
 
           {report.evidenceWarnings.length >
             0 && (
@@ -488,11 +512,9 @@ export default function StudentProgressReportPanel({
 
               <p className="mt-1 text-xs text-slate-500">
                 Confidence:{" "}
-                {
-                  String(
-                    report.confidence,
-                  )
-                }
+                {String(
+                  report.confidence,
+                )}
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">

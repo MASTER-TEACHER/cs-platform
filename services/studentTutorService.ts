@@ -3,11 +3,19 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
+  query,
   serverTimestamp,
   Timestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+
+import {
+  auth,
+  db,
+} from "@/lib/firebase";
+
 import type {
   TutorConversation,
   TutorMessage,
@@ -15,122 +23,415 @@ import type {
   TutorStudentContext,
 } from "@/types/studentTutor";
 
-type FMsg = Omit<TutorMessage, "createdAt"> & { createdAt?: Timestamp };
-type FConv = {
+type FirestoreMessage =
+  Omit<
+    TutorMessage,
+    "createdAt"
+  > & {
+    createdAt?: Timestamp;
+  };
+
+type FirestoreConversation = {
   studentId: string;
   title: string;
-  messages?: FMsg[];
+  messages?: FirestoreMessage[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
-const toDate = (v?: Timestamp | null) => (v?.toDate ? v.toDate() : null);
-const convert = (id: string, d: FConv): TutorConversation => ({
-  id,
-  studentId: d.studentId,
-  title: d.title || "Tutor conversation",
-  messages: (d.messages || []).map((m) => ({
-    ...m,
-    createdAt: toDate(m.createdAt),
-  })),
-  createdAt: toDate(d.createdAt),
-  updatedAt: toDate(d.updatedAt),
-});
-const mid = () =>
-  `message-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-export async function createTutorConversation(studentId: string) {
-  const r = await addDoc(collection(db, "studentTutorConversations"), {
-    studentId: studentId.trim(),
-    title: "New tutor conversation",
-    messages: [],
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return r.id;
-}
-export async function getTutorConversation(id: string) {
-  const s = await getDoc(doc(db, "studentTutorConversations", id));
-  return s.exists() ? convert(s.id, s.data() as FConv) : null;
-}
-export async function saveTutorExchange(input: {
-  conversationId: string;
-  studentId: string;
-  studentMessage: string;
-  tutorResponse: TutorResponse;
-}) {
-  const c = await getTutorConversation(input.conversationId);
-  if (!c || c.studentId !== input.studentId)
-    throw new Error("Tutor conversation unavailable.");
-  const now = new Date();
-  const messages = [
-    ...c.messages,
-    {
-      id: mid(),
-      role: "student" as const,
-      content: input.studentMessage.trim(),
-      createdAt: now,
-    },
-    {
-      id: mid(),
-      role: "assistant" as const,
-      content: input.tutorResponse.reply,
-      createdAt: now,
-      mode: input.tutorResponse.mode,
-    },
-  ];
-  await updateDoc(doc(db, "studentTutorConversations", input.conversationId), {
-    title: c.messages.length
-      ? c.title
-      : input.studentMessage.trim().slice(0, 60),
-    messages: messages.map((m) => ({
-      ...m,
-      createdAt: Timestamp.fromDate(m.createdAt || now),
-    })),
-    updatedAt: serverTimestamp(),
-  });
-}
-export async function clearTutorConversation(id: string, studentId: string) {
-  const c = await getTutorConversation(id);
-  if (!c || c.studentId !== studentId)
-    throw new Error("Tutor conversation unavailable.");
-  await updateDoc(doc(db, "studentTutorConversations", id), {
-    title: "New tutor conversation",
-    messages: [],
-    updatedAt: serverTimestamp(),
-  });
-}
-export async function requestTutorResponse(input: {
-  studentId: string;
-  conversationId: string;
-  message: string;
-  history: { role: "student" | "assistant"; content: string }[];
-  context: TutorStudentContext;
-}): Promise<TutorResponse> {
-  const currentUser = auth.currentUser;
 
-  if (!currentUser || currentUser.uid !== input.studentId) {
+const MAX_STORED_MESSAGES = 40;
+
+const toDate = (
+  value?: Timestamp | null,
+) =>
+  value?.toDate
+    ? value.toDate()
+    : null;
+
+function convert(
+  id: string,
+  data: FirestoreConversation,
+): TutorConversation {
+  return {
+    id,
+    studentId:
+      data.studentId,
+    title:
+      data.title ||
+      "Tutor conversation",
+    messages:
+      (data.messages || []).map(
+        (message) => ({
+          ...message,
+          createdAt:
+            toDate(
+              message.createdAt,
+            ),
+        }),
+      ),
+    createdAt:
+      toDate(
+        data.createdAt,
+      ),
+    updatedAt:
+      toDate(
+        data.updatedAt,
+      ),
+  };
+}
+
+const messageId = () =>
+  `message-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
+
+export async function createTutorConversation(
+  studentId: string,
+): Promise<TutorConversation> {
+  const cleanedStudentId =
+    studentId.trim();
+
+  if (!cleanedStudentId) {
     throw new Error(
-      "Sign in with the student account using the AI Tutor.",
+      "A valid student account is required.",
     );
   }
 
-  const idToken = await currentUser.getIdToken();
+  const reference =
+    await addDoc(
+      collection(
+        db,
+        "studentTutorConversations",
+      ),
+      {
+        studentId:
+          cleanedStudentId,
+        title:
+          "New tutor conversation",
+        messages: [],
+        createdAt:
+          serverTimestamp(),
+        updatedAt:
+          serverTimestamp(),
+      },
+    );
 
-  const r = await fetch("/api/ai/student-tutor", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(input),
-  });
+  const now =
+    new Date();
 
-  const j = await r.json();
+  return {
+    id:
+      reference.id,
+    studentId:
+      cleanedStudentId,
+    title:
+      "New tutor conversation",
+    messages: [],
+    createdAt:
+      now,
+    updatedAt:
+      now,
+  };
+}
 
-  if (!r.ok) {
+export async function getTutorConversation(
+  id: string,
+): Promise<TutorConversation | null> {
+  const snapshot =
+    await getDoc(
+      doc(
+        db,
+        "studentTutorConversations",
+        id,
+      ),
+    );
+
+  return snapshot.exists()
+    ? convert(
+        snapshot.id,
+        snapshot.data() as
+          FirestoreConversation,
+      )
+    : null;
+}
+
+export async function getLatestTutorConversation(
+  studentId: string,
+): Promise<TutorConversation | null> {
+  const cleanedStudentId =
+    studentId.trim();
+
+  if (!cleanedStudentId) {
+    return null;
+  }
+
+  const snapshot =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "studentTutorConversations",
+        ),
+        where(
+          "studentId",
+          "==",
+          cleanedStudentId,
+        ),
+      ),
+    );
+
+  return (
+    snapshot.docs
+      .map((document) =>
+        convert(
+          document.id,
+          document.data() as
+            FirestoreConversation,
+        ),
+      )
+      .sort(
+        (first, second) =>
+          (second.updatedAt?.getTime() ||
+            second.createdAt?.getTime() ||
+            0) -
+          (first.updatedAt?.getTime() ||
+            first.createdAt?.getTime() ||
+            0),
+      )[0] || null
+  );
+}
+
+export async function getOrCreateTutorConversation(
+  studentId: string,
+): Promise<TutorConversation> {
+  const existing =
+    await getLatestTutorConversation(
+      studentId,
+    );
+
+  if (existing) {
+    return existing;
+  }
+
+  return createTutorConversation(
+    studentId,
+  );
+}
+
+export async function saveTutorExchange(
+  input: {
+    conversationId: string;
+    studentId: string;
+    studentMessage: string;
+    tutorResponse: TutorResponse;
+  },
+): Promise<TutorConversation> {
+  const conversation =
+    await getTutorConversation(
+      input.conversationId,
+    );
+
+  if (
+    !conversation ||
+    conversation.studentId !==
+      input.studentId
+  ) {
     throw new Error(
-      j.error || "The tutor could not respond.",
+      "Tutor conversation unavailable.",
     );
   }
 
-  return j as TutorResponse;
+  const now =
+    new Date();
+
+  const studentMessage: TutorMessage = {
+    id:
+      messageId(),
+    role:
+      "student",
+    content:
+      input.studentMessage
+        .trim()
+        .slice(
+          0,
+          2000,
+        ),
+    createdAt:
+      now,
+  };
+
+  const tutorMessage: TutorMessage = {
+    id:
+      messageId(),
+    role:
+      "assistant",
+    content:
+      input.tutorResponse.reply.slice(
+        0,
+        6000,
+      ),
+    createdAt:
+      now,
+    mode:
+      input.tutorResponse.mode,
+  };
+
+  const messages: TutorMessage[] = [
+    ...conversation.messages,
+    studentMessage,
+    tutorMessage,
+  ].slice(
+    -MAX_STORED_MESSAGES,
+  );
+
+  const title =
+    conversation.messages.length
+      ? conversation.title
+      : input.studentMessage
+          .trim()
+          .slice(
+            0,
+            60,
+          ) ||
+        "Tutor conversation";
+
+  await updateDoc(
+    doc(
+      db,
+      "studentTutorConversations",
+      input.conversationId,
+    ),
+    {
+      title,
+      messages:
+        messages.map(
+          (message) => ({
+            ...message,
+            createdAt:
+              Timestamp.fromDate(
+                message.createdAt ||
+                  now,
+              ),
+          }),
+        ),
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+
+  return {
+    ...conversation,
+    title,
+    messages,
+    updatedAt:
+      now,
+  };
+}
+
+export async function clearTutorConversation(
+  id: string,
+  studentId: string,
+): Promise<void> {
+  const conversation =
+    await getTutorConversation(
+      id,
+    );
+
+  if (
+    !conversation ||
+    conversation.studentId !==
+      studentId
+  ) {
+    throw new Error(
+      "Tutor conversation unavailable.",
+    );
+  }
+
+  await updateDoc(
+    doc(
+      db,
+      "studentTutorConversations",
+      id,
+    ),
+    {
+      title:
+        "New tutor conversation",
+      messages: [],
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+}
+
+export async function requestTutorResponse(
+  input: {
+    studentId: string;
+    conversationId: string;
+    message: string;
+    history: {
+      role:
+        | "student"
+        | "assistant";
+      content: string;
+    }[];
+    context:
+      TutorStudentContext;
+  },
+): Promise<TutorResponse> {
+  const currentUser =
+    auth.currentUser;
+
+  if (
+    !currentUser ||
+    currentUser.uid !==
+      input.studentId
+  ) {
+    throw new Error(
+      "Sign in with the student account to use the AI Tutor.",
+    );
+  }
+
+  const idToken =
+    await currentUser.getIdToken();
+
+  const response =
+    await fetch(
+      "/api/ai/student-tutor",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+          Authorization:
+            `Bearer ${idToken}`,
+        },
+        body:
+          JSON.stringify({
+            ...input,
+            history:
+              input.history.slice(
+                -10,
+              ),
+          }),
+      },
+    );
+
+  const result =
+    (await response.json()) as
+      | TutorResponse
+      | {
+          error?: string;
+        };
+
+  if (!response.ok) {
+    throw new Error(
+      "error" in result &&
+      result.error
+        ? result.error
+        : "The tutor could not respond.",
+    );
+  }
+
+  return result as
+    TutorResponse;
 }

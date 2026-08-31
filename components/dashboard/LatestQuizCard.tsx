@@ -1,16 +1,21 @@
 import Card from "@/components/ui/Card";
-import { RecentQuiz } from "@/hooks/useRecentQuiz";
+import { type RecentQuiz } from "@/hooks/useRecentQuiz";
 
 type Props = {
   quiz: RecentQuiz | null;
   loading: boolean;
 };
 
-export default function LatestQuizCard({ quiz, loading }: Props) {
+export default function LatestQuizCard({
+  quiz,
+  loading,
+}: Props) {
   if (loading) {
     return (
       <Card>
-        <p className="text-slate-500">Loading latest quiz...</p>
+        <p className="text-slate-500">
+          Loading your latest curriculum quiz...
+        </p>
       </Card>
     );
   }
@@ -18,10 +23,17 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
   if (!quiz) {
     return (
       <Card>
-        <h2 className="text-xl font-bold text-slate-900">ðŸ“ Latest Quiz</h2>
+        <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
+          Current curriculum
+        </p>
+
+        <h2 className="mt-2 text-xl font-bold text-slate-900">
+          📝 Latest Quiz
+        </h2>
 
         <p className="mt-4 text-slate-600">
-          You haven&apos;t completed any quizzes yet.
+          No completed quiz from your current curriculum is available yet.
+          Historical results remain available in your analytics.
         </p>
       </Card>
     );
@@ -29,9 +41,17 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
 
   return (
     <Card>
-      <h2 className="text-xl font-bold text-slate-900">ðŸ“ Latest Quiz</h2>
+      <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">
+        Current curriculum
+      </p>
 
-      <p className="mt-4 text-lg font-semibold">{quiz.title}</p>
+      <h2 className="mt-2 text-xl font-bold text-slate-900">
+        📝 Latest Quiz
+      </h2>
+
+      <p className="mt-4 text-lg font-semibold">
+        {quiz.title}
+      </p>
 
       <div className="mt-6 grid grid-cols-2 gap-4">
         <div className="rounded-xl bg-blue-50 p-4">
@@ -44,7 +64,7 @@ export default function LatestQuizCard({ quiz, loading }: Props) {
         <div className="rounded-xl bg-green-50 p-4">
           <p className="text-sm text-slate-500">XP Earned</p>
           <p className="text-2xl font-bold text-green-700">
-            â­ {quiz.earnedXP}
+            ⭐ {quiz.earnedXP}
           </p>
         </div>
       </div>

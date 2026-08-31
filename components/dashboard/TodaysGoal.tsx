@@ -18,7 +18,7 @@ export default function TodaysGoal() {
       </p>
 
       <div className="mt-6">
-        <Button>Start Learning â†’</Button>
+        <Button>Start Learning →</Button>
       </div>
     </Card>
   );

@@ -816,7 +816,9 @@ function ActivityRow({ activity }: { activity: StudentAnalyticsActivity }) {
       </td>
 
       <td className="px-6 py-5 font-semibold text-slate-700">
-        {activity.earnedXP > 0 ? `⭐ ${activity.earnedXP}` : "—"}
+        {activity.earnedXP > 0
+  ? `+${activity.earnedXP} XP`
+  : "No XP"}
       </td>
 
       <td className="px-6 py-5 font-semibold text-slate-700">

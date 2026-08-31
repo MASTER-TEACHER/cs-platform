@@ -15,95 +15,210 @@ import {
   type User,
 } from "firebase/auth";
 
-import { auth } from "@/lib/firebase";
-import { getUserProfile } from "@/services/userService";
+import {
+  auth,
+} from "@/lib/firebase";
 
-import type { UserProfile } from "@/types/database";
+import {
+  getUserProfile,
+} from "@/services/userService";
+
+import type {
+  UserProfile,
+} from "@/types/database";
 
 type AuthContextType = {
   user: User | null;
-  profile: UserProfile | null;
+
+  profile:
+    UserProfile | null;
 
   loading: boolean;
+
   profileReady: boolean;
+
   profileError: string;
 
-  refreshProfile: () => Promise<UserProfile | null>;
+  refreshProfile:
+    () =>
+      Promise<UserProfile | null>;
 };
 
 const AuthContext =
-  createContext<AuthContextType | undefined>(
+  createContext<
+    AuthContextType | undefined
+  >(
     undefined,
   );
+
+const PROFILE_LOAD_ATTEMPTS =
+  12;
+
+const PROFILE_RETRY_DELAY_MS =
+  250;
+
+function wait(
+  milliseconds: number,
+): Promise<void> {
+  return new Promise(
+    (resolve) => {
+      window.setTimeout(
+        resolve,
+        milliseconds,
+      );
+    },
+  );
+}
+
+async function loadProfileWithRetry(
+  uid: string,
+): Promise<UserProfile | null> {
+  for (
+    let attempt = 0;
+    attempt <
+    PROFILE_LOAD_ATTEMPTS;
+    attempt += 1
+  ) {
+    const loadedProfile =
+      await getUserProfile(
+        uid,
+      );
+
+    if (
+      loadedProfile
+    ) {
+      return loadedProfile;
+    }
+
+    if (
+      attempt <
+      PROFILE_LOAD_ATTEMPTS -
+        1
+    ) {
+      await wait(
+        PROFILE_RETRY_DELAY_MS,
+      );
+    }
+  }
+
+  return null;
+}
 
 export function AuthProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  const [user, setUser] =
-    useState<User | null>(null);
+  const [
+    user,
+    setUser,
+  ] =
+    useState<User | null>(
+      null,
+    );
 
-  const [profile, setProfile] =
-    useState<UserProfile | null>(null);
+  const [
+    profile,
+    setProfile,
+  ] =
+    useState<UserProfile | null>(
+      null,
+    );
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [profileReady, setProfileReady] =
+  const [
+    profileReady,
+    setProfileReady,
+  ] =
     useState(false);
 
-  const [profileError, setProfileError] =
+  const [
+    profileError,
+    setProfileError,
+  ] =
     useState("");
 
   const refreshProfile =
     useCallback(
       async (): Promise<UserProfile | null> => {
-        const currentUser = auth.currentUser;
+        const currentUser =
+          auth.currentUser;
 
-        if (!currentUser) {
-          setProfile(null);
-          setProfileReady(false);
-          setProfileError("");
+        if (
+          !currentUser
+        ) {
+          setProfile(
+            null,
+          );
+
+          setProfileReady(
+            false,
+          );
+
+          setProfileError(
+            "",
+          );
 
           return null;
         }
 
         try {
-          setProfileError("");
+          setProfileError(
+            "",
+          );
 
-          /*
-           * IMPORTANT:
-           *
-           * We only READ the existing Firestore profile here.
-           *
-           * We deliberately do NOT call ensureUserProfile(),
-           * because that function can attempt automatic
-           * Firestore repair writes.
-           */
           const loadedProfile =
-            await getUserProfile(
+            await loadProfileWithRetry(
               currentUser.uid,
             );
 
-          if (!loadedProfile) {
-            throw new Error(
+          if (
+            !loadedProfile
+          ) {
+            setProfile(
+              null,
+            );
+
+            setProfileReady(
+              false,
+            );
+
+            setProfileError(
               "Your CS Master user profile could not be found.",
             );
+
+            return null;
           }
 
-          setProfile(loadedProfile);
-          setProfileReady(true);
+          setProfile(
+            loadedProfile,
+          );
+
+          setProfileReady(
+            true,
+          );
 
           return loadedProfile;
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
-            "Unable to load the user profile:",
+            "Unable to refresh the user profile:",
             error,
           );
 
-          setProfile(null);
-          setProfileReady(false);
+          setProfile(
+            null,
+          );
+
+          setProfileReady(
+            false,
+          );
 
           setProfileError(
             error instanceof Error
@@ -118,51 +233,113 @@ export function AuthProvider({
     );
 
   useEffect(() => {
+    let active =
+      true;
+
     const unsubscribe =
       onAuthStateChanged(
         auth,
-        async (firebaseUser) => {
-          setLoading(true);
+        async (
+          firebaseUser,
+        ) => {
+          if (!active) {
+            return;
+          }
 
-          setUser(firebaseUser);
+          setLoading(
+            true,
+          );
 
-          setProfile(null);
-          setProfileReady(false);
-          setProfileError("");
+          setUser(
+            firebaseUser,
+          );
 
-          if (!firebaseUser) {
-            setLoading(false);
+          setProfile(
+            null,
+          );
+
+          setProfileReady(
+            false,
+          );
+
+          setProfileError(
+            "",
+          );
+
+          if (
+            !firebaseUser
+          ) {
+            if (active) {
+              setLoading(
+                false,
+              );
+            }
+
             return;
           }
 
           try {
             /*
-             * Load only.
+             * A newly registered Firebase Auth user can exist
+             * a fraction of a second before our secure server
+             * route creates users/{uid}.
              *
-             * No automatic migration or repair write
-             * is performed during authentication.
+             * Retry quietly instead of throwing a false profile
+             * error during that legitimate creation window.
              */
             const loadedProfile =
-              await getUserProfile(
+              await loadProfileWithRetry(
                 firebaseUser.uid,
               );
 
-            if (!loadedProfile) {
-              throw new Error(
-                "Your CS Master user profile could not be found.",
-              );
+            if (!active) {
+              return;
             }
 
-            setProfile(loadedProfile);
-            setProfileReady(true);
-          } catch (error) {
+            if (
+              !loadedProfile
+            ) {
+              setProfile(
+                null,
+              );
+
+              setProfileReady(
+                false,
+              );
+
+              setProfileError(
+                "Your CS Master user profile could not be found.",
+              );
+
+              return;
+            }
+
+            setProfile(
+              loadedProfile,
+            );
+
+            setProfileReady(
+              true,
+            );
+          } catch (
+            error
+          ) {
+            if (!active) {
+              return;
+            }
+
             console.error(
               "Unable to load the user profile:",
               error,
             );
 
-            setProfile(null);
-            setProfileReady(false);
+            setProfile(
+              null,
+            );
+
+            setProfileReady(
+              false,
+            );
 
             setProfileError(
               error instanceof Error
@@ -170,22 +347,34 @@ export function AuthProvider({
                 : "Your profile could not be loaded.",
             );
           } finally {
-            setLoading(false);
+            if (active) {
+              setLoading(
+                false,
+              );
+            }
           }
         },
       );
 
-    return unsubscribe;
+    return () => {
+      active =
+        false;
+
+      unsubscribe();
+    };
   }, []);
 
   const value =
     useMemo<AuthContextType>(
       () => ({
         user,
+
         profile,
 
         loading,
+
         profileReady,
+
         profileError,
 
         refreshProfile,
@@ -201,14 +390,19 @@ export function AuthProvider({
     );
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={value}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
+  const context =
+    useContext(
+      AuthContext,
+    );
 
   if (!context) {
     throw new Error(

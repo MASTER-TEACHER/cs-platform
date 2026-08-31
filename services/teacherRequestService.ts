@@ -1,206 +1,121 @@
 import {
-  addDoc,
-  collection,
-  doc,
-  getDocs,
-  limit,
-  query,
-  serverTimestamp,
-  setDoc,
-  where,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
+  auth,
+} from "@/lib/firebase";
 
 export type CreateTeacherRequestInput = {
   userId: string;
-  name: string;
-  email: string;
-  schoolName: string;
+
+  /*
+   * Retained as optional compatibility fields so older callers
+   * do not immediately break. The secure API does not trust
+   * these browser-supplied identity values.
+   */
+  name?: string;
+  email?: string;
+  schoolName?: string;
+
   jobTitle: string;
   message: string;
 };
 
-type ExistingTeacherRequest = {
-  id: string;
-  status:
-    | "pending"
-    | "approved"
-    | "rejected";
+type TeacherRequestResponse = {
+  success?: boolean;
+
+  status?: string;
+
+  schoolName?: string;
+
+  schoolAdminEmail?: string;
+
+  expiresAt?: string;
+
+  verificationRisk?: string;
+
+  error?: string;
 };
-
-async function findExistingRequest(
-  userId: string,
-): Promise<ExistingTeacherRequest | null> {
-  const snapshot = await getDocs(
-    query(
-      collection(
-        db,
-        "teacherRequests",
-      ),
-      where(
-        "userId",
-        "==",
-        userId,
-      ),
-      limit(10),
-    ),
-  );
-
-  if (snapshot.empty) {
-    return null;
-  }
-
-  const requests =
-    snapshot.docs.map(
-      (requestDocument) => {
-        const data =
-          requestDocument.data();
-
-        const status =
-          data.status === "approved" ||
-          data.status === "rejected"
-            ? data.status
-            : "pending";
-
-        return {
-          id: requestDocument.id,
-          status,
-        } satisfies ExistingTeacherRequest;
-      },
-    );
-
-  return (
-    requests.find(
-      (request) =>
-        request.status === "pending",
-    ) ||
-    requests.find(
-      (request) =>
-        request.status === "approved",
-    ) ||
-    requests[0] ||
-    null
-  );
-}
 
 export async function createTeacherRequest({
   userId,
-  name,
-  email,
-  schoolName,
   jobTitle,
   message,
 }: CreateTeacherRequestInput): Promise<string> {
-  const cleanedUserId =
-    userId.trim();
+  const user =
+    auth.currentUser;
 
-  const cleanedName =
-    name.trim();
+  if (!user) {
+    throw new Error(
+      "Please sign in before requesting teacher access.",
+    );
+  }
 
-  const cleanedEmail =
-    email.trim().toLowerCase();
-
-  const cleanedSchool =
-    schoolName.trim();
+  if (
+    user.uid !==
+    userId.trim()
+  ) {
+    throw new Error(
+      "The signed-in account does not match this teacher application.",
+    );
+  }
 
   const cleanedJobTitle =
     jobTitle.trim();
 
-  if (
-    !cleanedUserId ||
-    !cleanedName ||
-    !cleanedSchool ||
-    !cleanedJobTitle
-  ) {
+  if (!cleanedJobTitle) {
     throw new Error(
-      "Please complete all required fields.",
+      "Please enter your job title.",
     );
   }
 
-  const existing =
-    await findExistingRequest(
-      cleanedUserId,
+  const token =
+    await user.getIdToken(
+      true,
     );
 
-  if (
-    existing?.status === "pending"
-  ) {
-    await setDoc(
-      doc(
-        db,
-        "users",
-        cleanedUserId,
-      ),
+  const response =
+    await fetch(
+      "/api/teacher-verification/request",
       {
-        accountIntent: "teacher",
-        teacherAccessStatus:
-          "pending",
-        updatedAt:
-          serverTimestamp(),
-      },
-      {
-        merge: true,
+        method:
+          "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            jobTitle:
+              cleanedJobTitle,
+
+            message:
+              message.trim(),
+          }),
       },
     );
 
-    return existing.id;
-  }
+  let result:
+    TeacherRequestResponse;
 
-  if (
-    existing?.status === "approved"
-  ) {
+  try {
+    result =
+      (await response.json()) as
+        TeacherRequestResponse;
+  } catch {
     throw new Error(
-      "Teacher access has already been approved for this account.",
+      "CS Master could not read the teacher-verification response.",
     );
   }
 
-  const requestReference =
-    await addDoc(
-      collection(
-        db,
-        "teacherRequests",
-      ),
-      {
-        userId: cleanedUserId,
-        name: cleanedName,
-        email: cleanedEmail,
-        schoolName:
-          cleanedSchool,
-        jobTitle:
-          cleanedJobTitle,
-        message:
-          message.trim(),
-
-        status: "pending",
-
-        createdAt:
-          serverTimestamp(),
-
-        updatedAt:
-          serverTimestamp(),
-      },
+  if (!response.ok) {
+    throw new Error(
+      result.error ||
+        "Teacher verification could not be requested.",
     );
+  }
 
-  await setDoc(
-    doc(
-      db,
-      "users",
-      cleanedUserId,
-    ),
-    {
-      accountIntent: "teacher",
-
-      teacherAccessStatus:
-        "pending",
-
-      updatedAt:
-        serverTimestamp(),
-    },
-    {
-      merge: true,
-    },
-  );
-
-  return requestReference.id;
+  return user.uid;
 }

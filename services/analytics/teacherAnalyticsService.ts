@@ -1712,24 +1712,67 @@ export async function getTeacherAnalyticsPortfolio(
 export async function getTeacherStudentAnalytics({
   teacherId,
   studentId,
+  classId,
 }: {
   teacherId: string;
   studentId: string;
+  classId?: string;
 }): Promise<TeacherStudentAnalyticsRow | null> {
+  const cleanedTeacherId = teacherId.trim();
+  const cleanedStudentId = studentId.trim();
+  const cleanedClassId = classId?.trim() || "";
+
+  if (!cleanedTeacherId || !cleanedStudentId) {
+    return null;
+  }
+
   const portfolio =
     await getTeacherAnalyticsPortfolio(
-      teacherId,
+      cleanedTeacherId,
     );
 
-  for (
-    const classItem of
-    portfolio.classes
-  ) {
+  /*
+   * When a class is supplied, reporting and other class-scoped
+   * teacher workflows must resolve the learner from that exact
+   * teacher-owned class.
+   *
+   * This prevents a learner who belongs to multiple classes from
+   * being reported against whichever class happens to appear first
+   * in the teacher analytics portfolio.
+   */
+  if (cleanedClassId) {
+    const classItem =
+      portfolio.classes.find(
+        (item) =>
+          item.classId ===
+          cleanedClassId,
+      );
+
+    if (!classItem) {
+      return null;
+    }
+
+    return (
+      classItem.students.find(
+        (student) =>
+          student.studentId ===
+          cleanedStudentId,
+      ) || null
+    );
+  }
+
+  /*
+   * Backwards compatibility:
+   *
+   * Existing callers that are not class-scoped may continue to
+   * request a learner using teacherId + studentId only.
+   */
+  for (const classItem of portfolio.classes) {
     const row =
       classItem.students.find(
         (student) =>
           student.studentId ===
-          studentId,
+          cleanedStudentId,
       );
 
     if (row) {

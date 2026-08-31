@@ -31,7 +31,7 @@ function percentage(
   value: number | null,
 ): string {
   return value === null
-    ? "â€”"
+    ? "—"
     : `${value}%`;
 }
 
@@ -149,7 +149,7 @@ export default function ExamAssignmentIntelligencePanel({
 
       <Card className="rounded-3xl border border-amber-200 bg-amber-50">
         <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700">
-          Analysis confidence Â· {intelligence.analysisConfidence}
+          Analysis confidence · {intelligence.analysisConfidence}
         </p>
 
         {intelligence.analysisWarnings.length ? (
@@ -199,10 +199,10 @@ export default function ExamAssignmentIntelligencePanel({
               <p className="mt-1 text-xs font-bold text-slate-500">
                 Source: {grade.boundarySource}
                 {grade.boundaryAcademicYear
-                  ? ` Â· ${grade.boundaryAcademicYear}`
+                  ? ` · ${grade.boundaryAcademicYear}`
                   : ""}
                 {grade.boundaryVerifiedAt
-                  ? ` Â· saved ${new Date(grade.boundaryVerifiedAt).toLocaleDateString("en-GB")}`
+                  ? ` · saved ${new Date(grade.boundaryVerifiedAt).toLocaleDateString("en-GB")}`
                   : ""}
               </p>
 
@@ -219,17 +219,17 @@ export default function ExamAssignmentIntelligencePanel({
               label="Average mark"
               value={
                 grade.classAverageMark === null
-                  ? "â€”"
+                  ? "—"
                   : `${grade.classAverageMark}/${grade.totalMarks}`
               }
             />
-            <SmallMetric label="Assessment grade" value={grade.classAverageGrade || "â€”"} />
-            <SmallMetric label="Next grade" value={grade.classNextGrade || "â€”"} />
+            <SmallMetric label="Assessment grade" value={grade.classAverageGrade || "—"} />
+            <SmallMetric label="Next grade" value={grade.classNextGrade || "—"} />
             <SmallMetric
               label="Marks to next"
               value={
                 grade.classMarksToNextGrade === null
-                  ? "â€”"
+                  ? "—"
                   : String(grade.classMarksToNextGrade)
               }
             />
@@ -313,11 +313,11 @@ export default function ExamAssignmentIntelligencePanel({
                     </td>
                     <td className="p-4 font-bold">{student.nextGrade || "Top grade"}</td>
                     <td className="p-4 font-black">
-                      {student.marksToNextGrade === null ? "â€”" : student.marksToNextGrade}
+                      {student.marksToNextGrade === null ? "—" : student.marksToNextGrade}
                     </td>
                     <td className="p-4 font-bold">
                       {student.differenceFromClassAverage === null
-                        ? "â€”"
+                        ? "—"
                         : `${student.differenceFromClassAverage > 0 ? "+" : ""}${student.differenceFromClassAverage}pp`}
                     </td>
                   </tr>
@@ -452,7 +452,7 @@ export default function ExamAssignmentIntelligencePanel({
                 </p>
 
                 <p className="mt-2 text-sm text-slate-600">
-                  {item.availableMarks} marks on paper Â· {item.marksLost} class marks lost
+                  {item.availableMarks} marks on paper · {item.marksLost} class marks lost
                 </p>
               </div>
             ))}
@@ -518,10 +518,10 @@ export default function ExamAssignmentIntelligencePanel({
                     </span>
                   </td>
                   <td className="p-4 text-sm font-bold text-slate-700">{question.topic}</td>
-                  <td className="p-4 text-sm font-black text-violet-700">{question.assessmentObjective || "â€”"}</td>
+                  <td className="p-4 text-sm font-black text-violet-700">{question.assessmentObjective || "—"}</td>
                   <td className="p-4 text-sm font-bold">
                     {question.averageAwardedMarks === null
-                      ? "â€”"
+                      ? "—"
                       : `${question.averageAwardedMarks}/${question.availableMarks}`}
                   </td>
                   <td className="p-4 font-black">{percentage(question.successPercentage)}</td>
@@ -533,7 +533,7 @@ export default function ExamAssignmentIntelligencePanel({
                   <td className="p-4">
                     {question.discriminationIndex === null
                       ? "Insufficient sample"
-                      : `${question.discriminationIndex} Â· ${question.discriminationLabel}`}
+                      : `${question.discriminationIndex} · ${question.discriminationLabel}`}
                   </td>
                   <td className="p-4">
                     <span className={`rounded-full px-3 py-1 text-xs font-black capitalize ${

@@ -17,250 +17,153 @@ type TopicEvidenceGroup = {
   evidence: AdaptiveEvidence[];
 };
 
-const clamp = (
-  value: number,
-) =>
-  Math.max(
-    0,
-    Math.min(
-      100,
-      value,
-    ),
-  );
+const clamp = (value: number) =>
+  Math.max(0, Math.min(100, Math.round(value)));
 
-function weightedAverage(
+function scoredEvidence(
   evidence: AdaptiveEvidence[],
-): number {
-  const scored =
-    evidence.filter(
-      (item) =>
-        typeof item.score ===
-        "number",
-    );
-
-  const totalWeight =
-    scored.reduce(
-      (sum, item) =>
-        sum + item.weight,
-      0,
-    );
-
-  if (
-    !scored.length ||
-    totalWeight === 0
-  ) {
-    return 0;
-  }
-
-  return Math.round(
-    scored.reduce(
-      (sum, item) =>
-        sum +
-        (item.score || 0) *
-          item.weight,
-      0,
-    ) /
-      totalWeight,
+  mode?: AdaptiveEvidence["mode"],
+): AdaptiveEvidence[] {
+  return evidence.filter(
+    (item) =>
+      typeof item.score === "number" &&
+      Number.isFinite(item.score) &&
+      (mode ? item.mode === mode : true),
   );
 }
 
-function scoreSequence(
-  evidence: AdaptiveEvidence[],
-): number[] {
+function weightedAverage(evidence: AdaptiveEvidence[]): number {
+  const scored = scoredEvidence(evidence);
+  const totalWeight = scored.reduce(
+    (sum, item) => sum + Math.max(0, item.weight),
+    0,
+  );
+
+  if (!scored.length || totalWeight <= 0) return 0;
+
+  return clamp(
+    scored.reduce(
+      (sum, item) =>
+        sum + (item.score || 0) * Math.max(0, item.weight),
+      0,
+    ) / totalWeight,
+  );
+}
+
+function scoreSequence(evidence: AdaptiveEvidence[]): number[] {
   return evidence
     .filter(
       (item) =>
-        typeof item.score ===
-          "number" &&
+        item.mode === "independent" &&
+        typeof item.score === "number" &&
         item.completedAt,
     )
     .sort(
-      (
-        first,
-        second,
-      ) =>
-        (
-          first.completedAt?.getTime() ||
-          0
-        ) -
-        (
-          second.completedAt?.getTime() ||
-          0
-        ),
+      (a, b) =>
+        (a.completedAt?.getTime() || 0) -
+        (b.completedAt?.getTime() || 0),
     )
-    .map(
-      (item) =>
-        item.score || 0,
-    );
+    .map((item) => item.score || 0);
 }
 
-function calculateTrend(
-  evidence: AdaptiveEvidence[],
-): number {
-  const scores =
-    scoreSequence(
-      evidence,
-    );
+function calculateTrend(evidence: AdaptiveEvidence[]): number {
+  const scores = scoreSequence(evidence);
+  if (scores.length < 2) return 0;
 
-  if (
-    scores.length < 2
-  ) {
-    return 0;
-  }
-
-  const midpoint =
-    Math.ceil(
-      scores.length / 2,
-    );
-
-  const average = (
-    values: number[],
-  ) =>
+  const midpoint = Math.ceil(scores.length / 2);
+  const avg = (values: number[]) =>
     values.length
-      ? values.reduce(
-          (
-            sum,
-            value,
-          ) =>
-            sum + value,
-          0,
-        ) /
-        values.length
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
       : 0;
 
   return Math.round(
-    average(
-      scores.slice(
-        midpoint,
-      ),
-    ) -
-      average(
-        scores.slice(
-          0,
-          midpoint,
-        ),
-      ),
+    avg(scores.slice(midpoint)) - avg(scores.slice(0, midpoint)),
   );
 }
 
 function latestEvidence(
   evidence: AdaptiveEvidence[],
+  mode?: AdaptiveEvidence["mode"],
 ): AdaptiveEvidence | null {
   return (
     [...evidence]
       .filter(
         (item) =>
-          item.completedAt,
+          item.completedAt &&
+          (mode ? item.mode === mode : true),
       )
       .sort(
-        (
-          first,
-          second,
-        ) =>
-          (
-            second.completedAt?.getTime() ||
-            0
-          ) -
-          (
-            first.completedAt?.getTime() ||
-            0
-          ),
-      )[0] ||
-    null
+        (a, b) =>
+          (b.completedAt?.getTime() || 0) -
+          (a.completedAt?.getTime() || 0),
+      )[0] || null
   );
 }
 
 function determineState({
   masteryScore,
-  attempts,
+  independentAttempts,
+  supportedEvidenceCount,
   daysSincePractice,
   trend,
 }: {
   masteryScore: number;
-  attempts: number;
+  independentAttempts: number;
+  supportedEvidenceCount: number;
   daysSincePractice: number;
   trend: number;
 }): AdaptiveTopicState {
-  if (
-    attempts === 0
-  ) {
-    return "new";
-  }
+  if (independentAttempts === 0 && supportedEvidenceCount === 0) return "new";
+  if (independentAttempts === 0) return "developing";
 
   if (
     masteryScore >= 85 &&
-    attempts >= 3 &&
+    independentAttempts >= 3 &&
     daysSincePractice <= 21
   ) {
     return "mastered";
   }
 
-  if (
-    masteryScore >= 70 &&
-    daysSincePractice > 14
-  ) {
+  if (masteryScore >= 70 && daysSincePractice > 14) {
     return "forgetting-risk";
   }
 
-  if (
-    masteryScore >= 70
-  ) {
-    return "secure";
-  }
+  if (masteryScore >= 70) return "secure";
 
-  if (
-    masteryScore < 50 ||
-    trend <= -15
-  ) {
-    return "priority";
-  }
+  if (masteryScore < 50 || trend <= -15) return "priority";
 
   return "developing";
 }
 
 function difficultyFor(
   masteryScore: number,
+  independentAttempts: number,
 ): AdaptiveDifficulty {
-  if (
-    masteryScore < 45
-  ) {
-    return "foundation";
-  }
-
-  if (
-    masteryScore < 75
-  ) {
-    return "standard";
-  }
-
+  if (independentAttempts === 0 || masteryScore < 45) return "foundation";
+  if (masteryScore < 75) return "standard";
   return "higher";
 }
 
 function confidence({
-  attempts,
-  sources,
+  independentAttempts,
+  independentSources,
+  supportedEvidenceCount,
   averageScore,
 }: {
-  attempts: number;
-  sources: AdaptiveEvidenceSource[];
+  independentAttempts: number;
+  independentSources: AdaptiveEvidenceSource[];
+  supportedEvidenceCount: number;
   averageScore: number;
 }): number {
+  if (independentAttempts === 0) {
+    return Math.min(25, supportedEvidenceCount * 5);
+  }
+
   return clamp(
-    Math.min(
-      55,
-      attempts * 12,
-    ) +
-      Math.min(
-        25,
-        sources.length * 10,
-      ) +
-      (
-        averageScore >= 70
-          ? 20
-          : averageScore >= 50
-            ? 12
-            : 6
-      ),
+    Math.min(50, independentAttempts * 11) +
+      Math.min(25, independentSources.length * 10) +
+      (averageScore >= 70 ? 20 : averageScore >= 50 ? 12 : 6) +
+      Math.min(5, supportedEvidenceCount),
   );
 }
 
@@ -268,54 +171,30 @@ function priority({
   masteryScore,
   daysSincePractice,
   trend,
-  attempts,
+  independentAttempts,
   state,
 }: {
   masteryScore: number;
   daysSincePractice: number;
   trend: number;
-  attempts: number;
+  independentAttempts: number;
   state: AdaptiveTopicState;
 }): number {
   const stateBoost =
     state === "priority"
       ? 15
-      : state ===
-          "forgetting-risk"
+      : state === "forgetting-risk"
         ? 12
         : state === "new"
           ? 10
           : 0;
 
   return clamp(
-    Math.round(
-      (
-        100 -
-        masteryScore
-      ) *
-        0.55 +
-        Math.min(
-          25,
-          daysSincePractice *
-            1.5,
-        ) +
-        (
-          trend < 0
-            ? Math.min(
-                20,
-                Math.abs(
-                  trend,
-                ),
-              )
-            : 0
-        ) +
-        (
-          attempts < 2
-            ? 10
-            : 0
-        ) +
-        stateBoost,
-    ),
+    (100 - masteryScore) * 0.55 +
+      Math.min(25, daysSincePractice * 1.5) +
+      (trend < 0 ? Math.min(20, Math.abs(trend)) : 0) +
+      (independentAttempts < 2 ? 10 : 0) +
+      stateBoost,
   );
 }
 
@@ -324,244 +203,160 @@ function reason({
   masteryScore,
   trend,
   daysSincePractice,
+  independentAttempts,
+  supportedEvidenceCount,
 }: {
   state: AdaptiveTopicState;
   masteryScore: number;
   trend: number;
   daysSincePractice: number;
+  independentAttempts: number;
+  supportedEvidenceCount: number;
 }): string {
-  if (
-    state === "new"
-  ) {
-    return "This topic has not yet been assessed, so an initial learning check is needed.";
+  if (independentAttempts === 0 && supportedEvidenceCount > 0) {
+    return "Learning activity has been completed, but independent assessed evidence is still needed before mastery can be estimated.";
   }
 
-  if (
-    state ===
-    "forgetting-risk"
-  ) {
-    return `Mastery is ${masteryScore}%, but the topic has not been practised for ${daysSincePractice} days. Retrieval is due.`;
+  if (state === "new") {
+    return "This topic has not yet been assessed, so an initial independent learning check is needed.";
   }
 
-  if (
-    state === "priority"
-  ) {
+  if (state === "forgetting-risk") {
+    return `Independent mastery is ${masteryScore}%, but the topic has not been independently practised for ${daysSincePractice} days. Retrieval is due.`;
+  }
+
+  if (state === "priority") {
     return trend < 0
-      ? `Mastery is ${masteryScore}% and recent performance has fallen by ${Math.abs(
-          trend,
-        )} percentage points.`
-      : `Mastery is currently ${masteryScore}%, so this topic needs immediate support.`;
+      ? `Independent mastery is ${masteryScore}% and recent independent performance has fallen by ${Math.abs(trend)} percentage points.`
+      : `Independent mastery is currently ${masteryScore}%, so this topic needs immediate support and reassessment.`;
   }
 
-  if (
-    state === "developing"
-  ) {
-    return `Mastery is ${masteryScore}%. Further guided practice is needed.`;
+  if (state === "developing") {
+    return `Independent mastery is ${masteryScore}%. Further guided practice followed by an independent check is recommended.`;
   }
 
-  if (
-    state === "mastered"
-  ) {
-    return `Mastery is ${masteryScore}% across repeated evidence. Use occasional retrieval to maintain it.`;
+  if (state === "mastered") {
+    return `Independent mastery is ${masteryScore}% across repeated evidence. Use occasional retrieval to maintain it.`;
   }
 
-  return `Mastery is ${masteryScore}%. Continue spaced retrieval to keep the topic secure.`;
+  return `Independent mastery is ${masteryScore}%. Continue spaced retrieval to keep the topic secure.`;
 }
 
 export function buildTopicMastery(
   groups: TopicEvidenceGroup[],
 ): AdaptiveTopicMastery[] {
   return groups
-    .map(
-      (
-        group,
-        index,
-      ) => {
-        const attempts =
-          group.evidence.filter(
-            (item) =>
-              typeof item.score ===
-              "number",
-          ).length;
+    .map((group, index) => {
+      const independent = scoredEvidence(group.evidence, "independent");
+      const supported = scoredEvidence(group.evidence, "supported");
 
-        const averageScore =
-          weightedAverage(
-            group.evidence,
-          );
+      const independentAttempts = independent.length;
+      const supportedEvidenceCount = supported.length;
 
-        const trend =
-          calculateTrend(
-            group.evidence,
-          );
+      const independentAverageScore = weightedAverage(independent);
+      const supportedAverageScore = weightedAverage(supported);
+      const trend = calculateTrend(group.evidence);
 
-        const latest =
-          latestEvidence(
-            group.evidence,
-          );
+      const latestIndependent = latestEvidence(group.evidence, "independent");
+      const latestAny = latestEvidence(group.evidence);
 
-        const latestScore =
-          typeof latest?.score ===
-          "number"
-            ? latest.score
-            : averageScore;
+      const latestScore =
+        typeof latestIndependent?.score === "number"
+          ? latestIndependent.score
+          : independentAverageScore;
 
-        const lastPractisedAt =
-          latest?.completedAt ||
-          null;
+      const lastPractisedAt =
+        latestIndependent?.completedAt || latestAny?.completedAt || null;
 
-        const daysSincePractice =
-          calculateDaysSince(
-            lastPractisedAt,
-          );
+      const daysSincePractice = calculateDaysSince(lastPractisedAt);
 
-        /*
-         * After seven days without graded practice, gradually
-         * reduce mastery to represent forgetting.
-         *
-         * The penalty remains capped at 20 percentage points.
-         */
-        const recencyPenalty =
-          Math.min(
-            20,
-            Math.max(
-              0,
-              daysSincePractice -
-                7,
-            ) * 1.2,
-          );
+      let masteryScore = 0;
 
-        /*
-         * Base mastery must use a complete 100% weighting.
-         *
-         * Historical weighted evidence contributes 75%.
-         * The latest result contributes 25%, giving recent
-         * evidence extra influence without replacing the
-         * student's broader evidence history.
-         *
-         * Trend and recency are then applied as adjustments.
-         *
-         * Previous implementation used 70% + 20% = 90%,
-         * unintentionally reducing stable scores by 10%.
-         * Example: 20% evidence became 18% mastery.
-         */
-        const masteryScore =
-          clamp(
-            Math.round(
-              averageScore *
-                0.75 +
-                latestScore *
-                  0.25 +
-                Math.max(
-                  -10,
-                  Math.min(
-                    10,
-                    trend *
-                      0.2,
-                  ),
-                ) -
-                recencyPenalty,
-            ),
-          );
+      if (independentAttempts > 0) {
+        const recencyPenalty = Math.min(
+          20,
+          Math.max(0, daysSincePractice - 7) * 1.2,
+        );
 
-        const evidenceSources =
-          Array.from(
-            new Set(
-              group.evidence.map(
-                (item) =>
-                  item.source,
-              ),
-            ),
-          );
+        masteryScore = clamp(
+          independentAverageScore * 0.75 +
+            latestScore * 0.25 +
+            Math.max(-10, Math.min(10, trend * 0.2)) -
+            recencyPenalty,
+        );
+      }
 
-        const state =
-          determineState({
-            masteryScore,
-            attempts,
-            daysSincePractice,
-            trend,
-          });
+      const state = determineState({
+        masteryScore,
+        independentAttempts,
+        supportedEvidenceCount,
+        daysSincePractice,
+        trend,
+      });
 
-        const reviewIntervalDays =
-          calculateReviewInterval({
-            masteryScore,
-            attempts,
-            state,
-          });
+      const reviewIntervalDays = calculateReviewInterval({
+        masteryScore,
+        attempts: independentAttempts,
+        state,
+      });
 
-        const nextReviewAt =
-          calculateNextReviewDate({
-            lastPractisedAt,
-            intervalDays:
-              reviewIntervalDays,
-          });
+      const nextReviewAt = calculateNextReviewDate({
+        lastPractisedAt,
+        intervalDays: reviewIntervalDays,
+      });
 
-        return {
-          id:
-            `mastery-${index}`,
+      const evidenceSources = Array.from(
+        new Set(group.evidence.map((item) => item.source)),
+      );
 
-          topic:
-            group.topic,
+      const independentSources = Array.from(
+        new Set(independent.map((item) => item.source)),
+      );
 
+      return {
+        id: `mastery-${index}`,
+        topic: group.topic,
+        masteryScore,
+        independentAverageScore,
+        supportedAverageScore,
+        confidenceScore: confidence({
+          independentAttempts,
+          independentSources,
+          supportedEvidenceCount,
+          averageScore: independentAverageScore,
+        }),
+        priorityScore: priority({
           masteryScore,
-
-          confidenceScore:
-            confidence({
-              attempts,
-              sources:
-                evidenceSources,
-              averageScore,
-            }),
-
-          priorityScore:
-            priority({
-              masteryScore,
-              daysSincePractice,
-              trend,
-              attempts,
-              state,
-            }),
-
-          attempts,
-
-          averageScore,
-
-          latestScore,
-
-          trend,
-
-          lastPractisedAt,
-
-          nextReviewAt,
-
           daysSincePractice,
-
-          reviewIntervalDays,
-
+          trend,
+          independentAttempts,
           state,
-
-          recommendedDifficulty:
-            difficultyFor(
-              masteryScore,
-            ),
-
-          evidenceSources,
-
-          reason:
-            reason({
-              state,
-              masteryScore,
-              trend,
-              daysSincePractice,
-            }),
-        };
-      },
-    )
-    .sort(
-      (
-        first,
-        second,
-      ) =>
-        second.priorityScore -
-        first.priorityScore,
-    );
+        }),
+        attempts: independentAttempts,
+        independentEvidenceCount: independentAttempts,
+        supportedEvidenceCount,
+        averageScore: independentAverageScore,
+        latestScore,
+        trend,
+        lastPractisedAt,
+        nextReviewAt,
+        daysSincePractice,
+        reviewIntervalDays,
+        state,
+        recommendedDifficulty: difficultyFor(
+          masteryScore,
+          independentAttempts,
+        ),
+        evidenceSources,
+        reason: reason({
+          state,
+          masteryScore,
+          trend,
+          daysSincePractice,
+          independentAttempts,
+          supportedEvidenceCount,
+        }),
+      };
+    })
+    .sort((a, b) => b.priorityScore - a.priorityScore);
 }
