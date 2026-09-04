@@ -10,6 +10,10 @@ export type QuizDeliveryMode =
   | "practice"
   | "assessment";
 
+export type AssignmentRecipientMode =
+  | "classes"
+  | "students";
+
 export type AssignmentWizardResource = {
   id: string;
   title: string;
@@ -37,15 +41,25 @@ export type AssignmentWizardResource = {
   totalMarks?: number;
 };
 
+export type AssignmentWizardStudent = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 export type AssignmentWizardClass = {
   id: string;
   name: string;
   yearGroup: string;
+  studentIds: string[];
+  students: AssignmentWizardStudent[];
 };
 
 export type AssignmentWizardData = {
   resource: AssignmentWizardResource | null;
+  recipientMode: AssignmentRecipientMode;
   selectedClassIds: string[];
+  selectedStudentIds: string[];
   dueDate: string;
   instructions: string;
 

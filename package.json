@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "hardening:audit": "node scripts/hardening-audit.mjs",
+    "verify": "npm run lint && npm run typecheck && npm run hardening:audit && npm run build"
   },
   "dependencies": {
     "docx": "^9.7.1",

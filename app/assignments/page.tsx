@@ -157,9 +157,13 @@ function matchesFilter(
 
 function getHref(assignment: UnifiedAssignment): string {
   if (assignment.kind === "quiz") {
-    return `/quiz?topic=${encodeURIComponent(
+    const baseHref = `/quiz?topic=${encodeURIComponent(
       assignment.resourceId,
     )}&assignment=${encodeURIComponent(assignment.id)}`;
+
+    return assignment.status === "completed"
+      ? `${baseHref}&review=1`
+      : baseHref;
   }
 
   if (assignment.kind === "exam") {

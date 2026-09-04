@@ -31,10 +31,11 @@ type SavedQuizOption = {
   id: string;
   title: string;
   description: string;
-  qualification: string;
+  qualification: "GCSE" | "A_LEVEL";
   examBoard: string;
   difficulty: string;
   questionCount: number;
+  estimatedTime?: string;
 };
 
 const resourceOptions: Array<{
@@ -146,15 +147,26 @@ export default function AssignmentResourceStep({
               title: data.title || "Untitled Quiz",
               description:
                 data.description || "Complete the assigned quiz.",
-              qualification: data.qualification || "GCSE",
-              examBoard: data.examBoard || "AQA",
-              difficulty: data.difficulty || "standard",
+              qualification:
+                data.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
+              examBoard:
+                typeof data.examBoard === "string" && data.examBoard.trim()
+                  ? data.examBoard.trim()
+                  : "AQA",
+              difficulty:
+                typeof data.difficulty === "string" && data.difficulty.trim()
+                  ? data.difficulty.trim()
+                  : "standard",
               questionCount:
                 typeof data.questionCount === "number"
                   ? data.questionCount
                   : Array.isArray(data.questions)
                     ? data.questions.length
                     : 0,
+              estimatedTime:
+                typeof data.estimatedTime === "string" && data.estimatedTime.trim()
+                  ? data.estimatedTime.trim()
+                  : undefined,
             };
           },
         );
@@ -241,6 +253,9 @@ export default function AssignmentResourceStep({
       resourceType: "ai-quiz",
       resourceId: quiz.id,
       questionCount: quiz.questionCount,
+      qualification: quiz.qualification,
+      examBoard: quiz.examBoard,
+      estimatedTime: quiz.estimatedTime,
     });
   }
 
@@ -365,10 +380,23 @@ export default function AssignmentResourceStep({
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
-                        <h4 className="font-bold text-slate-900">{quiz.title}</h4>
+                        <p className="text-xs font-black uppercase tracking-wide text-indigo-600">
+                          {quiz.examBoard} · {quiz.qualification === "A_LEVEL" ? "A-Level" : "GCSE"}
+                        </p>
+                        <h4 className="mt-1 font-bold text-slate-900">{quiz.title}</h4>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
                           {quiz.description}
                         </p>
+                        <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+                          <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-700">
+                            {quiz.questionCount} questions
+                          </span>
+                          {quiz.estimatedTime && (
+                            <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                              {quiz.estimatedTime}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-bold ${
@@ -444,11 +472,22 @@ export default function AssignmentResourceStep({
             </p>
           )}
 
-          {selectedResource.resourceType === "quiz" && (
+          {(selectedResource.resourceType === "quiz" ||
+            selectedResource.resourceType === "ai-quiz") && (
             <p className="mt-1 text-sm text-slate-600">
               {selectedResource.questionCount ?? 0} questions
               {selectedResource.estimatedTime
                 ? ` · ${selectedResource.estimatedTime}`
+                : ""}
+              {selectedResource.examBoard
+                ? ` · ${selectedResource.examBoard}`
+                : ""}
+              {selectedResource.qualification
+                ? ` ${
+                    selectedResource.qualification === "A_LEVEL"
+                      ? "A-Level"
+                      : "GCSE"
+                  }`
                 : ""}
             </p>
           )}

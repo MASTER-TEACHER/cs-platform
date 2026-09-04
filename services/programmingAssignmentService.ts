@@ -98,7 +98,7 @@ function convertAssignment(
     className: String(data.className ?? "Class"),
     studentIds: Array.isArray(data.studentIds)
       ? data.studentIds.filter(
-          (value): value is string => typeof value === "string",
+          (value: unknown): value is string => typeof value === "string",
         )
       : [],
     studentCount:
@@ -122,6 +122,7 @@ export type CreateProgrammingAssignmentInput = {
   challengeId: string;
   instructions: string;
   dueDate: string;
+  studentIds?: string[];
 };
 
 export async function createProgrammingAssignment({
@@ -130,6 +131,7 @@ export async function createProgrammingAssignment({
   challengeId,
   instructions,
   dueDate,
+  studentIds: requestedStudentIds,
 }: CreateProgrammingAssignmentInput): Promise<string> {
   const cleanedTeacherId = teacherId.trim();
   const cleanedClassId = classId.trim();
@@ -145,6 +147,13 @@ export async function createProgrammingAssignment({
 
   if (Number.isNaN(parsedDueDate.getTime())) {
     throw new Error("Select a valid due date.");
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (parsedDueDate.getTime() < today.getTime()) {
+    throw new Error("The due date cannot be in the past.");
   }
 
   const challenge = getProgrammingChallengeById(cleanedChallengeId);
@@ -178,16 +187,35 @@ export async function createProgrammingAssignment({
     );
   }
 
-  const studentIds = Array.isArray(classData.studentIds)
+  const enrolledStudentIds = Array.isArray(classData.studentIds)
     ? Array.from(
         new Set(
-          classData.studentIds.filter(
-            (value: unknown): value is string =>
-              typeof value === "string" && Boolean(value.trim()),
-          ),
+          classData.studentIds
+            .filter(
+              (value: unknown): value is string =>
+                typeof value === "string" && Boolean(value.trim()),
+            )
+            .map((value: string) => value.trim()),
         ),
       )
     : [];
+
+  const requestedIds = Array.from(
+    new Set((requestedStudentIds ?? []).map((id) => id.trim()).filter(Boolean)),
+  );
+
+  const studentIds =
+    requestedIds.length > 0
+      ? requestedIds.filter((id) => enrolledStudentIds.includes(id))
+      : enrolledStudentIds;
+
+  if (studentIds.length === 0) {
+    throw new Error(
+      requestedIds.length > 0
+        ? "None of the selected students are enrolled in this class."
+        : "The selected class has no enrolled students.",
+    );
+  }
 
   const teacherName = String(
     teacherData.name ??
@@ -387,6 +415,17 @@ export async function recordProgrammingAssignmentAttempt({
     );
   }
 
+  const existingSubmission = await getProgrammingSubmission(
+    assignmentId,
+    studentId,
+  );
+
+  if (existingSubmission?.status === "completed") {
+    throw new Error(
+      "This programming assignment has already been completed.",
+    );
+  }
+
   if (!code.trim()) {
     throw new Error(
       "Enter some Python code before checking the assignment.",
@@ -410,6 +449,13 @@ export async function recordProgrammingAssignmentAttempt({
       "A programming assignment can only complete when every test passes.",
     );
   }
+
+  /*
+   * Create/validate the base progress record before saving programming
+   * evidence. This keeps the Firestore write tied to a real active
+   * assignment and an enrolled student.
+   */
+  await startStudentAssignment(assignmentId, studentId);
 
   const id = progressId(assignmentId, studentId);
   const progressReference = doc(
@@ -466,11 +512,6 @@ export async function recordProgrammingAssignmentAttempt({
 
   if (passed) {
     await completeStudentAssignment(
-      assignmentId,
-      studentId,
-    );
-  } else {
-    await startStudentAssignment(
       assignmentId,
       studentId,
     );

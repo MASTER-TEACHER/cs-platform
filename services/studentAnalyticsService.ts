@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   doc,
   getDoc,
@@ -318,42 +318,46 @@ export async function getStudentAnalytics(
     getDocs(
       query(
         collection(db, "classes"),
-        where("teacherId", "==", cleanedTeacherId),
+        where("studentIds", "array-contains", cleanedStudentId),
       ),
     ),
 
     getDocs(
       query(
         collection(db, "classAssignments"),
-        where("teacherId", "==", cleanedTeacherId),
+        where("studentIds", "array-contains", cleanedStudentId),
       ),
     ),
 
-    getDocs(
-      query(
-        collection(db, "assignments"),
-        where("teacherId", "==", cleanedTeacherId),
+    Promise.all(
+      student.classIds.map((classId) =>
+        getDocs(
+          query(
+            collection(db, "assignments"),
+            where("classId", "==", classId),
+          ),
+        ),
       ),
     ),
 
     getDocs(
       query(
         collection(db, "assignmentResults"),
-        where("teacherId", "==", cleanedTeacherId),
+        where("studentId", "==", cleanedStudentId),
       ),
     ),
 
     getDocs(
       query(
         collection(db, "examAssignments"),
-        where("teacherId", "==", cleanedTeacherId),
+        where("studentIds", "array-contains", cleanedStudentId),
       ),
     ),
 
     getDocs(
       query(
         collection(db, "examSubmissions"),
-        where("teacherId", "==", cleanedTeacherId),
+        where("studentId", "==", cleanedStudentId),
       ),
     ),
   ]);
@@ -441,7 +445,11 @@ export async function getStudentAnalytics(
     }),
   );
 
-  const quizAssignments = quizAssignmentsSnapshot.docs.filter(
+  const quizAssignmentDocuments = quizAssignmentsSnapshot.flatMap(
+    (snapshot) => snapshot.docs,
+  );
+
+  const quizAssignments = quizAssignmentDocuments.filter(
     (assignmentDocument) => {
       const data = assignmentDocument.data();
 
@@ -841,3 +849,4 @@ export async function getStudentAnalytics(
     recommendations: buildRecommendations(metrics, weakestTopics),
   };
 }
+

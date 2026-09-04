@@ -76,6 +76,7 @@ function resolveRawTopic(
   fallback = "",
 ): string {
   return (
+    safeString(data.topicId) ||
     safeString(data.topicTitle) ||
     safeString(data.topic) ||
     safeString(data.curriculumTopic) ||
@@ -269,48 +270,114 @@ export async function getAdaptiveLearningPlan(
     throw new Error("A valid student account is required.");
   }
 
-  const [
-    profile,
-    quizSnapshot,
-    assignedQuizSnapshot,
-    programmingProgressSnapshot,
-    lessonProgressSnapshot,
-    examAssignments,
-    interventions,
-  ] = await Promise.all([
-    getUserProfile(id),
+ const [
+  profile,
+  quizSnapshot,
+  assignedQuizSnapshot,
+  programmingPracticeSnapshot,
+  programmingProgressSnapshot,
+  lessonProgressSnapshot,
+  examAssignments,
+  interventions,
+] = await Promise.all([
+  /*
+   * Student self-directed secure quiz results.
+   */
+  getUserProfile(id),
 
-    getDocs(
-      query(
-        collection(db, "users", id, "quizResults"),
-        orderBy("createdAt", "desc"),
+  getDocs(
+    query(
+      collection(
+        db,
+        "users",
+        id,
+        "quizResults",
+      ),
+      orderBy(
+        "createdAt",
+        "desc",
       ),
     ),
+  ),
 
-    getDocs(
-      query(
-        collection(db, "assignmentResults"),
-        where("studentId", "==", id),
+  /*
+   * Teacher-assigned quiz results.
+   *
+   * IMPORTANT:
+   * This must remain the third Promise because the
+   * destructured value above is assignedQuizSnapshot.
+   */
+  getDocs(
+    query(
+      collection(
+        db,
+        "assignmentResults",
+      ),
+      where(
+        "studentId",
+        "==",
+        id,
       ),
     ),
+  ),
 
-    getDocs(
-      query(
-        collection(db, "assignmentProgress"),
-        where("studentId", "==", id),
+  /*
+   * Student self-directed Programming Practice evidence.
+   *
+   * One canonical document exists per student/challenge.
+   */
+  getDocs(
+    query(
+      collection(
+        db,
+        "users",
+        id,
+        "programmingPracticeResults",
+      ),
+      orderBy(
+        "updatedAt",
+        "desc",
       ),
     ),
+  ),
 
-    getDocs(
-      query(
-        collection(db, "lessonProgress"),
-        where("studentId", "==", id),
+  /*
+   * Teacher-assigned programming challenge progress.
+   */
+  getDocs(
+    query(
+      collection(
+        db,
+        "assignmentProgress",
+      ),
+      where(
+        "studentId",
+        "==",
+        id,
       ),
     ),
+  ),
 
-    getStudentExamAssignments(id),
-    getStudentInterventions(id),
-  ]);
+  /*
+   * Interactive lesson evidence.
+   */
+  getDocs(
+    query(
+      collection(
+        db,
+        "lessonProgress",
+      ),
+      where(
+        "studentId",
+        "==",
+        id,
+      ),
+    ),
+  ),
+
+  getStudentExamAssignments(id),
+  getStudentInterventions(id),
+]);
 
   if (!profile) {
     throw new Error("The student profile could not be loaded.");
@@ -418,6 +485,56 @@ export async function getAdaptiveLearningPlan(
       weight: 1.1,
     });
   });
+
+// Independent programming evidence from normal Programming Practice.
+programmingPracticeSnapshot.docs.forEach(
+  (document) => {
+    const data =
+      document.data();
+
+    const topic =
+      resolveRawTopic(data);
+
+    if (
+      !topic ||
+      isGenericAssessmentTopic(topic)
+    ) {
+      return;
+    }
+
+    const score =
+      typeof data.latestScorePercent ===
+      "number"
+        ? data.latestScorePercent
+        : typeof data.bestScorePercent ===
+            "number"
+          ? data.bestScorePercent
+          : 0;
+
+    evidence.push({
+      id: `programming-practice-${document.id}`,
+      topic:
+        cleanAssignmentTitle(
+          topic,
+        ),
+      source:
+        "programming",
+      mode:
+        "independent",
+      score:
+        safeNumber(score),
+      completedAt:
+        toDate(
+          data.completedAt,
+        ) ||
+        toDate(
+          data.updatedAt,
+        ),
+      weight:
+        1.2,
+    });
+  },
+);
 
   // Independent programming evidence from teacher-assigned challenges.
   const programmingAssignmentIds = programmingProgressSnapshot.docs

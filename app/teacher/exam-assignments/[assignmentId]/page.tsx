@@ -208,6 +208,10 @@ export default function ExamAssignmentMarkbookPage() {
 
   const [error, setError] = useState("");
 
+  const [resettingStudentId, setResettingStudentId] = useState("");
+
+  const [resetError, setResetError] = useState("");
+
   useEffect(() => {
     let cancelled = false;
 
@@ -317,6 +321,88 @@ export default function ExamAssignmentMarkbookPage() {
     profileReady,
     user?.uid,
   ]);
+
+  async function resetExamAttempt(
+    student: StudentIdentity,
+    submission: ExamSubmission,
+  ) {
+    const assignmentId = assignment?.id;
+
+    if (!user?.uid || !assignmentId) {
+      return;
+    }
+
+    const completedAttempt = ["submitted", "marking", "marked"].includes(
+      submission.status,
+    );
+
+    const confirmed = window.confirm(
+      completedAttempt
+        ? `Allow ${student.name} to retake this exam?\n\nTheir current attempt will be archived for audit, then the live submission will be reset so they can start again.`
+        : `Restart ${student.name}'s current exam attempt?\n\nTheir current attempt will be archived for audit, then they can start the exam again.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setResettingStudentId(student.uid);
+      setResetError("");
+
+      const idToken = await user.getIdToken();
+
+      const response = await fetch("/api/exam-assignments/reset-attempt", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          assignmentId,
+          studentId: student.uid,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        archivedAttemptId?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.error || "The exam attempt could not be reset.",
+        );
+      }
+
+      /*
+       * Reload the assignment and submissions from Firestore rather than
+       * guessing at counters locally. This keeps the markbook, integrity
+       * intelligence and assignment totals aligned with the server reset.
+       */
+      const [reloadedAssignment, reloadedSubmissions] = await Promise.all([
+        getExamAssignmentById(assignmentId),
+        getAssignmentSubmissions(assignmentId, user.uid),
+      ]);
+
+      if (reloadedAssignment) {
+        setAssignment(reloadedAssignment);
+      }
+
+      setSubmissions(reloadedSubmissions);
+    } catch (caughtError) {
+      console.error("Unable to reset exam attempt:", caughtError);
+
+      setResetError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "The exam attempt could not be reset.",
+      );
+    } finally {
+      setResettingStudentId("");
+    }
+  }
 
   const submissionsByStudent = useMemo(
     () =>
@@ -465,6 +551,12 @@ export default function ExamAssignmentMarkbookPage() {
           </p>
         </div>
 
+        {resetError && (
+          <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-800">
+            {resetError}
+          </div>
+        )}
+
         <div className="mt-6 overflow-x-auto">
           <table className="w-full min-w-[900px] border-collapse">
             <thead>
@@ -486,6 +578,14 @@ export default function ExamAssignmentMarkbookPage() {
                 const submission = submissionsByStudent.get(student.uid);
 
                 const status = submission?.status ?? "not_started";
+
+                const canOpenSubmission =
+                  Boolean(submission) &&
+                  ["submitted", "marking", "marked"].includes(status);
+
+                const canResetAttempt = Boolean(submission);
+
+                const isResetting = resettingStudentId === student.uid;
 
                 return (
                   <tr
@@ -547,25 +647,41 @@ export default function ExamAssignmentMarkbookPage() {
                     </td>
 
                     <td className="p-4">
-                      {submission &&
-                      ["submitted", "marking", "marked"].includes(
-                        submission.status,
-                      ) ? (
-                        <Link
-                          href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.uid}`}
-                          className="inline-flex rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white transition hover:bg-indigo-700"
-                        >
-                          {submission.status === "marked"
-                            ? "Review"
-                            : "Mark submission"}
-                        </Link>
-                      ) : (
-                        <span className="text-sm text-slate-400">
-                          {submission?.status === "in_progress"
-                            ? "Assessment in progress"
-                            : "Awaiting submission"}
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canOpenSubmission && submission ? (
+                          <Link
+                            href={`/teacher/exam-assignments/${assignment.id}/submissions/${student.uid}`}
+                            className="inline-flex rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white transition hover:bg-indigo-700"
+                          >
+                            {submission.status === "marked"
+                              ? "Review"
+                              : "Mark submission"}
+                          </Link>
+                        ) : (
+                          <span className="text-sm text-slate-400">
+                            {submission?.status === "in_progress"
+                              ? "Assessment in progress"
+                              : "Awaiting submission"}
+                          </span>
+                        )}
+
+                        {canResetAttempt && submission && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void resetExamAttempt(student, submission)
+                            }
+                            disabled={Boolean(resettingStudentId)}
+                            className="inline-flex rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 font-bold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isResetting
+                              ? "Resetting..."
+                              : submission.status === "in_progress"
+                                ? "Restart attempt"
+                                : "Allow retake"}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

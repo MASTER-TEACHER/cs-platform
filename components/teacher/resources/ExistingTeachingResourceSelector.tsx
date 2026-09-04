@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import Link from "next/link";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -57,6 +58,11 @@ export default function ExistingTeachingResourceSelector({
   ] =
     useState("");
 
+  const [
+    error,
+    setError,
+  ] = useState("");
+
   useEffect(() => {
     if (
       authLoading
@@ -98,6 +104,7 @@ export default function ExistingTeachingResourceSelector({
         }
 
         setLoading(true);
+        setError("");
 
         const loaded =
           await getTeacherResources(
@@ -125,6 +132,11 @@ export default function ExistingTeachingResourceSelector({
           !cancelled
         ) {
           setResources([]);
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Could not load your published resources.",
+          );
         }
       } finally {
         if (
@@ -205,16 +217,32 @@ export default function ExistingTeachingResourceSelector({
           <div className="h-24 animate-pulse rounded-xl bg-white" />
           <div className="h-24 animate-pulse rounded-xl bg-white" />
         </div>
-      ) : filtered.length ===
-        0 ? (
+      ) : error ? (
+        <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-5 text-sm font-semibold text-red-700">
+          {error}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="mt-5 rounded-xl bg-white p-6 text-center">
           <p className="font-bold text-slate-900">
-            No published resources match
+            {resources.length === 0
+              ? "No published teaching resources yet"
+              : "No published resources match this search"}
           </p>
 
           <p className="mt-2 text-sm text-slate-500">
-            Publish a teaching resource in the Content Hub before assigning it.
+            {resources.length === 0
+              ? "Publish a teaching resource in the Content Hub before assigning it."
+              : "Clear the search or try a different title, topic, board or year group."}
           </p>
+
+          {resources.length === 0 && (
+            <Link
+              href="/teacher/content"
+              className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
+            >
+              Open Content Hub
+            </Link>
+          )}
         </div>
       ) : (
         <div className="mt-5 grid gap-3">

@@ -38,7 +38,9 @@ import type {
 
 const initialWizardData: AssignmentWizardData = {
   resource: null,
+  recipientMode: "classes",
   selectedClassIds: [],
+  selectedStudentIds: [],
   dueDate: "",
   instructions: "",
   deliveryMode: "practice",
@@ -104,64 +106,89 @@ export default function AssignmentWizardPage() {
 
     const unsubscribe = onSnapshot(
       classesQuery,
-      (snapshot) => {
+      async (snapshot) => {
         const loadedClasses: AssignmentWizardClass[] =
-          snapshot.docs.map(
-            (classDocument) => {
-              const data =
-                classDocument.data();
+          await Promise.all(
+            snapshot.docs.map(async (classDocument) => {
+              const data = classDocument.data();
+              const studentIds = Array.isArray(data.studentIds)
+                ? Array.from(
+                    new Set(
+                      data.studentIds
+                        .filter(
+                          (value: unknown): value is string =>
+                            typeof value === "string" && Boolean(value.trim()),
+                        )
+                        .map((value: string) => value.trim()),
+                    ),
+                  )
+                : [];
+
+              const embeddedStudents = Array.isArray(data.students)
+                ? data.students
+                : [];
+
+              const embeddedStudentsById = new Map<string, Record<string, unknown>>(
+                embeddedStudents
+                  .filter(
+                    (value: unknown): value is Record<string, unknown> =>
+                      Boolean(value) && typeof value === "object",
+                  )
+                  .map(
+                    (student): [string, Record<string, unknown>] => {
+                      const rawId =
+                        student.studentId ?? student.id ?? student.uid ?? "";
+
+                      return [String(rawId).trim(), student];
+                    },
+                  )
+                  .filter(([studentId]) => Boolean(studentId)),
+              );
+
+              const students = studentIds.map((studentId) => {
+                const studentData = embeddedStudentsById.get(studentId) ?? {};
+
+                return {
+                  id: studentId,
+                  name: String(
+                    studentData.displayName ??
+                      studentData.name ??
+                      studentData.fullName ??
+                      studentData.email ??
+                      "Student",
+                  ),
+                  email: String(studentData.email ?? ""),
+                };
+              });
+
+              students.sort((a, b) => a.name.localeCompare(b.name));
 
               return {
                 id: classDocument.id,
-                name:
-                  data.name ||
-                  "Untitled Class",
-                yearGroup:
-                  data.yearGroup ||
-                  "Not specified",
+                name: data.name || "Untitled Class",
+                yearGroup: data.yearGroup || "Not specified",
+                studentIds,
+                students,
               };
-            },
+            }),
           );
 
-        loadedClasses.sort((a, b) =>
-          a.name.localeCompare(
-            b.name,
-          ),
-        );
+        loadedClasses.sort((a, b) => a.name.localeCompare(b.name));
 
         if (
           isInterventionReassessment &&
           interventionStudentId
         ) {
-          const matchingClassIds =
-            snapshot.docs
-              .filter((classDocument) => {
-                const data =
-                  classDocument.data();
-
-                return (
-                  Array.isArray(
-                    data.studentIds,
-                  ) &&
-                  data.studentIds.some(
-                    (value) =>
-                      typeof value ===
-                        "string" &&
-                      value ===
-                        interventionStudentId,
-                  )
-                );
-              })
-              .map(
-                (classDocument) =>
-                  classDocument.id,
-              );
+          const matchingClassIds = loadedClasses
+            .filter((classItem) =>
+              classItem.studentIds.includes(interventionStudentId),
+            )
+            .map((classItem) => classItem.id);
 
           setWizardData((current) => ({
             ...current,
             selectedClassIds:
-              current.selectedClassIds
-                .length > 0
+              current.selectedClassIds.length > 0
                 ? current.selectedClassIds
                 : matchingClassIds,
             instructions:
@@ -447,6 +474,28 @@ export default function AssignmentWizardPage() {
     }));
   }
 
+  function changeRecipientMode(mode: "classes" | "students") {
+    setWizardData((current) => ({
+      ...current,
+      recipientMode: mode,
+      selectedClassIds: mode === "classes" ? current.selectedClassIds : [],
+      selectedStudentIds: mode === "students" ? current.selectedStudentIds : [],
+    }));
+  }
+
+  function toggleStudent(studentId: string) {
+    setWizardData((current) => {
+      const alreadySelected = current.selectedStudentIds.includes(studentId);
+
+      return {
+        ...current,
+        selectedStudentIds: alreadySelected
+          ? current.selectedStudentIds.filter((id) => id !== studentId)
+          : [...current.selectedStudentIds, studentId],
+      };
+    });
+  }
+
   function toggleClass(
     classId: string,
   ) {
@@ -474,86 +523,68 @@ export default function AssignmentWizardPage() {
 
   async function submitAssignments() {
     if (!user) {
-      toast.error(
-        "You must be logged in as a teacher.",
-      );
+      toast.error("You must be logged in as a teacher.");
       return;
     }
 
     if (!wizardData.resource) {
+      toast.error("Choose a resource first.");
+      return;
+    }
+
+    const hasRecipients =
+      wizardData.recipientMode === "classes"
+        ? wizardData.selectedClassIds.length > 0
+        : wizardData.selectedStudentIds.length > 0;
+
+    if (!hasRecipients) {
       toast.error(
-        "Choose a resource first.",
+        wizardData.recipientMode === "classes"
+          ? "Choose at least one class."
+          : "Choose at least one student.",
       );
       return;
     }
 
-    if (
-      wizardData.selectedClassIds.length ===
-      0
-    ) {
-      toast.error(
-        "Choose at least one class.",
-      );
-      return;
-    }
-
-    if (
-      !wizardData.dueDate ||
-      !wizardData.instructions.trim()
-    ) {
-      toast.error(
-        "Add a due date and instructions.",
-      );
+    if (!wizardData.dueDate || !wizardData.instructions.trim()) {
+      toast.error("Add a due date and instructions.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      /*
-       * Production preflight:
-       * verify every selected class still exists, belongs to this teacher,
-       * and has at least one enrolled student before creating any assignment.
-       *
-       * This protects every assignment path (lesson, quiz, AI quiz,
-       * exam paper, teaching resource and programming challenge) from
-       * producing empty or stale class assignments.
-       */
-      const selectedClassSnapshots =
-        await Promise.all(
-          wizardData.selectedClassIds.map(
-            (selectedClassId) =>
-              getDoc(
-                doc(
-                  db,
-                  "classes",
-                  selectedClassId,
+      const targetClassIds =
+        wizardData.recipientMode === "classes"
+          ? wizardData.selectedClassIds
+          : classes
+              .filter((classItem) =>
+                classItem.studentIds.some((studentId) =>
+                  wizardData.selectedStudentIds.includes(studentId),
                 ),
-              ),
-          ),
-        );
+              )
+              .map((classItem) => classItem.id);
 
-      selectedClassSnapshots.forEach(
-        (classSnapshot, index) => {
-          const selectedClassId =
-            wizardData.selectedClassIds[
-              index
-            ];
+      const selectedClassSnapshots = await Promise.all(
+        targetClassIds.map((classId) => getDoc(doc(db, "classes", classId))),
+      );
 
-          if (
-            !classSnapshot.exists()
-          ) {
+      const claimedStudentIds = new Set<string>();
+
+      const recipientGroups = selectedClassSnapshots
+        .map((classSnapshot, index) => {
+          const classId = targetClassIds[index];
+
+          if (!classSnapshot.exists()) {
             throw new Error(
-              "A selected class could not be found. Refresh the page and choose the class again.",
+              "A selected class could not be found. Refresh the page and choose the recipients again.",
             );
           }
 
-          const classData =
-            classSnapshot.data();
+          const classData = classSnapshot.data();
 
           if (
-            typeof classData.teacherId ===
-              "string" &&
+            typeof classData.teacherId === "string" &&
             classData.teacherId &&
             classData.teacherId !== user.uid
           ) {
@@ -562,201 +593,109 @@ export default function AssignmentWizardPage() {
             );
           }
 
-          const studentIds =
-            Array.isArray(
-              classData.studentIds,
-            )
-              ? classData.studentIds.filter(
-                  (
-                    value,
-                  ): value is string =>
-                    typeof value ===
-                      "string" &&
-                    Boolean(
-                      value.trim(),
-                    ),
-                )
-              : [];
+          const enrolledStudentIds = Array.isArray(classData.studentIds)
+            ? Array.from(
+                new Set(
+                  classData.studentIds
+                    .filter(
+                      (value: unknown): value is string =>
+                        typeof value === "string" && Boolean(value.trim()),
+                    )
+                    .map((value: string) => value.trim()),
+                ),
+              )
+            : [];
 
-          if (
-            studentIds.length === 0
-          ) {
-            const className =
-              classes.find(
-                (item) =>
-                  item.id ===
-                  selectedClassId,
-              )?.name ||
-              (typeof classData.name ===
-                "string"
-                ? classData.name
-                : "A selected class");
-
+          if (enrolledStudentIds.length === 0) {
             throw new Error(
-              `${className} has no enrolled students. Add at least one student before assigning work.`,
+              `${String(classData.name ?? "A selected class")} has no enrolled students.`,
             );
           }
-        },
-      );
 
-      if (
-        wizardData.resource.resourceType ===
-        "programming-challenge"
-      ) {
+          const studentIds =
+            wizardData.recipientMode === "classes"
+              ? enrolledStudentIds
+              : enrolledStudentIds.filter((studentId) => {
+                  if (!wizardData.selectedStudentIds.includes(studentId)) {
+                    return false;
+                  }
+
+                  if (claimedStudentIds.has(studentId)) {
+                    return false;
+                  }
+
+                  claimedStudentIds.add(studentId);
+                  return true;
+                });
+
+          return {
+            classId,
+            className: String(classData.name ?? "Untitled Class"),
+            studentIds,
+          };
+        })
+        .filter((group) => group.studentIds.length > 0);
+
+      if (recipientGroups.length === 0) {
+        throw new Error(
+          "None of the selected recipients are currently enrolled in an available class.",
+        );
+      }
+
+      const resource = wizardData.resource;
+      const dueDate = new Date(`${wizardData.dueDate}T23:59:59`);
+
+      if (resource.resourceType === "programming-challenge") {
         await Promise.all(
-          wizardData.selectedClassIds.map(
-            (selectedClassId) =>
-              createProgrammingAssignment(
-                {
-                  teacherId: user.uid,
-                  classId:
-                    selectedClassId,
-                  challengeId:
-                    wizardData.resource!
-                      .resourceId,
-                  dueDate:
-                    wizardData.dueDate,
-                  instructions:
-                    wizardData.instructions.trim(),
-                },
-              ),
+          recipientGroups.map((group) =>
+            createProgrammingAssignment({
+              teacherId: user.uid,
+              classId: group.classId,
+              challengeId: resource.resourceId,
+              dueDate: wizardData.dueDate,
+              instructions: wizardData.instructions.trim(),
+              studentIds: group.studentIds,
+            }),
           ),
         );
-      } else if (
-        wizardData.resource.resourceType ===
-        "teaching-resource"
-      ) {
+      } else if (resource.resourceType === "teaching-resource") {
         await Promise.all(
-          wizardData.selectedClassIds.map(async (selectedClassId) => {
-            const selectedClass = classes.find((item) => item.id === selectedClassId);
-            if (!selectedClass) throw new Error("A selected class could not be found.");
-
-            const classSnapshot = await getDoc(doc(db, "classes", selectedClassId));
-            if (!classSnapshot.exists()) throw new Error("A selected class could not be found.");
-            const classData = classSnapshot.data();
-            const studentIds = Array.isArray(classData.studentIds)
-              ? classData.studentIds.filter(
-                  (value): value is string =>
-                    typeof value === "string" && Boolean(value.trim()),
-                )
-              : [];
-
-            await createResourceAssignment({
-              resourceId: wizardData.resource!.resourceId,
-              resourceTitle: wizardData.resource!.title,
-              resourceTopic: wizardData.resource!.topicTitle || "Teaching resource",
+          recipientGroups.map((group) =>
+            createResourceAssignment({
+              resourceId: resource.resourceId,
+              resourceTitle: resource.title,
+              resourceTopic: resource.topicTitle || "Teaching resource",
               resourceType: "teacher-resource",
               teacherId: user.uid,
               teacherName: user.displayName || "Teacher",
-              classId: selectedClassId,
-              className: selectedClass.name,
+              classId: group.classId,
+              className: group.className,
               instructions: wizardData.instructions.trim(),
-              dueDate: new Date(`${wizardData.dueDate}T23:59:59`),
-              studentIds,
-            });
-          }),
-        );
-      } else if (
-        wizardData.resource.resourceType ===
-        "lesson"
-      ) {
-        await Promise.all(
-          wizardData.selectedClassIds.map(
-            async (
-              selectedClassId,
-            ) => {
-              const selectedClass =
-                classes.find(
-                  (item) =>
-                    item.id ===
-                    selectedClassId,
-                );
-
-              if (!selectedClass) {
-                throw new Error(
-                  "A selected class could not be found.",
-                );
-              }
-
-              const classSnapshot =
-                await getDoc(
-                  doc(
-                    db,
-                    "classes",
-                    selectedClassId,
-                  ),
-                );
-
-              if (
-                !classSnapshot.exists()
-              ) {
-                throw new Error(
-                  "A selected class could not be found.",
-                );
-              }
-
-              const classData =
-                classSnapshot.data();
-
-              const studentIds =
-                Array.isArray(
-                  classData.studentIds,
-                )
-                  ? classData.studentIds.filter(
-                      (
-                        value,
-                      ): value is string =>
-                        typeof value ===
-                          "string" &&
-                        Boolean(
-                          value.trim(),
-                        ),
-                    )
-                  : [];
-
-              await createResourceAssignment(
-                {
-                  resourceId:
-                    wizardData.resource!
-                      .resourceId,
-                  resourceTitle:
-                    wizardData.resource!
-                      .title,
-                  resourceTopic:
-                    wizardData.resource!
-                      .topicTitle ||
-                    "Interactive lesson",
-                  resourceType:
-                    "lesson",
-                  teacherId:
-                    user.uid,
-                  teacherName:
-                    user.displayName ||
-                    "Teacher",
-                  classId:
-                    selectedClassId,
-                  className:
-                    selectedClass.name,
-                  instructions:
-                    wizardData.instructions.trim(),
-                  dueDate:
-                    new Date(
-                      `${wizardData.dueDate}T23:59:59`,
-                    ),
-                  studentIds,
-                },
-              );
-            },
+              dueDate,
+              studentIds: group.studentIds,
+            }),
           ),
         );
-      } else if (
-        wizardData.resource.resourceType ===
-        "exam-paper"
-      ) {
-        const questionSet =
-          await getExamQuestionSetById(
-            wizardData.resource.resourceId,
-          );
+      } else if (resource.resourceType === "lesson") {
+        await Promise.all(
+          recipientGroups.map((group) =>
+            createResourceAssignment({
+              resourceId: resource.resourceId,
+              resourceTitle: resource.title,
+              resourceTopic: resource.topicTitle || "Interactive lesson",
+              resourceType: "lesson",
+              teacherId: user.uid,
+              teacherName: user.displayName || "Teacher",
+              classId: group.classId,
+              className: group.className,
+              instructions: wizardData.instructions.trim(),
+              dueDate,
+              studentIds: group.studentIds,
+            }),
+          ),
+        );
+      } else if (resource.resourceType === "exam-paper") {
+        const questionSet = await getExamQuestionSetById(resource.resourceId);
 
         if (!questionSet) {
           throw new Error(
@@ -765,198 +704,82 @@ export default function AssignmentWizardPage() {
         }
 
         await Promise.all(
-          wizardData.selectedClassIds.map(
-            async (
-              selectedClassId,
-            ) => {
-              const selectedClass =
-                classes.find(
-                  (item) =>
-                    item.id ===
-                    selectedClassId,
-                );
-
-              if (!selectedClass) {
-                throw new Error(
-                  "A selected class could not be found.",
-                );
-              }
-
-              const classSnapshot =
-                await getDoc(
-                  doc(
-                    db,
-                    "classes",
-                    selectedClassId,
-                  ),
-                );
-
-              if (
-                !classSnapshot.exists()
-              ) {
-                throw new Error(
-                  "A selected class could not be found.",
-                );
-              }
-
-              const classData =
-                classSnapshot.data();
-
-              const studentIds =
-                Array.isArray(
-                  classData.studentIds,
-                )
-                  ? classData.studentIds.filter(
-                      (
-                        value,
-                      ): value is string =>
-                        typeof value ===
-                          "string" &&
-                        Boolean(
-                          value.trim(),
-                        ),
-                    )
-                  : [];
-
-              await createExamAssignment({
-                teacherId:
-                  user.uid,
-                teacherName:
-                  user.displayName ||
-                  "Teacher",
-                classId:
-                  selectedClassId,
-                className:
-                  selectedClass.name,
-                studentIds,
-                questionSetId:
-                  questionSet.id,
-                questionSetTitle:
-                  questionSet.title,
-                questionSetSnapshot:
-                  questionSet.content,
-                title:
-                  wizardData.resource!
-                    .title,
-                instructions:
-                  wizardData.instructions.trim(),
-                dueDate:
-                  new Date(
-                    `${wizardData.dueDate}T23:59:59`,
-                  ),
-              });
-            },
+          recipientGroups.map((group) =>
+            createExamAssignment({
+              teacherId: user.uid,
+              teacherName: user.displayName || "Teacher",
+              classId: group.classId,
+              className: group.className,
+              studentIds: group.studentIds,
+              questionSetId: questionSet.id,
+              questionSetTitle: questionSet.title,
+              questionSetSnapshot: questionSet.content,
+              title: resource.title,
+              instructions: wizardData.instructions.trim(),
+              dueDate,
+            }),
           ),
         );
       } else if (
-        wizardData.resource.resourceType === "quiz" ||
-        wizardData.resource.resourceType === "ai-quiz"
+        resource.resourceType === "quiz" ||
+        resource.resourceType === "ai-quiz"
       ) {
-        const isAIQuiz =
-          wizardData.resource.resourceType === "ai-quiz";
+        const isAIQuiz = resource.resourceType === "ai-quiz";
 
         await Promise.all(
-          wizardData.selectedClassIds.map(
-            (selectedClassId) =>
-              createAssignment({
-                teacherId: user.uid,
-                classId: selectedClassId,
-                title: wizardData.resource!.title,
-                description:
-                  wizardData.instructions.trim(),
-                type: "quiz",
-                resourceId:
-                  wizardData.resource!.resourceId,
-                dueDate: wizardData.dueDate,
-                quizSource: isAIQuiz
-                  ? "ai-generated"
-                  : "built-in",
-                deliveryMode:
-                  wizardData.deliveryMode,
-              }),
+          recipientGroups.map((group) =>
+            createAssignment({
+              teacherId: user.uid,
+              classId: group.classId,
+              title: resource.title,
+              description: wizardData.instructions.trim(),
+              type: "quiz",
+              resourceId: resource.resourceId,
+              dueDate: wizardData.dueDate,
+              quizSource: isAIQuiz ? "ai-generated" : "built-in",
+              deliveryMode: wizardData.deliveryMode,
+              qualification: resource.qualification,
+              examBoard: resource.examBoard,
+              studentIds: group.studentIds,
+            }),
           ),
         );
       } else {
-        throw new Error(
-          "This assignment type is not yet supported.",
-        );
+        throw new Error("This assignment type is not yet supported.");
       }
 
-      if (
-        isInterventionReassessment &&
-        interventionId
-      ) {
-        await updateDoc(
-          doc(
-            db,
-            "interventions",
-            interventionId,
-          ),
-          {
-            reassessmentAssignedAt:
-              serverTimestamp(),
-            reassessmentAssignedBy:
-              user.uid,
-            reassessmentTopic:
-              interventionTopic || "",
-            reassessmentResourceType:
-              wizardData.resource
-                .resourceType,
-            reassessmentResourceId:
-              wizardData.resource
-                .resourceId,
-            reassessmentDueDate:
-              wizardData.dueDate,
-            reassessmentClassIds:
-              wizardData
-                .selectedClassIds,
-            updatedAt:
-              serverTimestamp(),
-          },
-        );
+      if (isInterventionReassessment && interventionId) {
+        await updateDoc(doc(db, "interventions", interventionId), {
+          reassessmentAssignedAt: serverTimestamp(),
+          reassessmentAssignedBy: user.uid,
+          reassessmentTopic: interventionTopic || "",
+          reassessmentResourceType: resource.resourceType,
+          reassessmentResourceId: resource.resourceId,
+          reassessmentDueDate: wizardData.dueDate,
+          reassessmentClassIds: recipientGroups.map((group) => group.classId),
+          updatedAt: serverTimestamp(),
+        });
       }
+
+      const studentRecipientCount = recipientGroups.reduce(
+        (sum, group) => sum + group.studentIds.length,
+        0,
+      );
 
       toast.success(
-        `${
-          wizardData.resource.resourceType ===
-          "programming-challenge"
-            ? "Programming assignment"
-            : wizardData.resource.resourceType ===
-                "teaching-resource"
-              ? "Resource assignment"
-              : wizardData.resource.resourceType ===
-                  "lesson"
-              ? "Lesson assignment"
-              : wizardData.resource.resourceType ===
-                  "exam-paper"
-                ? "Exam assignment"
-                : wizardData.resource.resourceType ===
-                    "ai-quiz"
-                  ? "AI quiz assignment"
-                  : wizardData.resource.resourceType ===
-                      "quiz"
-                    ? "Quiz assignment"
-                    : "Assignment"
-        } created for ${
-          wizardData.selectedClassIds.length
-        } ${
-          wizardData.selectedClassIds.length ===
-          1
-            ? "class"
-            : "classes"
-        }.`,
+        wizardData.recipientMode === "students"
+          ? `Assignment created for ${studentRecipientCount} ${
+              studentRecipientCount === 1 ? "student" : "students"
+            }.`
+          : `Assignment created for ${recipientGroups.length} ${
+              recipientGroups.length === 1 ? "class" : "classes"
+            } (${studentRecipientCount} students).`,
       );
 
-      setWizardData(
-        initialWizardData,
-      );
+      setWizardData(initialWizardData);
       setStep("resource");
     } catch (error) {
-      console.error(
-        "Assignment wizard error:",
-        error,
-      );
-
+      console.error("Assignment wizard error:", error);
       toast.error(
         error instanceof Error
           ? error.message
@@ -998,7 +821,7 @@ export default function AssignmentWizardPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-emerald-100">
-              Choose a resource or programming challenge, select classes,
+              Choose a resource or programming challenge, choose whole classes or individual students,
               add a deadline and create assignments in one guided workflow.
             </p>
           </div>
@@ -1024,12 +847,12 @@ export default function AssignmentWizardPage() {
 
           <p className="mt-2 text-sm leading-6 text-indigo-800">
             {interventionTopic
-              ? `Choose an appropriate task for ${interventionTopic}. The class containing the intervention student has been preselected where possible.`
-              : "Choose an appropriate reassessment task. The class containing the intervention student has been preselected where possible."}
+              ? `Choose an appropriate task for ${interventionTopic}. The class containing the intervention student has been preselected where possible. You can switch to Individual student(s) in Step 2 when targeted follow-up is required.`
+              : "Choose an appropriate reassessment task. The class containing the intervention student has been preselected where possible. You can switch to Individual student(s) in Step 2 when targeted follow-up is required."}
           </p>
 
           <p className="mt-2 text-xs font-semibold text-indigo-700">
-            This remains a class assignment. Return to the intervention impact review after new evidence is available.
+            Choose the intended recipients in Step 2, then return to the intervention impact review after new evidence is available.
           </p>
         </Card>
       )}
@@ -1053,19 +876,15 @@ export default function AssignmentWizardPage() {
       {step === "classes" && (
         <AssignmentClassStep
           classes={classes}
-          selectedClassIds={
-            wizardData.selectedClassIds
-          }
+          recipientMode={wizardData.recipientMode}
+          selectedClassIds={wizardData.selectedClassIds}
+          selectedStudentIds={wizardData.selectedStudentIds}
           loading={loadingClasses}
-          onToggleClass={
-            toggleClass
-          }
-          onBack={() =>
-            setStep("resource")
-          }
-          onNext={() =>
-            setStep("details")
-          }
+          onRecipientModeChange={changeRecipientMode}
+          onToggleClass={toggleClass}
+          onToggleStudent={toggleStudent}
+          onBack={() => setStep("resource")}
+          onNext={() => setStep("details")}
         />
       )}
 
@@ -1216,7 +1035,7 @@ function WizardProgress({
     },
     {
       id: "classes",
-      label: "Classes",
+      label: "Recipients",
     },
     {
       id: "details",

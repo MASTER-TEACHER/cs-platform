@@ -131,6 +131,13 @@ function validateInput(input: CreateExamAssignmentInput) {
       "The selected class has no enrolled students.",
     );
   }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (input.dueDate.getTime() < today.getTime()) {
+    throw new Error("The due date cannot be in the past.");
+  }
 }
 
 function sameCalendarDay(
@@ -190,6 +197,58 @@ export async function createExamAssignment(
 ): Promise<string> {
   validateInput(input);
 
+  const teacherId = input.teacherId.trim();
+  const classId = input.classId.trim();
+  const studentIds = Array.from(
+    new Set(
+      input.studentIds
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (studentIds.length === 0) {
+    throw new Error("Select at least one enrolled student.");
+  }
+
+  const classSnapshot = await getDoc(
+    doc(db, "classes", classId),
+  );
+
+  if (!classSnapshot.exists()) {
+    throw new Error("The selected class could not be found.");
+  }
+
+  const classData = classSnapshot.data();
+
+  if (
+    typeof classData.teacherId !== "string" ||
+    classData.teacherId.trim() !== teacherId
+  ) {
+    throw new Error("You cannot assign an exam to another teacher's class.");
+  }
+
+  const enrolledStudentIds = Array.from(
+    new Set(
+      (Array.isArray(classData.studentIds) ? classData.studentIds : [])
+        .filter(
+          (value: unknown): value is string => typeof value === "string",
+        )
+        .map((value: string) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const invalidRecipient = studentIds.find(
+    (studentId) => !enrolledStudentIds.includes(studentId),
+  );
+
+  if (invalidRecipient) {
+    throw new Error(
+      "One or more selected students are no longer enrolled in this class. Refresh the recipients and try again.",
+    );
+  }
+
   const existing =
     await findExistingExamAssignment(input);
 
@@ -199,22 +258,17 @@ export async function createExamAssignment(
     );
   }
 
-  const studentIds = Array.from(
-    new Set(
-      input.studentIds
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
-  );
-
   const reference = await addDoc(
     collection(db, "examAssignments"),
     {
-      teacherId: input.teacherId.trim(),
+      teacherId,
       teacherName:
         input.teacherName?.trim() || "Teacher",
-      classId: input.classId.trim(),
-      className: input.className.trim(),
+      classId,
+      className:
+        typeof classData.name === "string" && classData.name.trim()
+          ? classData.name.trim()
+          : input.className.trim(),
       studentIds,
       questionSetId: input.questionSetId.trim(),
       questionSetTitle:

@@ -4,9 +4,9 @@ import { auth } from "@/lib/firebase";
 
 import type {
   ExamAssignment,
+  ExamIntegrityIncidentType,
   ExamSubmission,
   StudentExamAnswer,
-  ExamIntegrityIncidentType,
 } from "@/types/examAssignment";
 
 type ApiResponse = {
@@ -53,6 +53,38 @@ async function authorisedRequest(
   return payload;
 }
 
+function convertSubmission(
+  submission: ExamSubmission,
+): ExamSubmission {
+  return {
+    ...submission,
+    startedAt: submission.startedAt
+      ? new Date(submission.startedAt)
+      : null,
+    submittedAt: submission.submittedAt
+      ? new Date(submission.submittedAt)
+      : null,
+    markedAt: submission.markedAt
+      ? new Date(submission.markedAt)
+      : null,
+    updatedAt: submission.updatedAt
+      ? new Date(submission.updatedAt)
+      : null,
+    integritySessionStartedAt:
+      submission.integritySessionStartedAt
+        ? new Date(submission.integritySessionStartedAt)
+        : null,
+    integrityIncidents: (submission.integrityIncidents || []).map(
+      (incident) => ({
+        ...incident,
+        occurredAt: incident.occurredAt
+          ? new Date(incident.occurredAt)
+          : null,
+      }),
+    ),
+  };
+}
+
 export async function getOrCreateStudentExamSubmission({
   assignment,
   studentName,
@@ -73,33 +105,49 @@ export async function getOrCreateStudentExamSubmission({
     throw new Error("The exam attempt could not be loaded.");
   }
 
-  return {
-    ...payload.submission,
-    startedAt: payload.submission.startedAt
-      ? new Date(payload.submission.startedAt)
-      : null,
-    submittedAt: payload.submission.submittedAt
-      ? new Date(payload.submission.submittedAt)
-      : null,
-    markedAt: payload.submission.markedAt
-      ? new Date(payload.submission.markedAt)
-      : null,
-    updatedAt: payload.submission.updatedAt
-      ? new Date(payload.submission.updatedAt)
-      : null,
-    integritySessionStartedAt:
-      payload.submission.integritySessionStartedAt
-        ? new Date(payload.submission.integritySessionStartedAt)
-        : null,
-    integrityIncidents: payload.submission.integrityIncidents.map(
-      (incident) => ({
-        ...incident,
-        occurredAt: incident.occurredAt
-          ? new Date(incident.occurredAt)
-          : null,
+  return convertSubmission(payload.submission);
+}
+
+export async function startStudentExamIntegritySession({
+  assignmentId,
+}: {
+  assignmentId: string;
+}): Promise<void> {
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error("You must be signed in.");
+  }
+
+  const idToken = await user.getIdToken();
+
+  const response = await fetch(
+    "/api/exam-assignments/start-integrity",
+    {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        assignmentId,
       }),
-    ),
-  };
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | {
+        ok?: boolean;
+        error?: string;
+      }
+    | null;
+
+  if (!response.ok || !payload?.ok) {
+    throw new Error(
+      payload?.error || "Exam Mode could not be started.",
+    );
+  }
 }
 
 export async function autosaveStudentExamAnswers({

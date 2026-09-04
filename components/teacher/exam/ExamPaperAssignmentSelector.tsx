@@ -191,12 +191,12 @@ export default function ExamPaperAssignmentSelector({
             Bank first, then return here.
           </p>
 
-          <a
+          <Link
             href="/teacher/exam-question-generator"
-            className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white"
+            className="mt-4 inline-flex rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-indigo-700"
           >
             Generate Exam Paper
-          </a>
+          </Link>
         </div>
       ) : (
         <div className="mt-6 grid gap-4 lg:grid-cols-2">

@@ -2,237 +2,372 @@
 
 import Link from "next/link";
 import {
+  useCallback,
   useEffect,
-  useEffectEvent,
   useMemo,
   useRef,
   useState,
 } from "react";
 import {
-  useParams,
-  useRouter,
-} from "next/navigation";
-import {
   AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Maximize2,
+  PauseCircle,
+  Save,
+  Send,
+  ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import {
+  useParams,
+} from "next/navigation";
 
-import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { getExamAssignmentById } from "@/services/examAssignmentService";
 import {
-  autosaveExamAnswers,
-  getOrCreateExamSubmission,
-  recordExamIntegrityIncident,
-  startExamIntegritySession,
-  submitExamSubmission,
-  terminateExamForIntegrity,
-  updateExamCurrentQuestion,
-} from "@/services/examSubmissionService";
+  autosaveStudentExamAnswers,
+  getOrCreateStudentExamSubmission,
+  recordStudentExamIntegrityIncident,
+  startStudentExamIntegritySession,
+  submitStudentExam,
+  terminateStudentExamForIntegrity,
+  updateStudentExamCurrentQuestion,
+} from "@/services/studentExamClientService";
+
 import type {
   ExamAssignment,
+  ExamIntegrityIncidentType,
+  ExamIntegrityPolicy,
   ExamSubmission,
   StudentExamAnswer,
 } from "@/types/examAssignment";
 
-function toStringList(
-  value: unknown,
-): string[] {
-  if (typeof value === "string") {
-    return value.trim()
-      ? [value.trim()]
-      : [];
+type Stage =
+  | "ready"
+  | "active"
+  | "complete";
+
+const FIVE_SECONDS = 5;
+
+function statusLabel(
+  submission: ExamSubmission,
+): string {
+  if (
+    submission.status ===
+    "marked"
+  ) {
+    return "Marked";
   }
 
-  if (!Array.isArray(value)) {
-    return [];
+  if (
+    submission.status ===
+    "marking"
+  ) {
+    return "Being marked";
   }
 
-  return value
-    .map((item) => {
-      if (
-        typeof item === "string"
-      ) {
-        return item.trim();
-      }
+  if (
+    submission.status ===
+    "submitted"
+  ) {
+    return submission.integrityTerminated
+      ? "Auto-submitted"
+      : "Submitted";
+  }
 
-      if (
-        item &&
-        typeof item === "object"
-      ) {
-        const candidate =
-          item as Record<
-            string,
-            unknown
-          >;
+  if (
+    submission.status ===
+    "in_progress"
+  ) {
+    return "In progress";
+  }
 
-        const text =
-          candidate.description ??
-          candidate.text ??
-          candidate.point;
-
-        return typeof text ===
-          "string"
-          ? text.trim()
-          : "";
-      }
-
-      return "";
-    })
-    .filter(Boolean);
+  return "Not started";
 }
 
-function getQuestionExtras(
-  question: unknown,
-) {
-  const candidate =
-    question as Record<
-      string,
-      unknown
-    >;
-
-  return {
-    examinerGuidance:
-      toStringList(
-        candidate.examinerGuidance,
-      ),
-
-    misconceptions:
-      toStringList(
-        candidate.misconceptions,
-      ),
-  };
+function isLocked(
+  submission: ExamSubmission,
+): boolean {
+  return [
+    "submitted",
+    "marking",
+    "marked",
+  ].includes(
+    submission.status,
+  );
 }
 
-export default function StudentExamPlayerPage() {
-  const params = useParams<{
-    assignmentId: string;
-  }>();
+function currentPolicy(
+  assignment: ExamAssignment,
+  submission: ExamSubmission,
+): ExamIntegrityPolicy {
+  return (
+    submission.integrityPolicySnapshot ||
+    assignment.integrityPolicy
+  );
+}
 
-  const router = useRouter();
+export default function StudentWrittenExamPage() {
+  const params =
+    useParams<{
+      assignmentId: string;
+    }>();
 
-  const { user } = useAuth();
+  const assignmentId =
+    typeof params.assignmentId ===
+    "string"
+      ? params.assignmentId
+      : "";
 
-  const examRootRef =
-    useRef<HTMLDivElement | null>(
-      null,
-    );
+  const {
+    user,
+    profile,
+    loading:
+      authLoading,
+  } =
+    useAuth();
 
-  const saveTimer =
-    useRef<ReturnType<
-      typeof setTimeout
-    > | null>(null);
-
-  const countdownTimer =
-    useRef<ReturnType<
-      typeof setInterval
-    > | null>(null);
-
-  const finishingRef =
-    useRef(false);
-
-  const fullscreenExitActiveRef =
-    useRef(false);
-
-  const [assignment, setAssignment] =
+  const [
+    assignment,
+    setAssignment,
+  ] =
     useState<ExamAssignment | null>(
       null,
     );
 
-  const [submission, setSubmission] =
+  const [
+    submission,
+    setSubmission,
+  ] =
     useState<ExamSubmission | null>(
       null,
     );
 
-  const [answers, setAnswers] =
-    useState<StudentExamAnswer[]>([]);
+  const [
+    answers,
+    setAnswers,
+  ] =
+    useState<StudentExamAnswer[]>(
+      [],
+    );
 
-  const [loading, setLoading] =
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] =
+    useState(0);
+
+  const [
+    stage,
+    setStage,
+  ] =
+    useState<Stage>(
+      "ready",
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [saving, setSaving] =
+  const [
+    error,
+    setError,
+  ] =
+    useState("");
+
+  const [
+    saving,
+    setSaving,
+  ] =
     useState(false);
 
   const [
-    integrityStarted,
-    setIntegrityStarted,
-  ] = useState(false);
+    submitting,
+    setSubmitting,
+  ] =
+    useState(false);
 
   const [
-    activeQuestionNumber,
-    setActiveQuestionNumber,
-  ] = useState<number | null>(
-    null,
-  );
+    paused,
+    setPaused,
+  ] =
+    useState(false);
 
   const [
-    fullscreenCountdown,
-    setFullscreenCountdown,
-  ] = useState<number | null>(
-    null,
-  );
+    warning,
+    setWarning,
+  ] =
+    useState("");
 
   const [
-    integrityPaused,
-    setIntegrityPaused,
-  ] = useState(false);
+    countdown,
+    setCountdown,
+  ] =
+    useState<number | null>(
+      null,
+    );
 
-  const [
-    integrityWarning,
-    setIntegrityWarning,
-  ] = useState("");
+  const answersRef =
+    useRef<
+      StudentExamAnswer[]
+    >([]);
 
-  const locked = submission
-    ? [
-        "submitted",
-        "marking",
-        "marked",
-      ].includes(
-        submission.status,
-      )
-    : false;
+  const currentQuestionRef =
+    useRef<number | null>(
+      null,
+    );
+
+  const activeRef =
+    useRef(false);
+
+  const terminatingRef =
+    useRef(false);
+
+  const submittingRef =
+    useRef(false);
+
+  const lastIncidentRef =
+    useRef<{
+      key: string;
+      at: number;
+    } | null>(null);
+
+  const fullscreenOutRef =
+    useRef(false);
+
+  const pageHiddenRef =
+    useRef(false);
+
+  const countdownIntervalRef =
+    useRef<number | null>(
+      null,
+    );
+
+  const countdownTimeoutRef =
+    useRef<number | null>(
+      null,
+    );
 
   useEffect(() => {
+    answersRef.current =
+      answers;
+  }, [
+    answers,
+  ]);
+
+  useEffect(() => {
+    activeRef.current =
+      stage ===
+      "active";
+  }, [
+    stage,
+  ]);
+
+  const questions =
+    assignment?.questionSetSnapshot
+      .questions || [];
+
+  const currentQuestion =
+    questions[
+      currentIndex
+    ] || null;
+
+  useEffect(() => {
+    currentQuestionRef.current =
+      currentQuestion
+        ?.questionNumber ??
+      null;
+  }, [
+    currentQuestion,
+  ]);
+
+  useEffect(() => {
+    let cancelled =
+      false;
+
     async function load() {
-      if (!user?.uid) {
-        setLoading(false);
+      if (
+        authLoading
+      ) {
+        return;
+      }
+
+      if (
+        !user?.uid ||
+        !assignmentId
+      ) {
+        if (
+          !cancelled
+        ) {
+          setError(
+            "A signed-in student account and valid exam assignment are required.",
+          );
+
+          setLoading(
+            false,
+          );
+        }
+
         return;
       }
 
       try {
+        setLoading(
+          true,
+        );
+
+        setError(
+          "",
+        );
+
         const loadedAssignment =
           await getExamAssignmentById(
-            params.assignmentId,
+            assignmentId,
           );
 
         if (
-          !loadedAssignment ||
+          !loadedAssignment
+        ) {
+          throw new Error(
+            "This written exam could not be found.",
+          );
+        }
+
+        if (
           !loadedAssignment.studentIds.includes(
             user.uid,
           )
         ) {
-          return;
+          throw new Error(
+            "This written exam is not assigned to your account.",
+          );
         }
 
         const loadedSubmission =
-          await getOrCreateExamSubmission(
+          await getOrCreateStudentExamSubmission(
             {
               assignment:
                 loadedAssignment,
-
-              studentId:
-                user.uid,
-
               studentName:
-                user.displayName ||
+                profile?.name ||
                 "Student",
-
               studentEmail:
-                user.email || "",
+                user.email ||
+                "",
             },
           );
+
+        if (
+          cancelled
+        ) {
+          return;
+        }
 
         setAssignment(
           loadedAssignment,
@@ -246,746 +381,1288 @@ export default function StudentExamPlayerPage() {
           loadedSubmission.answers,
         );
 
-        setActiveQuestionNumber(
-          loadedSubmission.integrityLastQuestionNumber,
-        );
-      } catch (error) {
-        console.error(
-          "Unable to load written assessment:",
-          error,
+        const lastQuestionNumber =
+          loadedSubmission.integrityLastQuestionNumber;
+
+        const resumeIndex =
+          lastQuestionNumber
+            ? Math.max(
+                0,
+                loadedAssignment.questionSetSnapshot.questions.findIndex(
+                  (
+                    question,
+                  ) =>
+                    question.questionNumber ===
+                    lastQuestionNumber,
+                ),
+              )
+            : 0;
+
+        setCurrentIndex(
+          resumeIndex,
         );
 
-        toast.error(
-          "The written assessment could not be loaded.",
+        setStage(
+          isLocked(
+            loadedSubmission,
+          )
+            ? "complete"
+            : "ready",
         );
+      } catch (
+        caughtError
+      ) {
+        console.error(
+          "Unable to load written exam:",
+          caughtError,
+        );
+
+        if (
+          !cancelled
+        ) {
+          setError(
+            caughtError instanceof
+              Error
+              ? caughtError.message
+              : "The written exam could not be loaded.",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (
+          !cancelled
+        ) {
+          setLoading(
+            false,
+          );
+        }
       }
     }
 
     void load();
+
+    return () => {
+      cancelled =
+        true;
+    };
   }, [
-    params.assignmentId,
-    user?.uid,
-    user?.displayName,
+    assignmentId,
+    authLoading,
+    profile?.name,
     user?.email,
+    user?.uid,
   ]);
 
-  useEffect(() => {
-    return () => {
-      if (saveTimer.current) {
-        clearTimeout(
-          saveTimer.current,
-        );
-      }
-
-      if (
-        countdownTimer.current
-      ) {
-        clearInterval(
-          countdownTimer.current,
-        );
-      }
-    };
-  }, []);
-
-  const answeredCount =
+  const policy =
     useMemo(
       () =>
-        answers.filter(
-          (answer) =>
-            answer.response.trim()
-              .length > 0,
-        ).length,
-      [answers],
+        assignment &&
+        submission
+          ? currentPolicy(
+              assignment,
+              submission,
+            )
+          : null,
+      [
+        assignment,
+        submission,
+      ],
     );
 
-  async function logIncident(
-    type:
-      | "fullscreen_exit"
-      | "fullscreen_restored"
-      | "page_hidden"
-      | "page_visible",
-    detail: string,
-  ) {
-    if (
-      !assignment ||
-      !user?.uid
-    ) {
-      return;
-    }
+  const clearFullscreenCountdown =
+    useCallback(
+      () => {
+        if (
+          countdownIntervalRef.current !==
+          null
+        ) {
+          window.clearInterval(
+            countdownIntervalRef.current,
+          );
 
-    try {
-      await recordExamIntegrityIncident(
-        {
-          assignmentId:
-            assignment.id,
+          countdownIntervalRef.current =
+            null;
+        }
 
-          studentId: user.uid,
+        if (
+          countdownTimeoutRef.current !==
+          null
+        ) {
+          window.clearTimeout(
+            countdownTimeoutRef.current,
+          );
 
+          countdownTimeoutRef.current =
+            null;
+        }
+
+        setCountdown(
+          null,
+        );
+      },
+      [],
+    );
+
+  const recordIncident =
+    useCallback(
+      async (
+        type: ExamIntegrityIncidentType,
+        detail: string,
+      ) => {
+        if (
+          !assignmentId ||
+          !activeRef.current
+        ) {
+          return;
+        }
+
+        const questionNumber =
+          currentQuestionRef.current;
+
+        const key = [
           type,
-
-          questionNumber:
-            activeQuestionNumber,
-
+          questionNumber ?? "none",
           detail,
-        },
-      );
-    } catch (error) {
-      /*
-       * The exam should remain usable even if an incident log write fails.
-       * Autosave/submission errors are handled separately.
-       */
-      console.error(
-        "Unable to record integrity incident:",
-        error,
-      );
-    }
-  }
+        ].join("|");
 
-  async function terminateForIntegrity(
-    reason: string,
-  ) {
-    if (
-      !assignment ||
-      !user?.uid ||
-      finishingRef.current ||
-      locked
-    ) {
-      return;
-    }
+        const now = Date.now();
+        const previous =
+          lastIncidentRef.current;
 
-    finishingRef.current = true;
+        /*
+         * Browser fullscreen/visibility APIs can occasionally emit the
+         * same event more than once during a single transition. Suppress
+         * only exact duplicates inside a very small window so genuine
+         * later incidents are still preserved.
+         */
+        if (
+          previous?.key === key &&
+          now - previous.at < 750
+        ) {
+          return;
+        }
 
-    if (
-      countdownTimer.current
-    ) {
-      clearInterval(
-        countdownTimer.current,
-      );
-      countdownTimer.current =
-        null;
-    }
+        lastIncidentRef.current = {
+          key,
+          at: now,
+        };
 
-    setFullscreenCountdown(
-      null,
+        try {
+          await recordStudentExamIntegrityIncident(
+            {
+              assignmentId,
+              type,
+              questionNumber,
+              detail,
+            },
+          );
+        } catch (
+          caughtError
+        ) {
+          /*
+           * A record request may legitimately lose a race with
+           * a final submit/termination. Do not destabilise the
+           * candidate UI after the attempt has already locked.
+           */
+          if (
+            !terminatingRef.current &&
+            !submittingRef.current
+          ) {
+            console.error(
+              "Unable to record exam integrity incident:",
+              caughtError,
+            );
+          }
+        }
+      },
+      [
+        assignmentId,
+      ],
     );
 
-    setSaving(true);
-
-    try {
-      await terminateExamForIntegrity(
-        {
-          assignmentId:
-            assignment.id,
-
-          studentId:
-            user.uid,
-
-          answers,
-
-          questionNumber:
-            activeQuestionNumber,
-
-          reason,
-        },
-      );
-
-      setSubmission(
-        (current) =>
-          current
-            ? {
-                ...current,
-                status:
-                  "submitted",
-
-                answers,
-
-                integrityTerminated:
-                  true,
-
-                integrityTerminationReason:
-                  reason,
-              }
-            : current,
-      );
-
-      if (
-        document.fullscreenElement
-      ) {
-        await document
-          .exitFullscreen()
-          .catch(() => undefined);
-      }
-
-      toast.error(
-        "Exam terminated and submitted because the integrity rule was triggered.",
-      );
-    } catch (error) {
-      console.error(
-        "Integrity termination failed:",
-        error,
-      );
-
-      finishingRef.current =
-        false;
-
-      toast.error(
-        "The exam could not be submitted automatically. Please contact your teacher.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function beginFullscreenCountdown() {
-    if (
-      fullscreenExitActiveRef.current ||
-      !assignment ||
-      locked ||
-      finishingRef.current
-    ) {
-      return;
-    }
-
-    fullscreenExitActiveRef.current =
-      true;
-
-    const seconds =
-      assignment.integrityPolicy
-        .fullscreenExitCountdownSeconds;
-
-    setFullscreenCountdown(
-      seconds,
+  const leaveFullscreen =
+    useCallback(
+      async () => {
+        if (
+          document.fullscreenElement
+        ) {
+          try {
+            await document.exitFullscreen();
+          } catch {
+            // Browser may already be leaving fullscreen.
+          }
+        }
+      },
+      [],
     );
 
-    void logIncident(
-      "fullscreen_exit",
-      `Fullscreen was exited. A ${seconds}-second return countdown started.`,
-    );
+  const terminateNow =
+    useCallback(
+      async (
+        reason: string,
+        alreadyClaimed = false,
+      ) => {
+        if (
+          !assignmentId ||
+          (
+            terminatingRef.current &&
+            !alreadyClaimed
+          ) ||
+          submittingRef.current ||
+          !activeRef.current
+        ) {
+          return;
+        }
 
-    let remaining = seconds;
+        terminatingRef.current =
+          true;
 
-    countdownTimer.current =
-      setInterval(() => {
-        remaining -= 1;
-
-        setFullscreenCountdown(
-          Math.max(
-            remaining,
-            0,
-          ),
+        setSubmitting(
+          true,
         );
 
-        if (remaining <= 0) {
-          if (
-            countdownTimer.current
-          ) {
-            clearInterval(
-              countdownTimer.current,
+        setWarning(
+          reason,
+        );
+
+        clearFullscreenCountdown();
+
+        try {
+          await terminateStudentExamForIntegrity(
+            {
+              assignmentId,
+              answers:
+                answersRef.current,
+              questionNumber:
+                currentQuestionRef.current,
+              reason,
+            },
+          );
+
+          /*
+           * The termination service writes the authoritative integrity
+           * incident list in Firestore. Re-read the locked submission before
+           * rendering the completion screen so the learner sees the same
+           * incident count as the teacher dashboard.
+           */
+          const refreshedSubmission =
+            assignment
+              ? await getOrCreateStudentExamSubmission(
+                  {
+                    assignment,
+                    studentName:
+                      profile?.name ||
+                      "Student",
+                    studentEmail:
+                      user?.email ||
+                      "",
+                  },
+                )
+              : null;
+
+          activeRef.current =
+            false;
+
+          if (refreshedSubmission) {
+            setSubmission(
+              refreshedSubmission,
             );
-            countdownTimer.current =
-              null;
+
+            setAnswers(
+              refreshedSubmission.answers,
+            );
+
+            answersRef.current =
+              refreshedSubmission.answers;
+          } else {
+            setSubmission(
+              (
+                current,
+              ) =>
+                current
+                  ? {
+                      ...current,
+                      status:
+                        "submitted",
+                      answers:
+                        answersRef.current,
+                      integrityTerminated:
+                        true,
+                      integrityTerminationReason:
+                        reason,
+                      submittedAt:
+                        new Date(),
+                    }
+                  : current,
+            );
           }
 
-          void terminateForIntegrity(
-            "The learner exited fullscreen and did not return within 5 seconds.",
+          setStage(
+            "complete",
+          );
+
+          await leaveFullscreen();
+        } catch (
+          caughtError
+        ) {
+          console.error(
+            "Automatic exam termination failed:",
+            caughtError,
+          );
+
+          setError(
+            "CS Master could not complete the automatic exam submission. Keep this page open and tell your teacher immediately.",
+          );
+
+          terminatingRef.current =
+            false;
+        } finally {
+          setSubmitting(
+            false,
           );
         }
-      }, 1000);
-  }
-
-  function resolveFullscreenExit() {
-    if (
-      !fullscreenExitActiveRef.current
-    ) {
-      return;
-    }
-
-    fullscreenExitActiveRef.current =
-      false;
-
-    if (
-      countdownTimer.current
-    ) {
-      clearInterval(
-        countdownTimer.current,
-      );
-
-      countdownTimer.current =
-        null;
-    }
-
-    setFullscreenCountdown(
-      null,
+      },
+      [
+  assignment,
+  assignmentId,
+  clearFullscreenCountdown,
+  leaveFullscreen,
+  profile,
+  user,
+],
     );
 
-    void logIncident(
-      "fullscreen_restored",
-      "Fullscreen was restored before the five-second termination countdown expired.",
+  const beginFullscreenCountdown =
+    useCallback(
+      () => {
+        clearFullscreenCountdown();
+
+        const duration =
+          policy?.fullscreenExitCountdownSeconds ||
+          FIVE_SECONDS;
+
+        const startedAt =
+          Date.now();
+
+        setCountdown(
+          duration,
+        );
+
+        countdownIntervalRef.current =
+          window.setInterval(
+            () => {
+              const elapsed =
+                Math.floor(
+                  (
+                    Date.now() -
+                    startedAt
+                  ) /
+                    1000,
+                );
+
+              const remaining =
+                Math.max(
+                  0,
+                  duration -
+                    elapsed,
+                );
+
+              setCountdown(
+                remaining,
+              );
+            },
+            200,
+          );
+
+        countdownTimeoutRef.current =
+          window.setTimeout(
+            () => {
+              clearFullscreenCountdown();
+
+              void terminateNow(
+                "The exam was automatically submitted because fullscreen was not restored within 5 seconds.",
+              );
+            },
+            duration *
+              1000,
+          );
+      },
+      [
+        clearFullscreenCountdown,
+        policy?.fullscreenExitCountdownSeconds,
+        terminateNow,
+      ],
     );
-  }
 
-  const handleExamFullscreenChange = useEffectEvent(() => {
+  useEffect(() => {
     if (
-      finishingRef.current
+      stage !==
+        "active" ||
+      !policy?.enabled
     ) {
       return;
     }
 
-    if (
-      document.fullscreenElement ===
-      examRootRef.current
-    ) {
-      resolveFullscreenExit();
-    } else {
-      beginFullscreenCountdown();
-    }
-  });
+    /*
+     * Capture the already-validated policy for the event-handler
+     * closures below. TypeScript cannot preserve optional-value
+     * narrowing across nested callbacks, even though this effect
+     * returns early when policy is null/disabled.
+     */
+    const activePolicy = policy;
 
-  const handleExamVisibilityChange = useEffectEvent(() => {
-    if (
-      finishingRef.current ||
-      !assignment
-        ?.integrityPolicy
-        .monitorPageVisibility
-    ) {
-      return;
-    }
+    function handleFullscreenChange() {
+      if (
+        !activeRef.current ||
+        terminatingRef.current ||
+        submittingRef.current ||
+        !activePolicy.fullscreenRequired
+      ) {
+        return;
+      }
 
-    if (
-      document.visibilityState ===
-      "hidden"
-    ) {
-      void logIncident(
-        "page_hidden",
-        "The exam page became hidden.",
-      );
-
-      const action =
-        assignment
-          .integrityPolicy
-          .visibilityAction;
+      const isFullscreen =
+        Boolean(
+          document.fullscreenElement,
+        );
 
       if (
-        action ===
-        "auto_submit"
+        !isFullscreen &&
+        !fullscreenOutRef.current
       ) {
-        void terminateForIntegrity(
-          "The exam page became hidden and the teacher configured immediate automatic submission.",
+        fullscreenOutRef.current =
+          true;
+
+        setWarning(
+          "Fullscreen was exited. Return now to keep the exam active.",
         );
+
+        void recordIncident(
+          "fullscreen_exit",
+          "The learner exited fullscreen during the monitored exam.",
+        );
+
+        beginFullscreenCountdown();
 
         return;
       }
 
-      if (action === "pause") {
-        setIntegrityPaused(
-          true,
+      if (
+        isFullscreen &&
+        fullscreenOutRef.current
+      ) {
+        fullscreenOutRef.current =
+          false;
+
+        clearFullscreenCountdown();
+
+        setWarning(
+          "",
         );
-      } else {
-        setIntegrityWarning(
-          "The exam page was hidden. This incident has been recorded.",
+
+        void recordIncident(
+          "fullscreen_restored",
+          "The learner returned to fullscreen before the termination countdown expired.",
         );
       }
-    } else {
-      void logIncident(
-        "page_visible",
-        "The exam page became visible again.",
-      );
-    }
-  });
-
-  useEffect(() => {
-    if (
-      !assignment ||
-      !user?.uid ||
-      locked ||
-      !integrityStarted ||
-      !assignment.integrityPolicy
-        .enabled
-    ) {
-      return;
     }
 
-    function onFullscreenChange() {
-      handleExamFullscreenChange();
-    }
+    function handleVisibilityChange() {
+      if (
+        !activeRef.current ||
+        terminatingRef.current ||
+        submittingRef.current ||
+        !activePolicy.monitorPageVisibility
+      ) {
+        return;
+      }
 
-    function onVisibilityChange() {
-      handleExamVisibilityChange();
+      if (
+        document.visibilityState ===
+        "hidden"
+      ) {
+        if (
+          pageHiddenRef.current
+        ) {
+          return;
+        }
+
+        pageHiddenRef.current =
+          true;
+
+        const hiddenDetail =
+          "The exam page became hidden during the monitored attempt.";
+
+        /*
+         * Auto-submit claims finalisation immediately. This prevents a
+         * near-simultaneous fullscreenchange event from starting its own
+         * countdown/termination path while page visibility termination
+         * is already in progress.
+         *
+         * The terminate request already contains the latest answers, so
+         * do not launch a separate autosave request in this branch.
+         */
+        if (
+          activePolicy.visibilityAction ===
+          "auto_submit"
+        ) {
+          const reason =
+            "The exam was automatically submitted because the exam page became hidden and the teacher policy was set to auto-submit.";
+
+          terminatingRef.current =
+            true;
+
+          clearFullscreenCountdown();
+
+          setWarning(
+            reason,
+          );
+
+          void (async () => {
+            await recordIncident(
+              "page_hidden",
+              hiddenDetail,
+            );
+
+            await terminateNow(
+              reason,
+              true,
+            );
+          })();
+
+          return;
+        }
+
+        /*
+         * Warn/pause policies keep the attempt live, so persist the
+         * latest answer state before recording the visibility incident.
+         */
+        void autosaveStudentExamAnswers(
+          {
+            assignmentId,
+            answers:
+              answersRef.current,
+          },
+        ).catch(
+          () => undefined,
+        );
+
+        void (async () => {
+          await recordIncident(
+            "page_hidden",
+            hiddenDetail,
+          );
+
+          if (
+            activePolicy.visibilityAction ===
+            "pause"
+          ) {
+            setPaused(
+              true,
+            );
+
+            setWarning(
+              "The exam was paused because the exam page became hidden. Resume is required.",
+            );
+
+            return;
+          }
+
+          setWarning(
+            "A page-visibility warning was recorded. Stay on the exam page.",
+          );
+        })();
+
+        return;
+      }
+
+      if (
+        pageHiddenRef.current
+      ) {
+        pageHiddenRef.current =
+          false;
+
+        void recordIncident(
+          "page_visible",
+          "The learner returned to the visible exam page.",
+        );
+      }
     }
 
     document.addEventListener(
       "fullscreenchange",
-      onFullscreenChange,
+      handleFullscreenChange,
     );
 
     document.addEventListener(
       "visibilitychange",
-      onVisibilityChange,
+      handleVisibilityChange,
     );
 
     return () => {
       document.removeEventListener(
         "fullscreenchange",
-        onFullscreenChange,
+        handleFullscreenChange,
       );
 
       document.removeEventListener(
         "visibilitychange",
-        onVisibilityChange,
+        handleVisibilityChange,
       );
     };
   }, [
-    assignment,
-    integrityStarted,
-    locked,
-    user?.uid,
+    assignmentId,
+    beginFullscreenCountdown,
+    clearFullscreenCountdown,
+    policy,
+    recordIncident,
+    stage,
+    terminateNow,
   ]);
 
-  async function enterExamMode() {
+  useEffect(() => {
+    if (
+      stage !==
+        "active" ||
+      paused ||
+      !assignmentId ||
+      terminatingRef.current ||
+      submittingRef.current
+    ) {
+      return;
+    }
+
+    const timer =
+      window.setTimeout(
+        () => {
+          if (
+            !activeRef.current ||
+            terminatingRef.current ||
+            submittingRef.current
+          ) {
+            return;
+          }
+
+          setSaving(
+            true,
+          );
+
+          void autosaveStudentExamAnswers(
+            {
+              assignmentId,
+              answers,
+            },
+          )
+            .catch(
+              (
+                caughtError,
+              ) => {
+                console.error(
+                  "Exam autosave failed:",
+                  caughtError,
+                );
+              },
+            )
+            .finally(
+              () => {
+                setSaving(
+                  false,
+                );
+              },
+            );
+        },
+        800,
+      );
+
+    return () => {
+      window.clearTimeout(
+        timer,
+      );
+    };
+  }, [
+    answers,
+    assignmentId,
+    paused,
+    stage,
+  ]);
+
+  useEffect(() => {
+    if (
+      stage !==
+        "active" ||
+      !currentQuestion ||
+      !assignmentId
+    ) {
+      return;
+    }
+
+    void updateStudentExamCurrentQuestion(
+      {
+        assignmentId,
+        questionNumber:
+          currentQuestion.questionNumber,
+      },
+    ).catch(
+      (
+        caughtError,
+      ) => {
+        console.error(
+          "Unable to update current exam question:",
+          caughtError,
+        );
+      },
+    );
+  }, [
+    assignmentId,
+    currentQuestion,
+    stage,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearFullscreenCountdown();
+    };
+  }, [
+    clearFullscreenCountdown,
+  ]);
+
+  async function requestExamFullscreen() {
+    if (
+      document.fullscreenElement
+    ) {
+      return;
+    }
+
+    if (
+      !document.documentElement.requestFullscreen
+    ) {
+      throw new Error(
+        "This browser does not support the fullscreen Exam Mode requirement.",
+      );
+    }
+
+    await document.documentElement.requestFullscreen();
+  }
+
+  async function startExam() {
     if (
       !assignment ||
-      !user?.uid ||
-      !examRootRef.current
+      !submission ||
+      !policy ||
+      !assignmentId
     ) {
       return;
     }
 
-    if (
-      !assignment.integrityPolicy
-        .enabled
-    ) {
-      setIntegrityStarted(
-        true,
-      );
-      return;
-    }
+    setError(
+      "",
+    );
 
-    if (
-      !document.fullscreenEnabled
-    ) {
-      toast.error(
-        "Fullscreen is not available in this browser. Ask your teacher for support.",
-      );
-      return;
-    }
+    setWarning(
+      "",
+    );
 
     try {
-      await examRootRef.current.requestFullscreen();
+      /*
+       * requestFullscreen must stay inside the student's click
+       * gesture. Do it before the network start call.
+       */
+      if (
+        policy.enabled &&
+        policy.fullscreenRequired
+      ) {
+        await requestExamFullscreen();
+      }
 
-      await startExamIntegritySession(
+      await startStudentExamIntegritySession(
         {
-          assignment,
-          studentId:
-            user.uid,
+          assignmentId,
         },
       );
 
-      setIntegrityStarted(
-        true,
-      );
-
-      setIntegrityPaused(
-        false,
-      );
-
-      setIntegrityWarning(
-        "",
-      );
-
-      finishingRef.current =
+      fullscreenOutRef.current =
         false;
 
-      toast.success(
-        "Exam Mode started.",
-      );
-    } catch (error) {
-      console.error(
-        "Unable to enter Exam Mode:",
-        error,
-      );
+      pageHiddenRef.current =
+        false;
 
-      toast.error(
-        "Fullscreen Exam Mode could not be started.",
-      );
-    }
-  }
+      terminatingRef.current =
+        false;
 
-  async function resumePausedExam() {
-    if (
-      !examRootRef.current
-    ) {
-      return;
-    }
+      submittingRef.current =
+        false;
 
-    try {
-      if (
-        document.fullscreenElement !==
-        examRootRef.current
-      ) {
-        await examRootRef.current.requestFullscreen();
-      }
+      lastIncidentRef.current =
+        null;
 
-      setIntegrityPaused(
+      setPaused(
         false,
       );
 
-      setIntegrityWarning(
-        "",
+      setSubmission(
+        {
+          ...submission,
+          status:
+            "in_progress",
+          integrityPolicySnapshot:
+            policy,
+          integritySessionStartedAt:
+            submission.integritySessionStartedAt ||
+            new Date(),
+          startedAt:
+            submission.startedAt ||
+            new Date(),
+        },
       );
-    } catch {
-      toast.error(
-        "Return to fullscreen to resume the exam.",
+
+      setStage(
+        "active",
+      );
+    } catch (
+      caughtError
+    ) {
+      await leaveFullscreen();
+
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Exam Mode could not be started.",
       );
     }
   }
 
-  function updateResponse(
-    questionId: string,
+  function updateAnswer(
     response: string,
   ) {
     if (
-      !assignment ||
-      !user?.uid ||
-      locked ||
-      integrityPaused
+      !currentQuestion
     ) {
       return;
     }
 
-    const nextAnswers =
-      answers.map((answer) =>
-        answer.questionId ===
-        questionId
-          ? {
-              ...answer,
-              response,
-            }
-          : answer,
+    const next =
+      answersRef.current.map(
+        (
+          answer,
+        ) =>
+          answer.questionId ===
+          currentQuestion.id
+            ? {
+                ...answer,
+                response,
+              }
+            : answer,
       );
+
+    answersRef.current =
+      next;
 
     setAnswers(
-      nextAnswers,
+      next,
     );
-
-    if (saveTimer.current) {
-      clearTimeout(
-        saveTimer.current,
-      );
-    }
-
-    saveTimer.current =
-      setTimeout(() => {
-        void autosaveExamAnswers(
-          assignment.id,
-          user.uid,
-          nextAnswers,
-        ).catch((error) => {
-          console.error(error);
-
-          toast.error(
-            "Autosave failed.",
-          );
-        });
-      }, 900);
-  }
-
-  function focusQuestion(
-    questionNumber: number,
-  ) {
-    setActiveQuestionNumber(
-      questionNumber,
-    );
-
-    if (
-      assignment &&
-      user?.uid
-    ) {
-      void updateExamCurrentQuestion(
-        {
-          assignmentId:
-            assignment.id,
-
-          studentId: user.uid,
-
-          questionNumber,
-        },
-      ).catch(
-        (error) =>
-          console.error(
-            "Unable to store current question:",
-            error,
-          ),
-      );
-    }
   }
 
   async function saveNow() {
     if (
-      !assignment ||
-      !user?.uid ||
-      locked
+      !assignmentId ||
+      stage !==
+        "active"
     ) {
       return;
     }
 
-    setSaving(true);
-
     try {
-      await autosaveExamAnswers(
-        assignment.id,
-        user.uid,
-        answers,
+      setSaving(
+        true,
       );
 
-      toast.success(
-        "Answers saved.",
+      await autosaveStudentExamAnswers(
+        {
+          assignmentId,
+          answers:
+            answersRef.current,
+        },
       );
-    } catch (error) {
-      console.error(error);
 
-      toast.error(
-        "Answers could not be saved.",
+      setWarning(
+        "Responses saved.",
+      );
+
+      window.setTimeout(
+        () => {
+          setWarning(
+            (
+              current,
+            ) =>
+              current ===
+              "Responses saved."
+                ? ""
+                : current,
+          );
+        },
+        1200,
+      );
+    } catch (
+      caughtError
+    ) {
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Responses could not be saved.",
       );
     } finally {
-      setSaving(false);
+      setSaving(
+        false,
+      );
     }
   }
 
-  async function submit() {
+  async function submitNormally() {
     if (
+      !assignmentId ||
       !assignment ||
-      !user?.uid ||
-      locked
+      submittingRef.current ||
+      terminatingRef.current ||
+      stage !== "active"
     ) {
       return;
     }
 
-    if (
-      !window.confirm(
-        "Submit this assessment? You will not be able to edit it afterwards.",
-      )
-    ) {
+    const confirmed =
+      window.confirm(
+        "Submit this written exam now? You will not be able to change your answers afterwards.",
+      );
+
+    if (!confirmed) {
       return;
     }
 
-    finishingRef.current =
-      true;
+    submittingRef.current = true;
 
-    setSaving(true);
+    setSubmitting(
+      true,
+    );
+
+    setError(
+      "",
+    );
+
+    clearFullscreenCountdown();
 
     try {
-      await autosaveExamAnswers(
-        assignment.id,
-        user.uid,
-        answers,
+      /*
+       * Persist the candidate's latest answer state before locking
+       * the submission.
+       */
+      await autosaveStudentExamAnswers(
+        {
+          assignmentId,
+          answers:
+            answersRef.current,
+        },
       );
 
-      await submitExamSubmission(
-        assignment.id,
-        user.uid,
+      /*
+       * The server is authoritative for submission state and
+       * integrity evidence.
+       */
+      await submitStudentExam(
+        {
+          assignmentId,
+        },
       );
 
-      setSubmission(
-        (current) =>
-          current
-            ? {
-                ...current,
-                status:
-                  "submitted",
-                answers,
-              }
-            : current,
-      );
-
-      if (
-        document.fullscreenElement
-      ) {
-        await document
-          .exitFullscreen()
-          .catch(
-            () => undefined,
-          );
-      }
-
-      toast.success(
-        "Assessment submitted.",
-      );
-
-      router.push(
-        "/exam",
-      );
-    } catch (error) {
-      console.error(error);
-
-      finishingRef.current =
+      /*
+       * Stop monitoring before rendering the completion state.
+       * submittingRef already prevents fullscreen/visibility
+       * handlers from recording new incidents during finalisation.
+       */
+      activeRef.current =
         false;
 
-      toast.error(
-        "Assessment could not be submitted.",
+      /*
+       * Re-read the locked server submission.
+       *
+       * Integrity incidents are written independently while the
+       * monitored attempt is active. The previous implementation
+       * only changed the local status to "submitted", leaving the
+       * learner completion screen with an old integrityIncidents
+       * array even though the teacher dashboard correctly saw the
+       * authoritative Firestore events.
+       *
+       * This mirrors the already-hardened automatic termination
+       * flow so both normal and integrity-triggered submissions
+       * display the same server evidence.
+       */
+      const refreshedSubmission =
+        await getOrCreateStudentExamSubmission(
+          {
+            assignment,
+            studentName:
+              profile?.name ||
+              "Student",
+            studentEmail:
+              user?.email ||
+              "",
+          },
+        );
+
+      setSubmission(
+        refreshedSubmission,
+      );
+
+      setAnswers(
+        refreshedSubmission.answers,
+      );
+
+      answersRef.current =
+        refreshedSubmission.answers;
+
+      setStage(
+        "complete",
+      );
+
+      await leaveFullscreen();
+    } catch (
+      caughtError
+    ) {
+      /*
+       * If finalisation itself failed, allow another submission
+       * attempt. A successfully locked server attempt remains
+       * idempotent, so retrying is safe.
+       */
+      submittingRef.current =
+        false;
+
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "The exam could not be submitted.",
       );
     } finally {
-      setSaving(false);
+      setSubmitting(
+        false,
+      );
+    }
+  }
+  async function returnToFullscreen() {
+    try {
+      await requestExamFullscreen();
+    } catch (
+      caughtError
+    ) {
+      setError(
+        caughtError instanceof
+          Error
+          ? caughtError.message
+          : "Fullscreen could not be restored.",
+      );
     }
   }
 
-  if (loading) {
+  async function resumeAfterPause() {
+    if (
+      policy?.enabled &&
+      policy.fullscreenRequired &&
+      !document.fullscreenElement
+    ) {
+      try {
+        await requestExamFullscreen();
+      } catch (
+        caughtError
+      ) {
+        setError(
+          caughtError instanceof
+            Error
+            ? caughtError.message
+            : "Fullscreen must be restored before the exam can resume.",
+        );
+
+        return;
+      }
+    }
+
+    setPaused(
+      false,
+    );
+
+    setWarning(
+      "",
+    );
+  }
+
+  if (
+    authLoading ||
+    loading
+  ) {
     return (
-      <Skeleton className="h-96" />
+      <div className="mx-auto max-w-6xl space-y-6 p-6">
+        <Skeleton className="h-48 rounded-3xl" />
+        <Skeleton className="h-[520px] rounded-3xl" />
+      </div>
+    );
+  }
+
+  if (
+    error &&
+    (
+      !assignment ||
+      !submission
+    )
+  ) {
+    return (
+      <main className="min-h-screen bg-slate-100 p-6">
+        <div className="mx-auto max-w-2xl rounded-3xl border border-red-200 bg-white p-8 shadow-sm">
+          <AlertTriangle className="h-10 w-10 text-red-600" />
+
+          <h1 className="mt-4 text-3xl font-black text-slate-950">
+            Written exam unavailable
+          </h1>
+
+          <p className="mt-3 text-slate-600">
+            {error}
+          </p>
+
+          <Link
+            href="/exam"
+            className="mt-6 inline-flex rounded-xl bg-indigo-700 px-5 py-3 font-black text-white"
+          >
+            Return to Exam Mode
+          </Link>
+        </div>
+      </main>
     );
   }
 
   if (
     !assignment ||
-    !submission
+    !submission ||
+    !policy
+  ) {
+    return null;
+  }
+
+  if (
+    stage ===
+    "complete"
   ) {
     return (
-      <Card>
-        <h1 className="text-2xl font-black text-slate-950">
-          Assessment unavailable
-        </h1>
+      <main className="min-h-screen bg-slate-100 p-5 sm:p-8">
+        <div className="mx-auto max-w-4xl space-y-6">
+          <section className={`rounded-3xl p-8 text-white shadow-xl ${
+            submission.integrityTerminated
+              ? "bg-red-950"
+              : "bg-emerald-800"
+          }`}>
+            {submission.integrityTerminated ? (
+              <ShieldAlert className="h-10 w-10" />
+            ) : (
+              <CheckCircle2 className="h-10 w-10" />
+            )}
 
-        <p className="mt-3 text-slate-600">
-          This assessment does not exist or is not assigned to your account.
-        </p>
+            <p className="mt-5 text-xs font-black uppercase tracking-[0.18em] text-white/70">
+              {statusLabel(
+                submission,
+              )}
+            </p>
 
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Link
-            href="/exam"
-            className="rounded-xl bg-indigo-700 px-5 py-3 font-bold text-white"
-          >
-            Back to Exam Mode
-          </Link>
+            <h1 className="mt-2 text-3xl font-black">
+              {assignment.title}
+            </h1>
 
-          <Link
-            href="/dashboard"
-            className="rounded-xl border px-5 py-3 font-bold"
-          >
-            Dashboard
-          </Link>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
+              {submission.integrityTerminated
+                ? submission.integrityTerminationReason ||
+                  "The attempt was submitted automatically under the exam integrity policy."
+                : submission.status === "marked"
+                  ? "Your teacher has marked this written assessment."
+                  : "Your written assessment has been submitted and is locked for marking."}
+            </p>
+          </section>
+
+          {submission.status ===
+            "marked" && (
+            <section className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-3xl bg-white p-6 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  Marks
+                </p>
+
+                <p className="mt-2 text-3xl font-black text-slate-950">
+                  {submission.totalAwardedMarks}/
+                  {submission.totalAvailableMarks}
+                </p>
+              </div>
+
+              <div className="rounded-3xl bg-white p-6 shadow-sm">
+                <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                  Percentage
+                </p>
+
+                <p className="mt-2 text-3xl font-black text-slate-950">
+                  {submission.percentage}%
+                </p>
+              </div>
+            </section>
+          )}
+
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <p className="font-black text-slate-950">
+              Integrity monitoring
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {submission.integrityIncidents.length} integrity event
+              {submission.integrityIncidents.length === 1 ? "" : "s"} recorded.
+              These events are contextual evidence for teacher review and do
+              not by themselves prove misconduct.
+            </p>
+          </section>
+
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/exam"
+              className="rounded-xl bg-indigo-700 px-5 py-3 font-black text-white"
+            >
+              Back to Exam Mode
+            </Link>
+
+            <Link
+              href="/assignments"
+              className="rounded-xl border border-slate-200 bg-white px-5 py-3 font-black text-slate-800"
+            >
+              All assignments
+            </Link>
+          </div>
         </div>
-      </Card>
+      </main>
     );
   }
 
   if (
-    !locked &&
-    !integrityStarted
+    stage ===
+    "ready"
   ) {
     return (
-      <div
-        ref={examRootRef}
-        className="min-h-screen bg-slate-100 p-6"
-      >
-        <div className="mx-auto max-w-4xl space-y-6">
-          <Card className="overflow-hidden rounded-3xl border-0">
-            <div className="bg-gradient-to-r from-slate-950 to-indigo-950 p-8 text-white">
+      <main className="min-h-screen bg-slate-100 p-5 sm:p-8">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <Link
+            href="/exam"
+            className="inline-flex items-center gap-2 text-sm font-black text-indigo-700"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back to Exam Mode
+          </Link>
+
+          <section className="overflow-hidden rounded-3xl bg-slate-950 text-white shadow-xl">
+            <div className="p-7 sm:p-9">
               <div className="flex items-center gap-2 text-indigo-200">
                 <ShieldCheck className="h-5 w-5" />
 
-                <p className="text-xs font-black uppercase tracking-[0.16em]">
-                  Exam Mode
+                <p className="text-xs font-black uppercase tracking-[0.18em]">
+                  Monitored written assessment
                 </p>
               </div>
 
@@ -993,491 +1670,466 @@ export default function StudentExamPlayerPage() {
                 {assignment.title}
               </h1>
 
-              <p className="mt-3 text-indigo-100">
-                {assignment.questionCount} questions ·{" "}
-                {assignment.totalMarks} marks
+              <p className="mt-3 text-white/70">
+                {assignment.className} Â· {assignment.teacherName}
               </p>
             </div>
 
-            <div className="space-y-5 p-7">
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-                <p className="font-black text-amber-950">
-                  Integrity monitoring
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-amber-900">
-                  This exam uses fullscreen and page-visibility monitoring.
-                  Events are recorded for teacher review. This is not a
-                  guaranteed lockdown browser.
-                </p>
-              </div>
-
-              {assignment.integrityPolicy.enabled ? (
-                <div className="space-y-3 text-sm leading-6 text-slate-700">
-                  <p>
-                    • The exam will enter fullscreen and normal CS Master
-                    navigation will be hidden.
-                  </p>
-
-                  <p>
-                    • Leaving fullscreen starts a visible 5-second countdown.
-                  </p>
-
-                  <p>
-                    • If fullscreen is not restored before the countdown ends,
-                    the exam is automatically terminated and submitted.
-                  </p>
-
-                  {assignment.integrityPolicy.monitorPageVisibility && (
-                    <p>
-                      • Switching away from the exam page is recorded and the
-                      teacher&apos;s configured visibility rule is applied.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-600">
-                  Integrity monitoring has been disabled by the teacher for this
-                  assignment.
-                </p>
-              )}
-
-              <button
-                type="button"
-                onClick={() =>
-                  void enterExamMode()
-                }
-                className="w-full rounded-2xl bg-indigo-700 px-6 py-4 text-lg font-black text-white"
-              >
-                Enter Exam Mode
-              </button>
+            <div className="border-t border-white/10 bg-white/5 p-7 sm:p-9">
+              <p className="max-w-3xl text-sm leading-6 text-white/75">
+                CS Master Exam Mode records configured fullscreen and
+                page-visibility events for teacher review. It is integrity
+                monitoring, not a guaranteed lockdown browser.
+              </p>
             </div>
-          </Card>
+          </section>
+
+          <section className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Questions
+              </p>
+
+              <p className="mt-2 text-3xl font-black">
+                {assignment.questionCount}
+              </p>
+            </div>
+
+            <div className="rounded-3xl bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Total marks
+              </p>
+
+              <p className="mt-2 text-3xl font-black">
+                {assignment.totalMarks}
+              </p>
+            </div>
+
+            <div className="rounded-3xl bg-white p-5 shadow-sm">
+              <p className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Attempt
+              </p>
+
+              <p className="mt-2 text-lg font-black">
+                {submission.status === "in_progress"
+                  ? "Resume"
+                  : "New attempt"}
+              </p>
+            </div>
+          </section>
+
+          {assignment.instructions && (
+            <section className="rounded-3xl bg-white p-6 shadow-sm">
+              <p className="font-black text-slate-950">
+                Teacher instructions
+              </p>
+
+              <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-600">
+                {assignment.instructions}
+              </p>
+            </section>
+          )}
+
+          {policy.enabled && (
+            <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+              <p className="font-black text-amber-950">
+                Integrity policy for this attempt
+              </p>
+
+              <div className="mt-3 space-y-2 text-sm leading-6 text-amber-900">
+                <p>
+                  Fullscreen:{" "}
+                  <b>
+                    {policy.fullscreenRequired
+                      ? "Required"
+                      : "Not required"}
+                  </b>
+                </p>
+
+                {policy.fullscreenRequired && (
+                  <p>
+                    Leaving fullscreen starts a visible 5-second countdown.
+                    Failure to return before it expires automatically
+                    terminates and submits the exam.
+                  </p>
+                )}
+
+                <p>
+                  Page visibility monitoring:{" "}
+                  <b>
+                    {policy.monitorPageVisibility
+                      ? "Enabled"
+                      : "Disabled"}
+                  </b>
+                </p>
+
+                {policy.monitorPageVisibility && (
+                  <p>
+                    Hidden-page action:{" "}
+                    <b className="capitalize">
+                      {policy.visibilityAction.replace("_", " ")}
+                    </b>
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-bold text-red-700">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              void startExam()
+            }
+            className="inline-flex min-h-12 items-center gap-2 rounded-xl bg-indigo-700 px-6 py-3 font-black text-white hover:bg-indigo-800"
+          >
+            {policy.enabled &&
+            policy.fullscreenRequired ? (
+              <Maximize2 className="h-5 w-5" />
+            ) : (
+              <FileText className="h-5 w-5" />
+            )}
+
+            {submission.status === "in_progress"
+              ? "Resume Exam Mode"
+              : "Enter Exam Mode"}
+          </button>
         </div>
-      </div>
+      </main>
     );
   }
 
+  const response =
+    answers.find(
+      (
+        answer,
+      ) =>
+        answer.questionId ===
+        currentQuestion?.id,
+    )?.response ||
+    "";
+
   return (
-    <div
-      ref={examRootRef}
-      className="h-screen min-h-screen overflow-y-auto overscroll-contain bg-slate-100 p-5 md:p-8"
-    >
-      {fullscreenCountdown !==
-        null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 p-6">
-          <div className="w-full max-w-xl rounded-3xl bg-white p-8 text-center shadow-2xl">
-            <AlertTriangle className="mx-auto h-12 w-12 text-red-600" />
-
-            <p className="mt-4 text-sm font-black uppercase tracking-[0.16em] text-red-600">
-              Fullscreen exited
+    <main className="min-h-screen bg-slate-100">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-slate-950 text-white shadow-lg">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-300">
+              CS Master Exam Mode
             </p>
 
-            <h2 className="mt-3 text-3xl font-black text-slate-950">
-              Return to fullscreen
-            </h2>
+            <h1 className="mt-1 font-black">
+              {assignment.title}
+            </h1>
+          </div>
 
-            <p className="mt-3 text-slate-600">
-              This exam will be terminated and submitted automatically if you
-              do not return before the countdown ends.
-            </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black">
+            <span className="rounded-full bg-white/10 px-3 py-2">
+              Question {currentIndex + 1}/{questions.length}
+            </span>
 
-            <p className="mt-6 text-7xl font-black text-red-600">
-              {fullscreenCountdown}
-            </p>
+            <span className="rounded-full bg-white/10 px-3 py-2">
+              {assignment.totalMarks} marks
+            </span>
 
-            <button
-              type="button"
-              onClick={() =>
-                void resumePausedExam()
-              }
-              className="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl bg-indigo-700 px-7 py-3 font-black text-white transition hover:bg-indigo-800 focus:outline-none focus:ring-4 focus:ring-indigo-200"
-            >
-              Return to fullscreen
-            </button>
+            <span className="rounded-full bg-white/10 px-3 py-2">
+              {saving ? "Saving..." : "Autosave on"}
+            </span>
           </div>
         </div>
-      )}
+      </header>
 
-      {integrityPaused && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/80 p-6">
-          <div className="max-w-xl rounded-3xl bg-white p-8 text-center">
-            <p className="text-sm font-black uppercase tracking-wide text-amber-700">
-              Exam paused
-            </p>
+      <div className="mx-auto grid max-w-7xl gap-6 p-4 sm:p-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="rounded-3xl bg-white p-4 shadow-sm">
+          <p className="px-2 text-xs font-black uppercase tracking-wide text-slate-400">
+            Questions
+          </p>
 
-            <h2 className="mt-3 text-2xl font-black text-slate-950">
-              Page visibility incident recorded
-            </h2>
+          <div className="mt-3 grid grid-cols-5 gap-2 lg:grid-cols-3">
+            {questions.map(
+              (
+                question,
+                index,
+              ) => {
+                const answered =
+                  Boolean(
+                    answers.find(
+                      (
+                        answer,
+                      ) =>
+                        answer.questionId ===
+                        question.id,
+                    )?.response.trim(),
+                  );
 
-            <p className="mt-3 text-slate-600">
-              Your teacher configured page-hidden events to pause the exam.
-              Return to fullscreen to continue.
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                void resumePausedExam()
-              }
-              className="mt-6 rounded-xl bg-indigo-700 px-6 py-3 font-black text-white"
-            >
-              Resume in fullscreen
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="mx-auto max-w-6xl space-y-6">
-        <Card className="sticky top-0 z-20 border-0 bg-gradient-to-r from-slate-950 to-indigo-950 text-white shadow-xl">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-indigo-200">
-                Monitored Exam Mode
-              </p>
-
-              <h1 className="mt-2 text-2xl font-black">
-                {assignment.title}
-              </h1>
-
-              <p className="mt-2 text-sm text-indigo-100">
-                {answeredCount}/{assignment.questionCount} answered ·{" "}
-                {assignment.totalMarks} marks
-              </p>
-            </div>
-
-            {!locked && (
-              <div className="rounded-xl bg-white/10 px-4 py-3 text-sm font-bold text-white/80">
-                Question{" "}
-                {activeQuestionNumber ?? "—"}
-              </div>
+                return (
+                  <button
+                    type="button"
+                    key={
+                      question.id
+                    }
+                    onClick={() =>
+                      setCurrentIndex(
+                        index,
+                      )
+                    }
+                    disabled={
+                      paused ||
+                      submitting
+                    }
+                    className={`rounded-xl px-3 py-2 text-sm font-black ${
+                      index === currentIndex
+                        ? "bg-indigo-700 text-white"
+                        : answered
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-100 text-slate-700"
+                    } disabled:opacity-50`}
+                  >
+                    {question.questionNumber}
+                  </button>
+                );
+              },
             )}
           </div>
-        </Card>
 
-        {integrityWarning && !locked && (
-          <Card className="border border-amber-200 bg-amber-50">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-xs leading-5 text-slate-500">
+            <ShieldCheck className="mb-2 h-5 w-5 text-indigo-600" />
 
-              <div className="flex-1">
-                <p className="font-black text-amber-950">
-                  Integrity warning
-                </p>
+            Integrity monitoring is active according to the policy shown before
+            entry. Events are recorded for teacher review.
+          </div>
+        </aside>
 
-                <p className="mt-1 text-sm text-amber-900">
-                  {integrityWarning}
-                </p>
+        <section className="space-y-5">
+          {warning && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 font-bold text-amber-900">
+              {warning}
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 font-bold text-red-700">
+              {error}
+            </div>
+          )}
+
+          {currentQuestion && (
+            <article className="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-indigo-600">
+                    Question {currentQuestion.questionNumber}
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-slate-400">
+                    {currentQuestion.assessmentObjective} Â·{" "}
+                    {currentQuestion.commandWord}
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-indigo-50 px-4 py-2 text-sm font-black text-indigo-700">
+                  {currentQuestion.marks} mark
+                  {currentQuestion.marks === 1 ? "" : "s"}
+                </span>
               </div>
+
+              {currentQuestion.context && (
+                <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-sm leading-7 text-slate-700">
+                  {currentQuestion.context}
+                </div>
+              )}
+
+              <p className="mt-6 whitespace-pre-wrap text-lg font-bold leading-8 text-slate-950">
+                {currentQuestion.question}
+              </p>
+
+              <label className="mt-7 block">
+                <span className="text-sm font-black text-slate-700">
+                  Your answer
+                </span>
+
+                <textarea
+                  rows={10}
+                  value={response}
+                  disabled={
+                    paused ||
+                    submitting
+                  }
+                  onChange={(
+                    event,
+                  ) =>
+                    updateAnswer(
+                      event.target.value,
+                    )
+                  }
+                  maxLength={12000}
+                  className="mt-3 w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 leading-7 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 disabled:bg-slate-100"
+                  placeholder="Write your answer here..."
+                />
+              </label>
+            </article>
+          )}
+
+          <div className="flex flex-col gap-3 rounded-3xl bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={
+                  currentIndex === 0 ||
+                  paused ||
+                  submitting
+                }
+                onClick={() =>
+                  setCurrentIndex(
+                    (
+                      current,
+                    ) =>
+                      Math.max(
+                        0,
+                        current - 1,
+                      ),
+                  )
+                }
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-black text-slate-700 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
 
               <button
                 type="button"
-                onClick={() =>
-                  setIntegrityWarning("")
+                disabled={
+                  currentIndex >=
+                    questions.length -
+                      1 ||
+                  paused ||
+                  submitting
                 }
-                className="text-sm font-black text-amber-900"
+                onClick={() =>
+                  setCurrentIndex(
+                    (
+                      current,
+                    ) =>
+                      Math.min(
+                        questions.length -
+                          1,
+                        current +
+                          1,
+                      ),
+                  )
+                }
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-black text-slate-700 disabled:opacity-40"
               >
-                Dismiss
+                Next
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-          </Card>
-        )}
 
-        {submission.integrityTerminated && (
-          <Card className="border border-red-300 bg-red-50">
-            <p className="text-sm font-black uppercase tracking-wide text-red-700">
-              Exam automatically terminated
-            </p>
-
-            <h2 className="mt-2 text-2xl font-black text-red-950">
-              Your answers were submitted
-            </h2>
-
-            <p className="mt-3 text-red-900">
-              {submission.integrityTerminationReason}
-            </p>
-          </Card>
-        )}
-
-        {submission.status ===
-          "marked" && (
-          <Card className="border border-emerald-200 bg-emerald-50">
-            <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">
-              Marked result
-            </p>
-
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-5">
-              <div>
-                <p className="text-4xl font-black text-emerald-950">
-                  {submission.totalAwardedMarks}/
-                  {submission.totalAvailableMarks}
-                </p>
-
-                <p className="mt-1 text-lg font-bold text-emerald-800">
-                  {submission.percentage}%
-                </p>
-              </div>
-
-              <p className="max-w-3xl text-sm leading-6 text-emerald-900">
-                {submission.overallFeedback ||
-                  "Your teacher has released the marked result."}
-              </p>
-            </div>
-          </Card>
-        )}
-
-        {assignment.questionSetSnapshot.questions.map(
-          (question) => {
-            const answer =
-              answers.find(
-                (item) =>
-                  item.questionId ===
-                  question.id,
-              );
-
-            const extras =
-              getQuestionExtras(
-                question,
-              );
-
-            return (
-              <Card
-                key={question.id}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <h2 className="text-xl font-black">
-                    Question{" "}
-                    {question.questionNumber}
-                  </h2>
-
-                  <span className="rounded-full bg-indigo-100 px-3 py-1 font-bold text-indigo-800">
-                    {question.marks} marks
-                  </span>
-                </div>
-
-                {question.context && (
-                  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                    {question.context}
-                  </div>
-                )}
-
-                <p className="mt-5 whitespace-pre-wrap font-semibold">
-                  {question.question}
-                </p>
-
-                <label className="mt-5 block">
-                  <span className="text-sm font-bold">
-                    Your answer
-                  </span>
-
-                  <textarea
-                    rows={8}
-                    value={
-                      answer?.response ||
-                      ""
-                    }
-                    disabled={
-                      locked ||
-                      integrityPaused
-                    }
-                    onFocus={() =>
-                      focusQuestion(
-                        question.questionNumber,
-                      )
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      updateResponse(
-                        question.id,
-                        event.target.value,
-                      )
-                    }
-                    className="mt-2 w-full rounded-xl border px-4 py-3 disabled:bg-slate-100"
-                  />
-                </label>
-
-                {submission.status ===
-                  "marked" && (
-                  <div className="mt-6 space-y-5">
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
-                      <p className="font-black text-emerald-950">
-                        Awarded:{" "}
-                        {answer?.awardedMarks ??
-                          0}
-                        /{question.marks}
-                      </p>
-
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-emerald-900">
-                        {answer?.teacherFeedback ||
-                          "No question-specific feedback was provided."}
-                      </p>
-                    </div>
-
-                    <div className="grid gap-5 xl:grid-cols-2">
-                      <div className="rounded-2xl bg-blue-50 p-5">
-                        <h3 className="font-black text-blue-950">
-                          Model answer
-                        </h3>
-
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-blue-900">
-                          {
-                            question.modelAnswer
-                          }
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl bg-emerald-50 p-5">
-                        <h3 className="font-black text-emerald-950">
-                          Mark scheme
-                        </h3>
-
-                        <ul className="mt-3 space-y-2 text-sm text-emerald-900">
-                          {question.markScheme.map(
-                            (point) => (
-                              <li
-                                key={
-                                  point.id
-                                }
-                              >
-                                •{" "}
-                                {
-                                  point.description
-                                }{" "}
-                                (
-                                {
-                                  point.marks
-                                }
-                                )
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    </div>
-
-                    {extras.examinerGuidance
-                      .length > 0 && (
-                      <div className="rounded-2xl bg-amber-50 p-5">
-                        <h3 className="font-black text-amber-950">
-                          Examiner guidance
-                        </h3>
-
-                        <ul className="mt-3 space-y-2 text-sm text-amber-900">
-                          {extras.examinerGuidance.map(
-                            (item) => (
-                              <li
-                                key={
-                                  item
-                                }
-                              >
-                                •{" "}
-                                {
-                                  item
-                                }
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    )}
-
-                    {extras.misconceptions
-                      .length > 0 && (
-                      <div className="rounded-2xl bg-red-50 p-5">
-                        <h3 className="font-black text-red-950">
-                          Common misconceptions
-                        </h3>
-
-                        <ul className="mt-3 space-y-2 text-sm text-red-900">
-                          {extras.misconceptions.map(
-                            (item) => (
-                              <li
-                                key={
-                                  item
-                                }
-                              >
-                                •{" "}
-                                {
-                                  item
-                                }
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          },
-        )}
-
-        {!locked ? (
-          <Card>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() =>
                   void saveNow()
                 }
-                disabled={saving}
-                className="rounded-xl border px-5 py-3 font-bold"
+                disabled={
+                  saving ||
+                  paused ||
+                  submitting
+                }
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-4 font-black text-slate-700 disabled:opacity-40"
               >
-                Save Answers
+                <Save className="h-4 w-4" />
+                Save
               </button>
 
               <button
                 type="button"
                 onClick={() =>
-                  void submit()
+                  void submitNormally()
                 }
-                disabled={saving}
-                className="rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white"
+                disabled={
+                  paused ||
+                  submitting
+                }
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-indigo-700 px-5 font-black text-white disabled:opacity-50"
               >
-                Submit Assessment
+                <Send className="h-4 w-4" />
+                {submitting
+                  ? "Submitting..."
+                  : "Submit exam"}
               </button>
             </div>
-          </Card>
-        ) : (
-          <Card
-            className={
-              submission.status ===
-              "marked"
-                ? "border border-emerald-200 bg-emerald-50"
-                : submission.integrityTerminated
-                  ? "border border-red-200 bg-red-50"
-                  : "border border-cyan-200 bg-cyan-50"
-            }
-          >
-            <p className="font-bold text-slate-900">
-              {submission.status ===
-              "marked"
-                ? "Your marked result and feedback are shown above."
-                : submission.integrityTerminated
-                  ? "This exam was automatically submitted after an integrity rule was triggered."
-                  : "Your assessment has been submitted and is awaiting marking."}
+          </div>
+        </section>
+      </div>
+
+      {countdown !== null && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/85 p-5 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl border border-red-300 bg-white p-8 text-center shadow-2xl">
+            <ShieldAlert className="mx-auto h-12 w-12 text-red-600" />
+
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-red-600">
+              Fullscreen exited
             </p>
 
-            <div className="mt-4 flex flex-wrap gap-3">
-              <Link
-                href="/exam"
-                className="rounded-xl bg-indigo-700 px-5 py-3 font-bold text-white"
-              >
-                Back to Exam Mode
-              </Link>
+            <h2 className="mt-2 text-4xl font-black text-slate-950">
+              {countdown}
+            </h2>
 
-              <Link
-                href="/dashboard"
-                className="rounded-xl border px-5 py-3 font-bold"
-              >
-                Dashboard
-              </Link>
-            </div>
-          </Card>
-        )}
-      </div>
-    </div>
+            <p className="mt-3 leading-7 text-slate-600">
+              Return to fullscreen before the countdown expires. Otherwise this
+              exam will be terminated and submitted automatically.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                void returnToFullscreen()
+              }
+              className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-xl bg-red-600 px-6 font-black text-white"
+            >
+              <Maximize2 className="h-5 w-5" />
+              Return to fullscreen
+            </button>
+          </div>
+        </div>
+      )}
+
+      {paused && (
+        <div className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/80 p-5 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-8 text-center shadow-2xl">
+            <PauseCircle className="mx-auto h-12 w-12 text-amber-600" />
+
+            <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-amber-600">
+              Exam paused
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Return to the monitored exam
+            </h2>
+
+            <p className="mt-3 leading-7 text-slate-600">
+              The teacher policy requires an explicit resume after the exam
+              page becomes hidden.
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                void resumeAfterPause()
+              }
+              className="mt-6 rounded-xl bg-amber-600 px-6 py-3 font-black text-white"
+            >
+              Resume exam
+            </button>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }

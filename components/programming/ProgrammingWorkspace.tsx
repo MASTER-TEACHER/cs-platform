@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
+import { saveProgrammingPracticeEvidence } from "@/services/programmingPracticeEvidenceService";
 import ProgrammingChallengePanel from "@/components/programming/ProgrammingChallengePanel";
 import ProgrammingConsole from "@/components/programming/ProgrammingConsole";
 import ProgrammingEditor from "@/components/programming/ProgrammingEditor";
@@ -405,43 +405,66 @@ export default function ProgrammingWorkspace({
       setEvaluation(result);
 
       const awarded =
-        progress.recordAttempt(
-          challenge,
-          result.passed,
-        );
+  progress.recordAttempt(
+    challenge,
+    result.passed,
+  );
 
-      if (
-        assignedMode &&
-        assignmentId &&
-        user?.uid
-      ) {
-        await recordProgrammingAssignmentAttempt(
-          {
-            assignmentId,
-            studentId: user.uid,
-            code,
-            passed: result.passed,
-            passedCount:
-              result.passedCount,
-            totalTests:
-              result.totalCount,
-            error:
-              result.results
-                .filter(
-                  (item) =>
-                    !item.passed &&
-                    item.error,
-                )
-                .map(
-                  (item) =>
-                    item.error,
-                )
-                .filter(Boolean)
-                .join("\n")
-                .slice(0, 2000),
-          },
-        );
-      }
+if (
+  !assignedMode &&
+  user?.uid
+) {
+  const scorePercent =
+    result.totalCount > 0
+      ? Math.round(
+          (
+            result.passedCount /
+            result.totalCount
+          ) * 100,
+        )
+      : 0;
+
+  await saveProgrammingPracticeEvidence({
+    uid: user.uid,
+    challenge,
+    scorePercent,
+    qualification,
+    examBoard,
+  });
+}
+
+if (
+  assignedMode &&
+  assignmentId &&
+  user?.uid
+) {
+  await recordProgrammingAssignmentAttempt(
+    {
+      assignmentId,
+      studentId: user.uid,
+      code,
+      passed: result.passed,
+      passedCount:
+        result.passedCount,
+      totalTests:
+        result.totalCount,
+      error:
+        result.results
+          .filter(
+            (item) =>
+              !item.passed &&
+              item.error,
+          )
+          .map(
+            (item) =>
+              item.error,
+          )
+          .filter(Boolean)
+          .join("\n")
+          .slice(0, 2000),
+    },
+  );
+}
 
       if (result.passed) {
         setShowExplanation(true);

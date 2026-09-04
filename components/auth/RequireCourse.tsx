@@ -18,6 +18,9 @@ type RequireCourseProps = {
   children: ReactNode;
 };
 
+/*
+ * Public routes can be opened without authentication.
+ */
 const publicRoutes =
   new Set([
     "/",
@@ -25,17 +28,21 @@ const publicRoutes =
     "/login",
     "/register",
     "/forgot-password",
+    "/pricing",
     "/auth-test",
     "/teacher-access",
     "/teacher-verification",
-    "/cookies",
-    "/terms",
-    "/privacy",
-    "/help",
-    "/contact",
-    "/about",
-  ]);
 
+    "/about",
+    "/contact",
+    "/help",
+    "/privacy",
+    "/terms",
+    "/cookies",
+  ]);
+/*
+ * Routes used while creating or repairing an account.
+ */
 const accountSetupRoutes =
   new Set([
     "/",
@@ -46,23 +53,71 @@ const accountSetupRoutes =
     "/auth-test",
   ]);
 
+/*
+ * These routes authenticate themselves independently
+ * from the currently signed-in CS Master account.
+ */
 const externallyAccessibleRoutes =
   new Set([
     "/teacher-verification",
-    "/cookies",
-    "/terms",
-    "/privacy",
-    "/help",
-    "/contact",
-    "/about",
   ]);
+
+/*
+ * Known student/application route families.
+ *
+ * This list is important for 404 handling:
+ * an unknown pathname must NOT automatically be treated
+ * as a protected student route.
+ */
+const studentRoutePrefixes = [
+  "/adaptive-learning",
+  "/analytics",
+  "/assignments",
+  "/dashboard",
+  "/exam",
+  "/exam-trainer",
+  "/join-school",
+  "/knowledge-map",
+  "/learn",
+  "/profile",
+  "/programming",
+  "/quiz",
+  "/resources",
+  "/revision-plan",
+  "/tutor",
+  "/upgrade",
+  "/visualisers",
+];
+
+function matchesRoutePrefix(
+  pathname: string,
+  prefix: string,
+): boolean {
+  return (
+    pathname === prefix ||
+    pathname.startsWith(
+      `${prefix}/`,
+    )
+  );
+}
+
+function isStudentRoute(
+  pathname: string,
+): boolean {
+  return studentRoutePrefixes.some(
+    (prefix) =>
+      matchesRoutePrefix(
+        pathname,
+        prefix,
+      ),
+  );
+}
 
 function isTeacherRoute(
   pathname: string,
 ): boolean {
   return (
-    pathname ===
-      "/teacher" ||
+    pathname === "/teacher" ||
     pathname.startsWith(
       "/teacher/",
     )
@@ -73,8 +128,7 @@ function isAdminRoute(
   pathname: string,
 ): boolean {
   return (
-    pathname ===
-      "/admin" ||
+    pathname === "/admin" ||
     pathname.startsWith(
       "/admin/",
     )
@@ -124,6 +178,11 @@ export default function RequireCourse({
       pathname,
     );
 
+  const studentRoute =
+    isStudentRoute(
+      pathname,
+    );
+
   const teacherAccessRoute =
     pathname ===
     "/teacher-access";
@@ -131,6 +190,22 @@ export default function RequireCourse({
   const onboardingRoute =
     pathname ===
     "/onboarding";
+
+  /*
+   * Only recognised CS Master routes should participate
+   * in authentication/course redirection.
+   *
+   * Anything else must be allowed through so Next.js can
+   * render app/not-found.tsx with a real 404 response.
+   */
+  const isKnownApplicationRoute =
+    isPublicRoute ||
+    isExternallyAccessibleRoute ||
+    teacherRoute ||
+    adminRoute ||
+    studentRoute ||
+    teacherAccessRoute ||
+    onboardingRoute;
 
   const curriculumComplete =
     profile?.onboardingComplete ===
@@ -153,10 +228,12 @@ export default function RequireCourse({
     | null = null;
 
   /*
-   * Token-authenticated routes must remain independent from
-   * whichever CS Master account happens to be signed in.
+   * Unknown routes deliberately bypass all authentication
+   * redirects. This allows the root Next.js not-found page
+   * to render for signed-out and signed-in users alike.
    */
   if (
+    isKnownApplicationRoute &&
     !isExternallyAccessibleRoute
   ) {
     if (
@@ -199,13 +276,8 @@ export default function RequireCourse({
         isTeacherApplicant
       ) {
         /*
-         * All teacher-applicant states are deliberately
-         * rendered by /teacher-access:
-         *
-         * not_submitted
-         * pending
-         * platform review
-         * rejected
+         * Teacher-applicant accounts are managed by
+         * /teacher-access until approval is complete.
          */
         if (
           !teacherAccessRoute
@@ -214,6 +286,9 @@ export default function RequireCourse({
             "/teacher-access";
         }
       } else {
+        /*
+         * Student account.
+         */
         if (
           teacherRoute ||
           adminRoute
@@ -223,6 +298,10 @@ export default function RequireCourse({
         } else if (
           teacherAccessRoute
         ) {
+          /*
+           * Student users may deliberately visit the
+           * teacher-access application route.
+           */
           redirectTarget =
             null;
         } else if (
@@ -240,6 +319,7 @@ export default function RequireCourse({
             "/dashboard";
         } else if (
           !onboardingRoute &&
+          studentRoute &&
           !curriculumComplete
         ) {
           redirectTarget =
@@ -260,6 +340,14 @@ export default function RequireCourse({
     router,
   ]);
 
+  /*
+   * Unknown paths are intentionally rendered immediately.
+   * Next.js supplies app/not-found.tsx as children here.
+   */
+  if (!isKnownApplicationRoute) {
+    return <>{children}</>;
+  }
+
   if (
     isExternallyAccessibleRoute
   ) {
@@ -268,7 +356,9 @@ export default function RequireCourse({
 
   if (loading) {
     return (
-      <LoadingScreen message="Loading CS Master..." />
+      <LoadingScreen
+        message="Loading CS Master..."
+      />
     );
   }
 
@@ -296,13 +386,17 @@ export default function RequireCourse({
     )
   ) {
     return (
-      <LoadingScreen message="Preparing your account..." />
+      <LoadingScreen
+        message="Preparing your account..."
+      />
     );
   }
 
   if (redirectTarget) {
     return (
-      <LoadingScreen message="Opening the correct portal..." />
+      <LoadingScreen
+        message="Opening the correct portal..."
+      />
     );
   }
 
@@ -317,9 +411,9 @@ function LoadingScreen({
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
       <div className="text-center">
-        <div className="mx-auto h-11 w-11 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
+        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
 
-        <p className="mt-4 font-bold text-slate-700">
+        <p className="mt-4 font-black text-slate-700">
           {message}
         </p>
       </div>

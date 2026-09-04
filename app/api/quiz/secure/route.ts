@@ -55,7 +55,11 @@ type AssignmentContext = {
   classId: string;
   teacherId: string;
   resourceId: string;
+  quizSource: "built-in" | "ai-generated";
+  qualification: Qualification | null;
+  examBoard: ExamBoard | null;
   deliveryMode: SecureQuizDeliveryMode;
+  status: "active" | "closed";
 };
 
 type SubmitBody = {
@@ -364,11 +368,9 @@ function normaliseGeneratedQuiz(
 async function getAssignmentContext({
   assignmentId,
   uid,
-  resourceIds,
 }: {
   assignmentId: string;
   uid: string;
-  resourceIds: string[];
 }): Promise<AssignmentContext> {
   const assignmentSnapshot =
     await adminDb
@@ -408,17 +410,6 @@ async function getAssignmentContext({
       assignment.resourceId,
     );
 
-  if (
-    !resourceId ||
-    !resourceIds.includes(
-      resourceId,
-    )
-  ) {
-    throw new Error(
-      "ASSIGNMENT_MISMATCH",
-    );
-  }
-
   const classId =
     cleanString(
       assignment.classId,
@@ -430,6 +421,7 @@ async function getAssignmentContext({
     );
 
   if (
+    !resourceId ||
     !classId ||
     !teacherId
   ) {
@@ -438,50 +430,103 @@ async function getAssignmentContext({
     );
   }
 
-  const classSnapshot =
-    await adminDb
-      .collection(
-        "classes",
-      )
-      .doc(
-        classId,
-      )
-      .get();
-
-  if (
-    !classSnapshot.exists
-  ) {
-    throw new Error(
-      "ASSIGNMENT_NOT_AVAILABLE",
-    );
-  }
-
-  const classData =
-    classSnapshot.data() ||
-    {};
-
-  const studentIds =
+  /*
+   * New targeted assignments carry their explicit studentIds.
+   * Prefer that list so another student in the same class cannot
+   * open an individually targeted quiz simply by discovering the
+   * assignment ID.
+   *
+   * Older assignments may not have studentIds, so class membership
+   * remains as a legacy fallback only.
+   */
+  const assignedStudentIds =
     Array.isArray(
-      classData.studentIds,
+      assignment.studentIds,
     )
-      ? classData.studentIds.filter(
+      ? assignment.studentIds.filter(
           (
             value: unknown,
           ): value is string =>
             typeof value ===
-            "string",
+            "string" &&
+            Boolean(
+              value.trim(),
+            ),
         )
       : [];
 
   if (
-    !studentIds.includes(
-      uid,
-    )
+    assignedStudentIds.length >
+      0
   ) {
-    throw new Error(
-      "FORBIDDEN",
-    );
+    if (
+      !assignedStudentIds.includes(
+        uid,
+      )
+    ) {
+      throw new Error(
+        "FORBIDDEN",
+      );
+    }
+  } else {
+    const classSnapshot =
+      await adminDb
+        .collection(
+          "classes",
+        )
+        .doc(
+          classId,
+        )
+        .get();
+
+    if (
+      !classSnapshot.exists
+    ) {
+      throw new Error(
+        "ASSIGNMENT_NOT_AVAILABLE",
+      );
+    }
+
+    const classData =
+      classSnapshot.data() ||
+      {};
+
+    const classStudentIds =
+      Array.isArray(
+        classData.studentIds,
+      )
+        ? classData.studentIds.filter(
+            (
+              value: unknown,
+            ): value is string =>
+              typeof value ===
+              "string",
+          )
+        : [];
+
+    if (
+      !classStudentIds.includes(
+        uid,
+      )
+    ) {
+      throw new Error(
+        "FORBIDDEN",
+      );
+    }
   }
+
+  const qualification =
+    assignment.qualification ===
+      "GCSE" ||
+    assignment.qualification ===
+      "A_LEVEL"
+      ? (assignment.qualification as Qualification)
+      : null;
+
+  const examBoardValue =
+    cleanString(
+      assignment.examBoard,
+    );
 
   return {
     id:
@@ -493,12 +538,44 @@ async function getAssignmentContext({
 
     resourceId,
 
+    quizSource:
+      assignment.quizSource ===
+      "ai-generated"
+        ? "ai-generated"
+        : "built-in",
+
+    qualification,
+
+    examBoard:
+      examBoardValue
+        ? (examBoardValue as ExamBoard)
+        : null,
+
     deliveryMode:
       assignment.deliveryMode ===
       "assessment"
         ? "assessment"
         : "practice",
+
+    status:
+      assignment.status === "closed"
+        ? "closed"
+        : "active",
   };
+}
+
+function assignmentMatchesQuiz(
+  assignment: AssignmentContext,
+  quiz: Quiz,
+  requestedTopic: string,
+): boolean {
+  return [
+    quiz.id,
+    quiz.topicId,
+    requestedTopic,
+  ].includes(
+    assignment.resourceId,
+  );
 }
 
 async function loadQuiz({
@@ -513,6 +590,171 @@ async function loadQuiz({
   quiz: Quiz;
   assignment: AssignmentContext | null;
 } | null> {
+  /*
+   * Assignment-driven quiz access is intentionally resolved before
+   * the student's normal curriculum lookup.
+   *
+   * A teacher may assign a quiz from a different curriculum from the
+   * student's current browsing selection. The assignment is therefore
+   * the authority for the exact quiz, but only after getAssignmentContext()
+   * has verified assignment status and student access.
+   */
+  if (assignmentId) {
+    const assignment =
+      await getAssignmentContext({
+        assignmentId,
+        uid:
+          identity.uid,
+      });
+
+    if (
+      assignment.quizSource ===
+      "ai-generated"
+    ) {
+      const generatedSnapshot =
+        await adminDb
+          .collection(
+            "generatedQuizzes",
+          )
+          .doc(
+            assignment.resourceId,
+          )
+          .get();
+
+      if (
+        !generatedSnapshot.exists
+      ) {
+        return null;
+      }
+
+      const data =
+        generatedSnapshot.data() ||
+        {};
+
+      const generatedQuiz =
+        normaliseGeneratedQuiz(
+          generatedSnapshot.id,
+          data,
+        );
+
+      if (
+        !assignmentMatchesQuiz(
+          assignment,
+          generatedQuiz,
+          topic,
+        )
+      ) {
+        throw new Error(
+          "ASSIGNMENT_MISMATCH",
+        );
+      }
+
+      return {
+        quiz:
+          generatedQuiz,
+
+        assignment,
+      };
+    }
+
+    /*
+     * Fresh built-in quiz assignments store the qualification and
+     * exam board chosen by the teacher. Legacy assignments without
+     * those fields fall back to the student's own curriculum so
+     * existing same-curriculum assignments remain usable.
+     */
+    const assignmentQualification =
+      assignment.qualification ||
+      identity.qualification;
+
+    const assignmentExamBoard =
+      assignment.examBoard ||
+      identity.examBoard;
+
+    /*
+     * Resolve assigned built-in quizzes from the same curriculum-aware
+     * collection used by the teacher selector. Assignments may store either
+     * the quiz id or the canonical topic id as resourceId.
+     */
+    const curriculumQuizzes =
+      getCurriculumQuizzes(
+        assignmentQualification,
+        assignmentExamBoard,
+      );
+
+    const assignedEntry =
+      curriculumQuizzes.find(
+        ({ quiz, topicId }) =>
+          assignment.resourceId === quiz.id ||
+          assignment.resourceId === quiz.topicId ||
+          assignment.resourceId === topicId,
+      ) ||
+      curriculumQuizzes.find(
+        ({ quiz, topicId }) =>
+          topic === quiz.id ||
+          topic === quiz.topicId ||
+          topic === topicId,
+      );
+
+    const assignedBuiltIn =
+      assignedEntry?.quiz ||
+      getCurriculumQuizByTopic(
+        assignment.resourceId,
+        assignmentQualification,
+        assignmentExamBoard,
+      ) ||
+      getCurriculumQuizByTopic(
+        topic,
+        assignmentQualification,
+        assignmentExamBoard,
+      );
+
+    if (!assignedBuiltIn) {
+      console.error(
+        "Assigned built-in quiz could not be resolved:",
+        {
+          assignmentId: assignment.id,
+          resourceId: assignment.resourceId,
+          requestedTopic: topic,
+          qualification: assignmentQualification,
+          examBoard: assignmentExamBoard,
+          available: curriculumQuizzes.map(
+            ({ quiz, topicId }) => ({
+              id: quiz.id,
+              topicId,
+              quizTopicId: quiz.topicId,
+            }),
+          ),
+        },
+      );
+
+      return null;
+    }
+
+    if (
+      !assignmentMatchesQuiz(
+        assignment,
+        assignedBuiltIn,
+        topic,
+      )
+    ) {
+      throw new Error(
+        "ASSIGNMENT_MISMATCH",
+      );
+    }
+
+    return {
+      quiz:
+        assignedBuiltIn,
+
+      assignment,
+    };
+  }
+
+  /*
+   * Normal, non-assignment quiz browsing remains locked to the
+   * student's selected qualification and exam board.
+   */
   const builtIn =
     getCurriculumQuizByTopic(
       topic,
@@ -521,26 +763,12 @@ async function loadQuiz({
     );
 
   if (builtIn) {
-    const assignment =
-      assignmentId
-        ? await getAssignmentContext({
-            assignmentId,
-            uid:
-              identity.uid,
-
-            resourceIds: [
-              builtIn.id,
-              builtIn.topicId,
-              topic,
-            ],
-          })
-        : null;
-
     return {
       quiz:
         builtIn,
 
-      assignment,
+      assignment:
+        null,
     };
   }
 
@@ -570,51 +798,31 @@ async function loadQuiz({
       data,
     );
 
-  let assignment:
-    AssignmentContext | null =
-    null;
+  /*
+   * Generated quizzes are teacher-created protected content.
+   * Without a linked assignment, only the owner may open the
+   * complete quiz through this endpoint.
+   */
+  const ownerId =
+    cleanString(
+      data.teacherId,
+    );
 
-  if (assignmentId) {
-    assignment =
-      await getAssignmentContext({
-        assignmentId,
-
-        uid:
-          identity.uid,
-
-        resourceIds: [
-          generatedSnapshot.id,
-          generatedQuiz.id,
-          generatedQuiz.topicId,
-          topic,
-        ],
-      });
-  } else {
-    /*
-     * Generated quizzes are teacher-created protected
-     * content. Without a linked assignment, only the owner
-     * may open the complete quiz through this endpoint.
-     */
-    const ownerId =
-      cleanString(
-        data.teacherId,
-      );
-
-    if (
-      ownerId !==
-      identity.uid
-    ) {
-      throw new Error(
-        "FORBIDDEN",
-      );
-    }
+  if (
+    ownerId !==
+    identity.uid
+  ) {
+    throw new Error(
+      "FORBIDDEN",
+    );
   }
 
   return {
     quiz:
       generatedQuiz,
 
-    assignment,
+    assignment:
+      null,
   };
 }
 
@@ -897,6 +1105,27 @@ function errorResponse(
   );
 }
 
+function timestampToIso(
+  value: unknown,
+): string | null {
+  if (value instanceof Timestamp) {
+    return value.toDate().toISOString();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : parsed.toISOString();
+  }
+
+  return null;
+}
+
 export async function GET(
   request: Request,
 ) {
@@ -924,6 +1153,159 @@ export async function GET(
           "assignment",
         ),
       );
+
+    const reviewRequested =
+      url.searchParams.get("review") === "1";
+
+    if (reviewRequested) {
+      if (!topic || !assignmentId) {
+        return NextResponse.json(
+          {
+            error:
+              "A completed quiz assignment is required for review.",
+          },
+          { status: 400 },
+        );
+      }
+
+      /*
+       * Validate the assignment/student/topic using the same secure resolver
+       * used for normal quiz delivery, but DO NOT create a new attempt.
+       */
+      const loadedReviewQuiz =
+        await loadQuiz({
+          topic,
+          identity,
+          assignmentId,
+        });
+
+      if (!loadedReviewQuiz?.assignment) {
+        throw new Error("FORBIDDEN");
+      }
+
+      const resultReference =
+        adminDb
+          .collection("assignmentResults")
+          .doc(
+            assignmentResultId(
+              assignmentId,
+              identity.uid,
+            ),
+          );
+
+      const resultSnapshot =
+        await resultReference.get();
+
+      if (!resultSnapshot.exists) {
+        return NextResponse.json(
+          {
+            error:
+              "This quiz has not been completed yet.",
+          },
+          { status: 404 },
+        );
+      }
+
+      const resultData =
+        resultSnapshot.data() || {};
+
+      if (
+        cleanString(resultData.studentId) !==
+        identity.uid
+      ) {
+        throw new Error("FORBIDDEN");
+      }
+
+      if (resultData.status !== "completed") {
+        return NextResponse.json(
+          {
+            error:
+              "This quiz has not been completed yet.",
+          },
+          { status: 409 },
+        );
+      }
+
+      let savedReview =
+        Array.isArray(resultData.review)
+          ? resultData.review
+          : [];
+
+      /*
+       * Backward-compatible fallback for assignments completed before the
+       * review snapshot was stored directly on assignmentResults.
+       */
+      if (savedReview.length === 0) {
+        const savedAttemptId =
+          cleanString(resultData.attemptId);
+
+        if (savedAttemptId) {
+          const attemptSnapshot =
+            await adminDb
+              .collection("quizAttempts")
+              .doc(savedAttemptId)
+              .get();
+
+          if (attemptSnapshot.exists) {
+            const attemptData =
+              attemptSnapshot.data() || {};
+
+            if (
+              cleanString(attemptData.uid) ===
+                identity.uid &&
+              attemptData.status === "completed" &&
+              attemptData.result &&
+              Array.isArray(
+                attemptData.result.review,
+              )
+            ) {
+              savedReview =
+                attemptData.result.review;
+            }
+          }
+        }
+      }
+
+      return NextResponse.json(
+        {
+          reviewResult: {
+            assignmentId,
+            quizTitle:
+              cleanString(resultData.quizTitle) ||
+              loadedReviewQuiz.quiz.title,
+            score:
+              typeof resultData.score === "number"
+                ? resultData.score
+                : 0,
+            totalQuestions:
+              typeof resultData.totalQuestions ===
+              "number"
+                ? resultData.totalQuestions
+                : savedReview.length,
+            percentage:
+              typeof resultData.percentage ===
+              "number"
+                ? resultData.percentage
+                : 0,
+            earnedXP:
+              typeof resultData.earnedXP === "number"
+                ? resultData.earnedXP
+                : 0,
+            completedAt:
+              timestampToIso(
+                resultData.completedAt,
+              ),
+            review: savedReview,
+          },
+        },
+        {
+          headers: {
+            "Cache-Control":
+              "private, no-store, max-age=0",
+          },
+        },
+      );
+    }
 
     if (!topic) {
       const quizzes =
@@ -990,6 +1372,19 @@ export async function GET(
         {
           status: 404,
         },
+      );
+    }
+
+    if (
+      loaded.assignment &&
+      loaded.assignment.status !== "active"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This quiz assignment has been closed by your teacher.",
+        },
+        { status: 409 },
       );
     }
 
@@ -1176,6 +1571,15 @@ export async function POST(
         {
           status: 404,
         },
+      );
+    }
+
+    if (
+      loaded.assignment &&
+      loaded.assignment.status !== "active"
+    ) {
+      throw new Error(
+        "ASSIGNMENT_NOT_AVAILABLE",
       );
     }
 
@@ -1414,10 +1818,11 @@ export async function POST(
            * the same assignment cannot farm XP.
            */
           const alreadyRewarded =
-            existingIndependentResult.exists ||
-            Boolean(
-              existingAssignmentResult?.exists,
-            );
+            loaded.assignment
+              ? Boolean(
+                  existingAssignmentResult?.exists,
+                )
+              : existingIndependentResult.exists;
 
           const earnedXP =
             alreadyRewarded
@@ -1533,6 +1938,13 @@ export async function POST(
                   scorePercent,
 
                 earnedXP,
+
+                /*
+                 * Store the authoritative server-marked review with the
+                 * assignment result so completed work can be reopened in
+                 * read-only mode without creating a new attempt.
+                 */
+                review,
 
                 timeTakenSeconds,
 

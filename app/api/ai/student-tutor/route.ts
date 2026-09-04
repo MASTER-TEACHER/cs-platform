@@ -1,4 +1,4 @@
-import "server-only";
+
 
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -405,6 +405,7 @@ Return:
 }`;
 }
 
+
 function noStore(
   body: unknown,
   status = 200,
@@ -415,6 +416,148 @@ function noStore(
       "Cache-Control": "private, no-store",
     },
   });
+}
+
+type AiProviderErrorInfo = {
+  status: number | null;
+  code: string;
+  type: string;
+  requestId: string;
+};
+
+function readAiProviderError(
+  error: unknown,
+): AiProviderErrorInfo {
+  if (!error || typeof error !== "object") {
+    return {
+      status: null,
+      code: "",
+      type: "",
+      requestId: "",
+    };
+  }
+
+  const candidate = error as {
+    status?: unknown;
+    code?: unknown;
+    type?: unknown;
+    requestID?: unknown;
+    request_id?: unknown;
+    error?: {
+      code?: unknown;
+      type?: unknown;
+    };
+  };
+
+  return {
+    status:
+      typeof candidate.status === "number"
+        ? candidate.status
+        : null,
+
+    code:
+      typeof candidate.code === "string"
+        ? candidate.code
+        : typeof candidate.error?.code === "string"
+          ? candidate.error.code
+          : "",
+
+    type:
+      typeof candidate.type === "string"
+        ? candidate.type
+        : typeof candidate.error?.type === "string"
+          ? candidate.error.type
+          : "",
+
+    requestId:
+      typeof candidate.requestID === "string"
+        ? candidate.requestID
+        : typeof candidate.request_id === "string"
+          ? candidate.request_id
+          : "",
+  };
+}
+
+function logAiProviderFailure(
+  error: unknown,
+): AiProviderErrorInfo {
+  const info = readAiProviderError(error);
+
+  console.error("Live tutor provider failure:", {
+    status: info.status,
+    code: info.code || "unknown",
+    type: info.type || "unknown",
+    requestId: info.requestId || undefined,
+  });
+
+  return info;
+}
+
+function aiProviderFailureResponse(
+  error: unknown,
+) {
+  const info = logAiProviderFailure(error);
+
+  if (
+    info.code === "credit_balance_exhausted" ||
+    info.code === "insufficient_quota" ||
+    info.type === "insufficient_quota"
+  ) {
+    return noStore(
+      {
+        error:
+          "AI Tutor is temporarily unavailable because the live AI service has reached its usage limit. Please try again later.",
+      },
+      503,
+    );
+  }
+
+  if (info.status === 429) {
+    return noStore(
+      {
+        error:
+          "AI Tutor is receiving a high number of requests. Please wait a moment and try again.",
+      },
+      429,
+    );
+  }
+
+  if (
+    info.status === 401 ||
+    info.status === 403 ||
+    info.code === "invalid_api_key"
+  ) {
+    return noStore(
+      {
+        error:
+          "AI Tutor is temporarily unavailable because the live AI service is not configured correctly.",
+      },
+      503,
+    );
+  }
+
+  if (
+    info.status === 408 ||
+    info.status === 409 ||
+    (typeof info.status === "number" &&
+      info.status >= 500)
+  ) {
+    return noStore(
+      {
+        error:
+          "AI Tutor is temporarily unavailable. Please try again shortly.",
+      },
+      503,
+    );
+  }
+
+  return noStore(
+    {
+      error:
+        "AI Tutor could not complete that request. Please try again.",
+    },
+    503,
+  );
 }
 
 export async function POST(request: Request) {
@@ -514,15 +657,7 @@ export async function POST(request: Request) {
         ),
       } satisfies TutorResponse);
     } catch (error) {
-      console.error("Live tutor unavailable:", error);
-
-      return noStore(
-        {
-          error:
-            "AI Tutor is temporarily unavailable. Please try again later.",
-        },
-        503,
-      );
+      return aiProviderFailureResponse(error);
     }
   } catch (error) {
     console.error("Tutor route error:", error);

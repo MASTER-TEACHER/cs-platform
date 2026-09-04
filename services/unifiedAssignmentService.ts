@@ -180,22 +180,67 @@ export function isUnifiedAssignmentOverdue(
 export async function getUnifiedStudentAssignments(
   studentId: string,
 ): Promise<UnifiedAssignment[]> {
-  const [resources, quizzes, exams] = await Promise.all([
+  const [resourceResult, quizResult, examResult] = await Promise.allSettled([
     getStudentAssignments(studentId),
     getStudentQuizAssignments(studentId),
     getStudentExamAssignments(studentId),
   ]);
 
+  if (resourceResult.status === "rejected") {
+    console.error(
+      "[Assignments] RESOURCE LOADER FAILED:",
+      resourceResult.reason,
+    );
+  }
+
+  if (quizResult.status === "rejected") {
+    console.error(
+      "[Assignments] QUIZ LOADER FAILED:",
+      quizResult.reason,
+    );
+  }
+
+  if (examResult.status === "rejected") {
+    console.error(
+      "[Assignments] EXAM LOADER FAILED:",
+      examResult.reason,
+    );
+  }
+
+  const resources =
+    resourceResult.status === "fulfilled" ? resourceResult.value : [];
+  const quizzes =
+    quizResult.status === "fulfilled" ? quizResult.value : [];
+  const exams =
+    examResult.status === "fulfilled" ? examResult.value : [];
+
   const examItems = await Promise.all(
-    exams.map(async (assignment) =>
-      convertExam(
-        assignment,
-        await getExamSubmission(
+    exams.map(async (assignment) => {
+      let submission: ExamSubmission | null = null;
+
+      try {
+        submission = await getExamSubmission(
           assignment.id,
           studentId,
-        ),
-      ),
-    ),
+        );
+      } catch (error) {
+        /*
+         * A missing/legacy exam submission must never prevent the student
+         * from seeing unrelated lesson, quiz or resource assignments.
+         * The exam remains visible as not started and can create its
+         * submission when the student actually opens Exam Mode.
+         */
+        console.warn(
+          "Unable to load exam submission while building assignment list:",
+          { assignmentId: assignment.id, error },
+        );
+      }
+
+      return convertExam(
+        assignment,
+        submission,
+      );
+    }),
   );
 
   return [

@@ -234,6 +234,17 @@ service cloud.firestore {
         );
     }
 
+    function isStudentForClassAssignment(assignmentId) {
+      return signedIn() &&
+        assignmentId is string &&
+        exists(
+          /databases/$(database)/documents/classAssignments/$(assignmentId)
+        ) &&
+        currentUserId() in get(
+          /databases/$(database)/documents/classAssignments/$(assignmentId)
+        ).data.studentIds;
+    }
+
 
     function examAssignmentExists(assignmentId) {
       return exists(
@@ -631,24 +642,45 @@ allow update: if signedIn() &&
 
     match /assignments/{assignmentId} {
 
-      allow get, list: if signedIn() &&
-        (
-          resource.data.teacherId == currentUserId() ||
-          belongsToClass(resource.data.classId) ||
-          isAdmin()
-        );
+      allow get: if signedIn() &&
+  (
+    resource.data.teacherId == currentUserId() ||
+    currentUserId() in resource.data.get("studentIds", []) ||
+    belongsToClass(resource.data.classId) ||
+    isAdmin()
+  );
+
+allow list: if signedIn() &&
+  (
+    resource.data.teacherId == currentUserId() ||
+    currentUserId() in resource.data.get("studentIds", []) ||
+    isAdmin()
+  );
 
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
-        ownsClass(request.resource.data.classId);
+        request.resource.data.classId is string &&
+        ownsClass(request.resource.data.classId) &&
+        request.resource.data.studentIds is list &&
+        request.resource.data.studentIds.size() > 0 &&
+        request.resource.data.studentIds.hasOnly(
+          get(
+            /databases/$(database)/documents/classes/$(request.resource.data.classId)
+          ).data.studentIds
+        ) &&
+        request.resource.data.status == "active";
 
       allow update: if isTeacher() &&
         (
           resource.data.teacherId == currentUserId() ||
           isAdmin()
         ) &&
-        request.resource.data.teacherId ==
-          resource.data.teacherId;
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.classId == resource.data.classId &&
+        request.resource.data.type == resource.data.type &&
+        request.resource.data.resourceId == resource.data.resourceId &&
+        request.resource.data.get("studentIds", []) ==
+          resource.data.get("studentIds", []);
 
       allow delete: if isTeacher() &&
         (
@@ -678,7 +710,19 @@ allow update: if signedIn() &&
 
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
-        request.resource.data.studentIds is list;
+        request.resource.data.classId is string &&
+        ownsClass(request.resource.data.classId) &&
+        request.resource.data.studentIds is list &&
+        request.resource.data.studentIds.size() > 0 &&
+        request.resource.data.studentIds.hasOnly(
+          get(
+            /databases/$(database)/documents/classes/$(request.resource.data.classId)
+          ).data.studentIds
+        ) &&
+        request.resource.data.resourceId is string &&
+        request.resource.data.resourceId != "" &&
+        request.resource.data.resourceType is string &&
+        request.resource.data.status == "active";
 
       /*
        * Teacher or admin management updates.
@@ -688,8 +732,11 @@ allow update: if signedIn() &&
           resource.data.teacherId == currentUserId() ||
           isAdmin()
         ) &&
-        request.resource.data.teacherId ==
-          resource.data.teacherId;
+        request.resource.data.teacherId == resource.data.teacherId &&
+        request.resource.data.classId == resource.data.classId &&
+        request.resource.data.resourceId == resource.data.resourceId &&
+        request.resource.data.resourceType == resource.data.resourceType &&
+        request.resource.data.studentIds == resource.data.studentIds;
 
       /*
        * Students may only update the completion counter and timestamp.
@@ -779,6 +826,12 @@ allow update: if signedIn() &&
     request.resource.data.studentId ==
       currentUserId() &&
     request.resource.data.assignmentId is string &&
+    isStudentForClassAssignment(
+      request.resource.data.assignmentId
+    ) &&
+    progressId.matches(
+      "^.*_" + currentUserId() + "$"
+    ) &&
     request.resource.data.status in [
       "not_started",
       "in_progress",
@@ -792,6 +845,9 @@ allow update: if signedIn() &&
       resource.data.studentId &&
     request.resource.data.assignmentId ==
       resource.data.assignmentId &&
+    isStudentForClassAssignment(
+      resource.data.assignmentId
+    ) &&
     request.resource.data.status in [
       "not_started",
       "in_progress",
@@ -1060,9 +1116,16 @@ allow update: if signedIn() &&
         );
 
       /*
-       * Signed-in students may load an assigned quiz directly.
+       * Generated quizzes may contain answer keys and explanations.
+       * Students receive assigned AI quizzes only through the protected
+       * /api/quiz/secure server route, so direct Firestore reads are
+       * restricted to the owning teacher or an administrator.
        */
-      allow get: if signedIn();
+      allow get: if isTeacher() &&
+        (
+          resource.data.teacherId == currentUserId() ||
+          isAdmin()
+        );
     }
 
 
@@ -1104,6 +1167,38 @@ allow update: if signedIn() &&
       allow get, list: if isTeacher();
     }
 
+
+// ------------------------------------------------------------
+// Student programming practice evidence
+// users/{userId}/programmingPracticeResults/{resultId}
+// ------------------------------------------------------------
+
+match /users/{userId}/programmingPracticeResults/{resultId} {
+
+  allow get, list: if signedIn() &&
+    (
+      currentUserId() == userId ||
+      isTeacher()
+    );
+
+  allow create: if signedIn() &&
+    currentUserId() == userId &&
+    request.resource.data.uid ==
+      currentUserId();
+
+  allow update: if signedIn() &&
+    currentUserId() == userId &&
+    request.resource.data.uid ==
+      resource.data.uid &&
+    request.resource.data.uid ==
+      currentUserId();
+
+  allow delete: if signedIn() &&
+    (
+      currentUserId() == userId ||
+      isAdmin()
+    );
+}
 
     // ------------------------------------------------------------
     // Teacher access requests
@@ -1275,6 +1370,12 @@ allow update: if signedIn() &&
         request.resource.data.teacherId == currentUserId() &&
         ownsClass(request.resource.data.classId) &&
         request.resource.data.studentIds is list &&
+        request.resource.data.studentIds.size() > 0 &&
+        request.resource.data.studentIds.hasOnly(
+          get(
+            /databases/$(database)/documents/classes/$(request.resource.data.classId)
+          ).data.studentIds
+        ) &&
         request.resource.data.questionSetSnapshot is map &&
         request.resource.data.status == "active";
 
@@ -2030,3 +2131,4 @@ match /users/{userId}/examTrainerResults/{resultId} {
     }
   }
 }
+

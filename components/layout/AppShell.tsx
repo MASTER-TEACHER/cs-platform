@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Menu } from "lucide-react";
-import { usePathname } from "next/navigation";
+import {
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  Menu,
+} from "lucide-react";
+import {
+  usePathname,
+} from "next/navigation";
 
 import Sidebar from "@/components/layout/Sidebar";
 import StudentAccessGate from "@/components/student/StudentAccessGate";
@@ -10,70 +18,102 @@ import StudentAccessGate from "@/components/student/StudentAccessGate";
 export default function AppShell({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  const pathname = usePathname();
+  const pathname =
+    usePathname();
 
-  const [mobileSidebarOpen, setMobileSidebarOpen] =
+  const [
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+  ] =
     useState(false);
 
   const publicPages = [
-    "/",
-    "/landing",
-    "/login",
-    "/register",
-    "/forgot-password",
-    "/onboarding",
-    "/teacher-verification",
-    "/cookies",
-    "/terms",
-    "/privacy",
-    "/help",
-    "/contact",
-    "/about",
-
-    /*
-     * Teacher applicants use this route before receiving
-     * the teacher role, so it must not render the normal
-     * authenticated sidebar shell.
-     */
-    "/teacher-access",
-  ];
+  "/",
+  "/landing",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/pricing",
+  "/onboarding",
+  "/teacher-verification",
+  "/cookies",
+  "/terms",
+  "/privacy",
+  "/help",
+  "/contact",
+  "/about",
+  "/teacher-access",
+];
 
   const isPublicPage =
-    publicPages.includes(pathname);
+    publicPages.includes(
+      pathname,
+    );
 
   const isTeacherWorkspace =
-    pathname === "/teacher" ||
-    pathname.startsWith("/teacher/");
+    pathname ===
+      "/teacher" ||
+    pathname.startsWith(
+      "/teacher/",
+    );
 
   const isAdminWorkspace =
-    pathname === "/admin" ||
-    pathname.startsWith("/admin/");
+    pathname ===
+      "/admin" ||
+    pathname.startsWith(
+      "/admin/",
+    );
+
+  /*
+   * Written-exam attempts deliberately remove the ordinary
+   * student navigation shell. The page itself controls the
+   * monitored exam experience, while StudentAccessGate still
+   * protects access to the authenticated student workspace.
+   */
+  const isWrittenExamAttempt =
+    pathname.startsWith(
+      "/assignments/exam/",
+    );
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      setMobileSidebarOpen(false);
-    });
-  }, [pathname]);
+    void Promise.resolve().then(
+      () => {
+        setMobileSidebarOpen(
+          false,
+        );
+      },
+    );
+  }, [
+    pathname,
+  ]);
 
   useEffect(() => {
-    if (!mobileSidebarOpen) {
+    if (
+      !mobileSidebarOpen
+    ) {
       return;
     }
 
     const previousOverflow =
-      document.body.style.overflow;
+      document.body.style
+        .overflow;
 
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow =
+      "hidden";
 
     return () => {
       document.body.style.overflow =
         previousOverflow;
     };
-  }, [mobileSidebarOpen]);
+  }, [
+    mobileSidebarOpen,
+  ]);
 
-  if (isPublicPage) {
+  if (
+    isPublicPage
+  ) {
     return (
       <main className="min-h-screen bg-slate-100">
         {children}
@@ -81,12 +121,28 @@ export default function AppShell({
     );
   }
 
+  if (
+    isWrittenExamAttempt
+  ) {
+    return (
+      <StudentAccessGate>
+        <main className="min-h-screen bg-slate-100">
+          {children}
+        </main>
+      </StudentAccessGate>
+    );
+  }
+
   const applicationShell = (
     <div className="min-h-screen bg-slate-100 xl:flex">
       <Sidebar
-        mobileOpen={mobileSidebarOpen}
+        mobileOpen={
+          mobileSidebarOpen
+        }
         onMobileClose={() =>
-          setMobileSidebarOpen(false)
+          setMobileSidebarOpen(
+            false,
+          )
         }
       />
 
@@ -105,11 +161,15 @@ export default function AppShell({
           <button
             type="button"
             onClick={() =>
-              setMobileSidebarOpen(true)
+              setMobileSidebarOpen(
+                true,
+              )
             }
             className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-800 transition hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-100"
             aria-label="Open navigation"
-            aria-expanded={mobileSidebarOpen}
+            aria-expanded={
+              mobileSidebarOpen
+            }
             aria-controls="mobile-navigation"
           >
             <Menu className="h-5 w-5" />
@@ -123,12 +183,6 @@ export default function AppShell({
     </div>
   );
 
-  /*
-   * Teacher and administrator workspaces keep their own
-   * role-specific protection. Every other authenticated
-   * application route is a student workspace and passes
-   * through the student production gate.
-   */
   if (
     isTeacherWorkspace ||
     isAdminWorkspace

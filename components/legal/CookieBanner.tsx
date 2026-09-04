@@ -1,38 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const STORAGE_KEY = "cs-master-cookie-notice-v1";
+const COOKIE_EVENT = "cs-master-cookie-notice-change";
 
-function hasAcknowledgedCookieNotice(): boolean {
-  if (typeof window === "undefined") {
-    return true;
-  }
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(COOKIE_EVENT, callback);
 
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(COOKIE_EVENT, callback);
+  };
+}
+
+function getSnapshot(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === "acknowledged";
+    return (
+      window.localStorage.getItem(STORAGE_KEY) ===
+      "acknowledged"
+    );
   } catch {
     return false;
   }
 }
 
+/**
+ * During SSR and hydration we deliberately report the notice as
+ * acknowledged. This means both the server HTML and the client's
+ * hydration pass initially render no banner.
+ *
+ * Immediately after hydration React reads getSnapshot(), and the
+ * banner appears if the user has not acknowledged it.
+ */
+function getServerSnapshot(): boolean {
+  return true;
+}
+
 export default function CookieBanner() {
-  const [visible, setVisible] = useState(
-    () => !hasAcknowledgedCookieNotice(),
+  const acknowledged = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
   );
 
   function acknowledge() {
     try {
-      localStorage.setItem(STORAGE_KEY, "acknowledged");
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        "acknowledged",
+      );
     } catch {
-      // The notice can still be dismissed for this page session.
+      // The banner can still be dismissed for the current render.
     }
 
-    setVisible(false);
+    window.dispatchEvent(
+      new Event(COOKIE_EVENT),
+    );
   }
 
-  if (!visible) {
+  if (acknowledged) {
     return null;
   }
 
@@ -43,9 +72,9 @@ export default function CookieBanner() {
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-6 text-slate-700">
-          CS Master uses essential browser storage to keep the platform
-          working. Non-essential analytics or advertising cookies are not
-          enabled by this notice. Read the{" "}
+          CS Master uses essential browser storage to keep the
+          platform working. Non-essential analytics or advertising
+          cookies are not enabled by this notice. Read the{" "}
           <Link
             href="/cookies"
             className="font-bold text-blue-700 underline"

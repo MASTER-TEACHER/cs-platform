@@ -8,7 +8,6 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -163,9 +162,31 @@ function createDefaultStudentProgress(
   };
 }
 
+function uniqueStudentIds(values: string[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((studentId) => studentId.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 function validateAssignmentInput(input: CreateResourceAssignmentInput): void {
   if (!input.resourceId.trim()) {
     throw new Error("A valid teaching resource is required.");
+  }
+
+  if (!input.resourceTitle.trim()) {
+    throw new Error("The assigned resource needs a title.");
+  }
+
+  if (!input.resourceTopic.trim()) {
+    throw new Error("The assigned resource needs a topic.");
+  }
+
+  if (!input.resourceType.trim()) {
+    throw new Error("The assigned resource type is invalid.");
   }
 
   if (!input.teacherId.trim()) {
@@ -201,11 +222,52 @@ export async function createResourceAssignment(
 ): Promise<string> {
   validateAssignmentInput(input);
 
-  const uniqueStudentIds = Array.from(
-    new Set(
-      input.studentIds.map((studentId) => studentId.trim()).filter(Boolean),
-    ),
+  const teacherId = input.teacherId.trim();
+  const classId = input.classId.trim();
+  const requestedStudentIds = uniqueStudentIds(input.studentIds);
+
+  const classSnapshot = await getDoc(
+    doc(db, "classes", classId),
   );
+
+  if (!classSnapshot.exists()) {
+    throw new Error("The selected class could not be found.");
+  }
+
+  const classData = classSnapshot.data();
+
+  if (
+    typeof classData.teacherId !== "string" ||
+    classData.teacherId.trim() !== teacherId
+  ) {
+    throw new Error("You cannot assign work to another teacher's class.");
+  }
+
+  const enrolledStudentIds = uniqueStudentIds(
+    Array.isArray(classData.studentIds)
+      ? classData.studentIds.filter(
+          (value: unknown): value is string => typeof value === "string",
+        )
+      : [],
+  );
+
+  if (enrolledStudentIds.length === 0) {
+    throw new Error("The selected class has no enrolled students.");
+  }
+
+  if (requestedStudentIds.length === 0) {
+    throw new Error("Select at least one student for this assignment.");
+  }
+
+  const invalidRecipient = requestedStudentIds.find(
+    (studentId) => !enrolledStudentIds.includes(studentId),
+  );
+
+  if (invalidRecipient) {
+    throw new Error(
+      "One or more selected students are no longer enrolled in this class. Refresh the recipients and try again.",
+    );
+  }
 
   const assignmentReference = await addDoc(collection(db, "classAssignments"), {
     resourceId: input.resourceId.trim(),
@@ -213,11 +275,14 @@ export async function createResourceAssignment(
     resourceTopic: input.resourceTopic.trim(),
     resourceType: input.resourceType.trim(),
 
-    teacherId: input.teacherId.trim(),
+    teacherId,
     teacherName: input.teacherName?.trim() || "Teacher",
 
-    classId: input.classId.trim(),
-    className: input.className.trim(),
+    classId,
+    className:
+      typeof classData.name === "string" && classData.name.trim()
+        ? classData.name.trim()
+        : input.className.trim(),
 
     instructions: input.instructions?.trim() || "",
 
@@ -225,8 +290,8 @@ export async function createResourceAssignment(
 
     status: "active",
 
-    studentIds: uniqueStudentIds,
-    studentCount: uniqueStudentIds.length,
+    studentIds: requestedStudentIds,
+    studentCount: requestedStudentIds.length,
     completedCount: 0,
 
     createdAt: serverTimestamp(),
@@ -358,39 +423,65 @@ export async function startStudentAssignment(
   assignmentId: string,
   studentId: string,
 ): Promise<void> {
-  if (!assignmentId.trim() || !studentId.trim()) {
+  const cleanedAssignmentId = assignmentId.trim();
+  const cleanedStudentId = studentId.trim();
+
+  if (!cleanedAssignmentId || !cleanedStudentId) {
     throw new Error("A valid assignment and student are required.");
   }
 
-  const progressId = createProgressDocumentId(assignmentId, studentId);
-
+  const assignmentReference = doc(
+    db,
+    "classAssignments",
+    cleanedAssignmentId,
+  );
+  const progressId = createProgressDocumentId(
+    cleanedAssignmentId,
+    cleanedStudentId,
+  );
   const progressReference = doc(db, "assignmentProgress", progressId);
 
-  const existingProgress = await getDoc(progressReference);
+  await runTransaction(db, async (transaction) => {
+    const [assignmentSnapshot, progressSnapshot] = await Promise.all([
+      transaction.get(assignmentReference),
+      transaction.get(progressReference),
+    ]);
 
-  if (
-    existingProgress.exists() &&
-    existingProgress.data().status === "completed"
-  ) {
-    return;
-  }
+    if (!assignmentSnapshot.exists()) {
+      throw new Error("This assignment could not be found.");
+    }
 
-  await setDoc(
-    progressReference,
-    {
-      assignmentId,
-      studentId,
+    const assignmentData =
+      assignmentSnapshot.data() as FirestoreResourceAssignment;
 
-      status: "in_progress",
+    if (!assignmentData.studentIds?.includes(cleanedStudentId)) {
+      throw new Error("You are not enrolled in this assignment.");
+    }
 
-      startedAt: serverTimestamp(),
-      completedAt: null,
-      updatedAt: serverTimestamp(),
-    },
-    {
-      merge: true,
-    },
-  );
+    if (progressSnapshot.exists() && progressSnapshot.data().status === "completed") {
+      return;
+    }
+
+    if (assignmentData.status !== "active") {
+      throw new Error("This assignment is no longer accepting work.");
+    }
+
+    transaction.set(
+      progressReference,
+      {
+        assignmentId: cleanedAssignmentId,
+        studentId: cleanedStudentId,
+        status: "in_progress",
+        startedAt:
+          progressSnapshot.exists()
+            ? progressSnapshot.data().startedAt ?? serverTimestamp()
+            : serverTimestamp(),
+        completedAt: null,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
 }
 
 export async function completeStudentAssignment(
@@ -429,6 +520,10 @@ export async function completeStudentAssignment(
 
     if (alreadyCompleted) {
       return;
+    }
+
+    if (assignmentData.status !== "active") {
+      throw new Error("This assignment is no longer accepting work.");
     }
 
     transaction.set(
