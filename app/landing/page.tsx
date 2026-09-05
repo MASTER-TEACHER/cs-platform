@@ -81,7 +81,7 @@ export default function LandingPage() {
 
         <footer className="mt-20 border-t border-white/10 pt-8 text-sm text-slate-400">
           <p>CS Master — GCSE Computer Science Learning Platform</p>
-          <p className="mt-2">Built by Chris Brown · Version 1.0 Public Beta</p>
+          <p className="mt-2">Built by Master Teacher · Version 1.0 Public Beta</p>
         </footer>
       </section>
     </main>
