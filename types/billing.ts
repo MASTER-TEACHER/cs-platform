@@ -222,6 +222,15 @@ export type SchoolSubscriptionSummary = {
 
   stripeSubscriptionId: string | null;
 
+  billingAccessBlocked?: boolean;
+
+  billingAccessBlockReason?:
+    | "payment_failed"
+    | "invoice_finalization_failed"
+    | "full_refund"
+    | "dispute"
+    | null;
+
   entitlementTier?:
     EntitlementTier;
 
@@ -270,6 +279,15 @@ export type IndividualSubscriptionSummary = {
   stripeCustomerId: string | null;
 
   stripeSubscriptionId: string | null;
+
+  billingAccessBlocked?: boolean;
+
+  billingAccessBlockReason?:
+    | "payment_failed"
+    | "invoice_finalization_failed"
+    | "full_refund"
+    | "dispute"
+    | null;
 
   entitlementTier?:
     EntitlementTier;

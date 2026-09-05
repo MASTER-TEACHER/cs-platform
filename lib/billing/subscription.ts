@@ -286,11 +286,32 @@ export async function persistStripeSubscription(
         )
       : 0;
 
-  await adminDb
-    .collection(
-      "schoolSubscriptions",
-    )
-    .doc(schoolId)
+  const subscriptionRef =
+    adminDb
+      .collection(
+        "schoolSubscriptions",
+      )
+      .doc(schoolId);
+
+  const existingSubscription =
+    await subscriptionRef.get();
+
+  const billingAccessBlocked =
+    existingSubscription.exists &&
+    booleanValue(
+      existingSubscription.data()
+        ?.billingAccessBlocked,
+    );
+
+  const active =
+    isSubscriptionActive(
+      normaliseStatus(
+        subscription.status,
+      ),
+    ) &&
+    !billingAccessBlocked;
+
+  await subscriptionRef
     .set(
       {
         schoolId,
@@ -324,20 +345,12 @@ export async function persistStripeSubscription(
           ),
 
         entitlementTier:
-          isSubscriptionActive(
-            normaliseStatus(
-              subscription.status,
-            ),
-          )
+          active
             ? "school"
             : "free",
 
         entitlementSource:
-          isSubscriptionActive(
-            normaliseStatus(
-              subscription.status,
-            ),
-          )
+          active
             ? "school_subscription"
             : "free",
 
@@ -401,11 +414,28 @@ export async function persistIndividualStripeSubscription(
       ? subscription.customer
       : subscription.customer.id;
 
-  await adminDb
-    .collection(
-      "individualSubscriptions",
-    )
-    .doc(userId)
+  const subscriptionRef =
+    adminDb
+      .collection(
+        "individualSubscriptions",
+      )
+      .doc(userId);
+
+  const existingSubscription =
+    await subscriptionRef.get();
+
+  const billingAccessBlocked =
+    existingSubscription.exists &&
+    booleanValue(
+      existingSubscription.data()
+        ?.billingAccessBlocked,
+    );
+
+  const entitlementActive =
+    active &&
+    !billingAccessBlocked;
+
+  await subscriptionRef
     .set(
       {
         userId,
@@ -435,12 +465,12 @@ export async function persistIndividualStripeSubscription(
           ),
 
         entitlementTier:
-          active
+          entitlementActive
             ? "student_premium"
             : "free",
 
         entitlementSource:
-          active
+          entitlementActive
             ? "individual_subscription"
             : "free",
 
@@ -477,7 +507,7 @@ export async function persistIndividualStripeSubscription(
     await userRef.set(
       {
         individualPlan:
-          active
+          entitlementActive
             ? "premium"
             : "free",
 
@@ -495,7 +525,7 @@ export async function persistIndividualStripeSubscription(
           "school"
             ? {
                 plan:
-                  active
+                  entitlementActive
                     ? "premium"
                     : "free",
 
@@ -510,6 +540,133 @@ export async function persistIndividualStripeSubscription(
       },
     );
   }
+}
+
+/*
+ * ---------------------------------------------------------
+ * BILLING ACCESS OVERRIDES
+ * ---------------------------------------------------------
+ *
+ * Stripe subscription status is the primary entitlement
+ * signal. Payment/refund/dispute webhooks can additionally
+ * block access until a later successful invoice clears the
+ * block. This prevents an "active" Stripe subscription from
+ * accidentally retaining paid access after a full refund,
+ * failed renewal or dispute.
+ */
+
+export type BillingAccessBlockReason =
+  | "payment_failed"
+  | "invoice_finalization_failed"
+  | "full_refund"
+  | "dispute";
+
+
+  function billingAccessBlockReasonValue(
+  value: unknown,
+): BillingAccessBlockReason | null {
+  const reason = stringValue(value);
+
+  switch (reason) {
+    case "payment_failed":
+    case "invoice_finalization_failed":
+    case "full_refund":
+    case "dispute":
+      return reason;
+
+    default:
+      return null;
+  }
+}
+
+export async function setBillingAccessForCustomer(
+  customerId: string,
+  blocked: boolean,
+  reason: BillingAccessBlockReason | null,
+): Promise<void> {
+  if (!customerId) {
+    return;
+  }
+
+  const now = new Date();
+
+  const [individualSnapshot, schoolSnapshot] =
+    await Promise.all([
+      adminDb
+        .collection("individualSubscriptions")
+        .where("stripeCustomerId", "==", customerId)
+        .get(),
+      adminDb
+        .collection("schoolSubscriptions")
+        .where("stripeCustomerId", "==", customerId)
+        .get(),
+    ]);
+
+  const writes: Promise<unknown>[] = [];
+
+  for (const document of individualSnapshot.docs) {
+    writes.push(
+      document.ref.set(
+        {
+          billingAccessBlocked: blocked,
+          billingAccessBlockReason: blocked ? reason : null,
+          billingAccessUpdatedAt: now,
+          updatedAt: now,
+        },
+        { merge: true },
+      ),
+    );
+
+    const userId = stringValue(document.data().userId) || document.id;
+
+    if (userId) {
+      const userRef = adminDb.collection("users").doc(userId);
+      const userSnapshot = await userRef.get();
+
+      if (userSnapshot.exists) {
+        const user = userSnapshot.data() || {};
+        const subscriptionStatus = normaliseStatus(
+          document.data().status,
+        );
+        const premium =
+          !blocked && isSubscriptionActive(subscriptionStatus);
+
+        writes.push(
+          userRef.set(
+            {
+              individualPlan: premium ? "premium" : "free",
+              billingAccessBlocked: blocked,
+              billingAccessBlockReason: blocked ? reason : null,
+              updatedAt: now,
+              ...(user.accountType !== "school"
+                ? {
+                    plan: premium ? "premium" : "free",
+                    accountType: "individual",
+                  }
+                : {}),
+            },
+            { merge: true },
+          ),
+        );
+      }
+    }
+  }
+
+  for (const document of schoolSnapshot.docs) {
+    writes.push(
+      document.ref.set(
+        {
+          billingAccessBlocked: blocked,
+          billingAccessBlockReason: blocked ? reason : null,
+          billingAccessUpdatedAt: now,
+          updatedAt: now,
+        },
+        { merge: true },
+      ),
+    );
+  }
+
+  await Promise.all(writes);
 }
 
 /*
@@ -616,10 +773,16 @@ export async function getSchoolSubscriptionSummary(
       data.status,
     );
 
+  const billingAccessBlocked =
+    booleanValue(
+      data.billingAccessBlocked,
+    );
+
   const active =
     isSubscriptionActive(
       status,
-    );
+    ) &&
+    !billingAccessBlocked;
 
   const planKeyValue =
     stringValue(
@@ -690,6 +853,12 @@ export async function getSchoolSubscriptionSummary(
       stringValue(
         data.stripeSubscriptionId,
       ) || null,
+
+    billingAccessBlocked,
+
+   billingAccessBlockReason: billingAccessBlockReasonValue(
+  data.billingAccessBlockReason,
+),
 
     entitlementTier:
       active
@@ -774,10 +943,16 @@ export async function getIndividualSubscriptionSummary(
       data.status,
     );
 
+  const billingAccessBlocked =
+    booleanValue(
+      data.billingAccessBlocked,
+    );
+
   const active =
     isSubscriptionActive(
       status,
-    );
+    ) &&
+    !billingAccessBlocked;
 
   const planKeyValue =
     stringValue(
@@ -828,6 +1003,12 @@ export async function getIndividualSubscriptionSummary(
       stringValue(
         data.stripeSubscriptionId,
       ) || null,
+
+    billingAccessBlocked,
+
+    billingAccessBlockReason: billingAccessBlockReasonValue(
+  data.billingAccessBlockReason,
+),
 
     entitlementTier:
       active
