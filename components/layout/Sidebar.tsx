@@ -12,6 +12,7 @@ import type {
 
 import {
   BarChart3,
+  Crown,
   X,
 } from "lucide-react";
 
@@ -245,6 +246,14 @@ export default function Sidebar({
     profile?.role ===
     "teacher";
 
+  const isStudent =
+    profile?.role ===
+    "student";
+
+  const isIndividualStudent =
+    isStudent &&
+    !profile?.schoolId;
+
   const links =
     isAdmin
       ? adminLinks
@@ -281,7 +290,9 @@ export default function Sidebar({
       ? "Administrator account"
       : isTeacher
         ? "Teacher account"
-        : "Student account";
+        : isIndividualStudent
+          ? "Individual student account"
+          : "Student account";
 
   function isActive(
     href: string,
@@ -420,6 +431,31 @@ export default function Sidebar({
               </Link>
             );
           },
+        )}
+
+        {isIndividualStudent && (
+          <Link
+            href="/upgrade"
+            onClick={
+              closeMobileNavigation
+            }
+            className={`mt-4 flex items-center gap-3 rounded-xl border px-4 py-3 font-black transition ${
+              isActive("/upgrade")
+                ? "border-amber-300 bg-amber-400 text-slate-950 shadow-lg"
+                : "border-amber-400/40 bg-amber-400/10 text-amber-300 hover:bg-amber-400 hover:text-slate-950"
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className="flex h-5 w-5 shrink-0 items-center justify-center"
+            >
+              <Crown className="h-5 w-5" />
+            </span>
+
+            <span>
+              Upgrade to Premium
+            </span>
+          </Link>
         )}
       </nav>
 
