@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
+import LogoutButton from "@/components/layout/LogoutButton";
 import { getSchoolSubscription } from "@/services/billingClientService";
 import type { SchoolSubscriptionSummary } from "@/types/billing";
 
@@ -146,6 +147,9 @@ export default function SchoolSubscriptionGate({
           Subscription check unavailable
         </h1>
         <p className="mt-3 text-red-800">{accessState.error}</p>
+        <div className="max-w-xs">
+          <LogoutButton />
+        </div>
       </section>
     );
   }
@@ -201,6 +205,9 @@ export default function SchoolSubscriptionGate({
       <p className="mt-4 leading-7 text-amber-900">
         Your account remains intact, but the school subscription for CS Master is not currently active.
       </p>
+      <div className="max-w-xs">
+        <LogoutButton />
+      </div>
     </section>
   );
 }
