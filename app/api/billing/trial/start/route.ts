@@ -327,6 +327,10 @@ export async function POST(
                 SCHOOL_TRIAL_PLAN
                   .cardRequired,
 
+              seatLimit:
+                SCHOOL_TRIAL_PLAN
+                  .seatLimit,
+
               /*
                * We will use this in the following batch when
                * creating the synthetic demonstration class.

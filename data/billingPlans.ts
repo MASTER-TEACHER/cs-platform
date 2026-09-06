@@ -51,6 +51,8 @@ export type SchoolTrialPlan = {
 
   cardRequired: boolean;
 
+  seatLimit: number;
+
   description: string;
 
   highlights: string[];
@@ -229,6 +231,9 @@ export const SCHOOL_TRIAL_PLAN: SchoolTrialPlan = {
   durationDays: 14,
 
   cardRequired: false,
+
+  // Trial schools use the Starter-plan capacity during evaluation.
+  seatLimit: 100,
 
   description:
     "Explore the complete teacher and school experience for 14 days with no payment card required.",

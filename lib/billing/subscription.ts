@@ -14,6 +14,10 @@ import {
   getSeatLimit,
 } from "@/lib/billing/plans";
 
+import {
+  SCHOOL_TRIAL_PLAN,
+} from "@/data/billingPlans";
+
 import type {
   EntitlementSource,
   EntitlementSummary,
@@ -1152,6 +1156,82 @@ export async function getSchoolTrialSummary(
   };
 }
 
+/**
+ * Resolve the trial attached to a real school workspace.
+ *
+ * Trial documents are keyed by the teacher who started them,
+ * so students cannot look them up by their own UID. This
+ * school-level resolver lets every member of the same school
+ * inherit the active 14-day school entitlement.
+ */
+export async function getSchoolTrialSummaryBySchoolId(
+  schoolId: string,
+): Promise<SchoolTrialSummary> {
+  const cleanedSchoolId =
+    schoolId.trim();
+
+  const empty: SchoolTrialSummary = {
+    schoolId:
+      cleanedSchoolId || null,
+    userId: "",
+    status: "none",
+    active: false,
+    startedAt: null,
+    endsAt: null,
+    daysRemaining: null,
+    convertedAt: null,
+  };
+
+  if (!cleanedSchoolId) {
+    return empty;
+  }
+
+  const snapshot =
+    await adminDb
+      .collection("schoolTrials")
+      .where(
+        "schoolId",
+        "==",
+        cleanedSchoolId,
+      )
+      .limit(10)
+      .get();
+
+  if (snapshot.empty) {
+    return empty;
+  }
+
+  const summaries =
+    await Promise.all(
+      snapshot.docs.map((doc) =>
+        getSchoolTrialSummary(
+          doc.id,
+        ),
+      ),
+    );
+
+  return (
+    summaries.find(
+      (trial) =>
+        trial.active &&
+        trial.schoolId ===
+          cleanedSchoolId,
+    ) ??
+    summaries.find(
+      (trial) =>
+        trial.schoolId ===
+          cleanedSchoolId &&
+        trial.status ===
+          "expired",
+    ) ??
+    empty
+  );
+}
+
+export function getSchoolTrialSeatLimit(): number {
+  return SCHOOL_TRIAL_PLAN.seatLimit;
+}
+
 /*
  * ---------------------------------------------------------
  * UNIFIED ENTITLEMENT RESOLVER
@@ -1209,35 +1289,39 @@ export async function getUserEntitlementSummary(
         userId,
       ),
 
-      role === "teacher" ||
-      role === "admin"
-        ? getSchoolTrialSummary(
-            userId,
+      schoolId
+        ? getSchoolTrialSummaryBySchoolId(
+            schoolId,
           )
-        : Promise.resolve<SchoolTrialSummary>({
-            schoolId:
-              null,
+        : role === "teacher" ||
+            role === "admin"
+          ? getSchoolTrialSummary(
+              userId,
+            )
+          : Promise.resolve<SchoolTrialSummary>({
+              schoolId:
+                null,
 
-            userId,
+              userId,
 
-            status:
-              "none",
+              status:
+                "none",
 
-            active:
-              false,
+              active:
+                false,
 
-            startedAt:
-              null,
+              startedAt:
+                null,
 
-            endsAt:
-              null,
+              endsAt:
+                null,
 
-            daysRemaining:
-              null,
+              daysRemaining:
+                null,
 
-            convertedAt:
-              null,
-          }),
+              convertedAt:
+                null,
+            }),
     ]);
 
   let schoolSubscription:
@@ -1318,11 +1402,12 @@ export async function getUserEntitlementSummary(
    */
 
   if (
+    schoolTrial.active &&
     (
-      role === "teacher" ||
-      role === "admin"
-    ) &&
-    schoolTrial.active
+      !schoolId ||
+      schoolTrial.schoolId ===
+        schoolId
+    )
   ) {
     return {
       tier:
@@ -1341,7 +1426,8 @@ export async function getUserEntitlementSummary(
         true,
 
       teacherSchoolAccess:
-        true,
+        role === "teacher" ||
+        role === "admin",
 
       trialStatus:
         "active",

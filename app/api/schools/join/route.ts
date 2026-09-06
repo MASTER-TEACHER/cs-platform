@@ -18,6 +18,8 @@ import {
 import {
   countStudentSeats,
   getSchoolSubscriptionSummary,
+  getSchoolTrialSeatLimit,
+  getSchoolTrialSummaryBySchoolId,
 } from "@/lib/billing/subscription";
 
 export const runtime = "nodejs";
@@ -198,17 +200,32 @@ export async function POST(
           schoolId,
         );
 
-      if (!subscription.active) {
+      const schoolTrial =
+        subscription.active
+          ? null
+          : await getSchoolTrialSummaryBySchoolId(
+              schoolId,
+            );
+
+      if (
+        !subscription.active &&
+        !schoolTrial?.active
+      ) {
         return NextResponse.json(
           {
             error:
-              "This school's CS Master subscription is not active.",
+              "This school's CS Master subscription or School Trial is not active.",
           },
           {
             status: 402,
           },
         );
       }
+
+      const seatLimit =
+        subscription.active
+          ? subscription.seatLimit
+          : getSchoolTrialSeatLimit();
 
       const existingSeatCount =
         await countStudentSeats(
@@ -217,7 +234,7 @@ export async function POST(
 
       if (
         existingSeatCount >=
-        subscription.seatLimit
+        seatLimit
       ) {
         return NextResponse.json(
           {
