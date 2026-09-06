@@ -149,6 +149,11 @@ const teacherLinks: SidebarLink[] = [
     icon: "🏢",
   },
   {
+    href: "/teacher/billing",
+    label: "Billing",
+    icon: "💳",
+  },
+  {
     href: "/teacher/assignments",
     label: "Assignments",
     icon: "📋",

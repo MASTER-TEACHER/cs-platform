@@ -459,7 +459,7 @@ export default function TeacherTrialBanner() {
                 )}
 
               <Link
-                href="/pricing"
+                href="/teacher/billing"
                 className="inline-flex min-h-12 items-center justify-center rounded-xl border border-indigo-300 bg-white px-6 py-3 font-black text-indigo-700 transition hover:bg-indigo-50"
               >
                 View school plans
@@ -516,7 +516,7 @@ export default function TeacherTrialBanner() {
           </div>
 
           <Link
-            href="/pricing"
+            href="/teacher/billing"
             className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-xl bg-slate-950 px-6 py-3 font-black text-white transition hover:bg-slate-800"
           >
             View school plans →
