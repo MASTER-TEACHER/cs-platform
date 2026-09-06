@@ -1,195 +1,158 @@
 "use client";
 
 import Link from "next/link";
-import {
-  usePathname,
-} from "next/navigation";
-import {
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import {
-  useAuth,
-} from "@/contexts/AuthContext";
-
-import {
-  getSchoolSubscription,
-} from "@/services/billingClientService";
-
-import type {
-  SchoolSubscriptionSummary,
-} from "@/types/billing";
+import { useAuth } from "@/contexts/AuthContext";
+import { getSchoolSubscription } from "@/services/billingClientService";
+import type { SchoolSubscriptionSummary } from "@/types/billing";
 
 const TEACHER_EXEMPT_PATHS = [
   "/teacher/school",
   "/teacher/billing",
 ];
 
+type TrialStatusResponse = {
+  entitlement?: {
+    teacherSchoolAccess?: boolean;
+  };
+  trial?: {
+    active?: boolean;
+    status?: string;
+  };
+};
+
+type AccessState = {
+  key: string;
+  subscription: SchoolSubscriptionSummary | null;
+  trialAccessActive: boolean;
+  error: string;
+};
+
 export default function SchoolSubscriptionGate({
   children,
 }: {
   children: ReactNode;
 }) {
-  const pathname =
-    usePathname();
+  const pathname = usePathname();
+  const { user, profile } = useAuth();
 
-  const {
-    user,
-    profile,
-  } = useAuth();
+  const accessKey = useMemo(() => {
+    if (!user || !profile?.schoolId || profile.role === "admin") {
+      return null;
+    }
 
-  const [
-    subscription,
-    setSubscription,
-  ] =
-    useState<SchoolSubscriptionSummary | null>(
-      null,
-    );
+    return `${user.uid}:${profile.schoolId}:${profile.role}`;
+  }, [user, profile?.schoolId, profile?.role]);
 
-  const [
-    checked,
-    setChecked,
-  ] =
-    useState(false);
-
-  const [
-    error,
-    setError,
-  ] =
-    useState("");
-
-  const [
-    trialAccessActive,
-    setTrialAccessActive,
-  ] =
-    useState(false);
+  const [accessState, setAccessState] = useState<AccessState | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (
-      !user ||
-      !profile?.schoolId ||
-      profile.role === "admin"
-    ) {
+    if (!accessKey || !user || !profile?.schoolId || profile.role === "admin") {
       return;
     }
 
-    void Promise.all([
-      getSchoolSubscription(),
-      user.getIdToken().then(async (token) => {
-        const response = await fetch(
-          "/api/billing/trial/status",
-          {
+    let cancelled = false;
+
+    const loadAccess = async () => {
+      try {
+        const subscriptionStatus = await getSchoolSubscription();
+        let teacherTrialActive = false;
+
+        /*
+         * The School Trial endpoint is restricted to teacher/admin accounts.
+         * Students must never call it. Student access is based only on the
+         * active school subscription, while teachers may additionally use an
+         * active 14-day School Trial entitlement.
+         */
+        if (profile.role === "teacher") {
+          const token = await user.getIdToken();
+          const response = await fetch("/api/billing/trial/status", {
             method: "GET",
             headers: {
               Authorization: `Bearer ${token}`,
             },
             cache: "no-store",
-          },
-        );
+          });
 
-        if (!response.ok) {
-          throw new Error(
-            "School Trial status could not be checked.",
-          );
-        }
+          if (!response.ok) {
+            throw new Error("School Trial status could not be checked.");
+          }
 
-        return response.json() as Promise<{
-          entitlement?: {
-            teacherSchoolAccess?: boolean;
-          };
-          trial?: {
-            active?: boolean;
-            status?: string;
-          };
-        }>;
-      }),
-    ])
-      .then(([value, trialStatus]) => {
-        if (!cancelled) {
-          setSubscription(value);
-          setTrialAccessActive(
+          const trialStatus = (await response.json()) as TrialStatusResponse;
+
+          teacherTrialActive =
             trialStatus.entitlement?.teacherSchoolAccess === true ||
-              (trialStatus.trial?.active === true &&
-                trialStatus.trial?.status === "active"),
-          );
-          setError("");
+            (trialStatus.trial?.active === true &&
+              trialStatus.trial?.status === "active");
         }
-      })
-      .catch((caught) => {
+
         if (!cancelled) {
-          setError(
-            caught instanceof Error
-              ? caught.message
-              : "School access status could not be checked.",
-          );
+          setAccessState({
+            key: accessKey,
+            subscription: subscriptionStatus,
+            trialAccessActive: teacherTrialActive,
+            error: "",
+          });
         }
-      })
-      .finally(() => {
+      } catch (caught) {
         if (!cancelled) {
-          setChecked(true);
+          setAccessState({
+            key: accessKey,
+            subscription: null,
+            trialAccessActive: false,
+            error:
+              caught instanceof Error
+                ? caught.message
+                : "School access status could not be checked.",
+          });
         }
-      });
+      }
+    };
+
+    void loadAccess();
 
     return () => {
       cancelled = true;
     };
-  }, [
-    user,
-    profile?.schoolId,
-    profile?.role,
-  ]);
+  }, [accessKey, user, profile?.schoolId, profile?.role]);
 
-  if (
-    !profile?.schoolId ||
-    profile.role === "admin"
-  ) {
+  if (!profile?.schoolId || profile.role === "admin") {
     return <>{children}</>;
   }
 
   if (
     profile.role === "teacher" &&
     TEACHER_EXEMPT_PATHS.some(
-      (path) =>
-        pathname === path ||
-        pathname.startsWith(
-          `${path}/`,
-        ),
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
     )
   ) {
     return <>{children}</>;
   }
 
-  if (!checked) {
+  if (!accessKey || accessState?.key !== accessKey) {
     return (
       <div className="flex min-h-[55vh] items-center justify-center">
-        <p className="font-bold text-slate-600">
-          Checking school subscription...
-        </p>
+        <p className="font-bold text-slate-600">Checking school subscription...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (accessState.error) {
     return (
       <section className="mx-auto max-w-2xl rounded-3xl border border-red-200 bg-red-50 p-8">
         <h1 className="text-2xl font-black text-red-950">
           Subscription check unavailable
         </h1>
-        <p className="mt-3 text-red-800">
-          {error}
-        </p>
+        <p className="mt-3 text-red-800">{accessState.error}</p>
       </section>
     );
   }
 
-  if (
-    !subscription ||
-    !subscription.enforcementEnabled
-  ) {
+  const { subscription, trialAccessActive } = accessState;
+
+  if (!subscription || !subscription.enforcementEnabled) {
     return <>{children}</>;
   }
 
