@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+
+import toast from "react-hot-toast";
 
 import { useAuth } from "@/contexts/AuthContext";
 import LogoutButton from "@/components/layout/LogoutButton";
@@ -48,6 +55,59 @@ export default function SchoolSubscriptionGate({
   }, [user, profile?.schoolId, profile?.role]);
 
   const [accessState, setAccessState] = useState<AccessState | null>(null);
+
+  const [startingTrial, setStartingTrial] = useState(false);
+
+async function startTrial() {
+  if (!user || startingTrial) {
+    return;
+  }
+
+  try {
+    setStartingTrial(true);
+
+    const token = await user.getIdToken();
+
+    const response = await fetch("/api/billing/trial/start", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      let message = "The School Trial could not be started.";
+
+      try {
+        const body = (await response.json()) as {
+          error?: string;
+        };
+
+        if (body.error) {
+          message = body.error;
+        }
+      } catch {
+        // Keep fallback message.
+      }
+
+      throw new Error(message);
+    }
+
+    toast.success("Your 14-day CS Master School Trial is active.");
+
+    window.location.reload();
+  } catch (error) {
+    console.error("Start School Trial error:", error);
+
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "The School Trial could not be started.",
+    );
+  } finally {
+    setStartingTrial(false);
+  }
+}
 
   useEffect(() => {
     if (!accessKey || !user || !profile?.schoolId || profile.role === "admin") {
@@ -165,34 +225,55 @@ export default function SchoolSubscriptionGate({
   }
 
   if (profile.role === "teacher") {
-    return (
-      <section className="mx-auto max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 p-8">
-        <p className="text-sm font-black uppercase tracking-widest text-amber-700">
-          School subscription required
-        </p>
-        <h1 className="mt-2 text-3xl font-black text-amber-950">
-          Activate CS Master for your school
-        </h1>
-        <p className="mt-4 leading-7 text-amber-900">
-          Your school workspace is ready, but paid features require an active school subscription.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/teacher/billing"
-            className="rounded-xl bg-amber-700 px-5 py-3 font-black text-white"
-          >
-            View plans
-          </Link>
-          <Link
-            href="/teacher/school"
-            className="rounded-xl border border-amber-300 bg-white px-5 py-3 font-black text-amber-900"
-          >
-            School settings
-          </Link>
-        </div>
-      </section>
-    );
-  }
+  return (
+    <section className="mx-auto max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 p-8">
+      <p className="text-sm font-black uppercase tracking-widest text-amber-700">
+        School access required
+      </p>
+
+      <h1 className="mt-2 text-3xl font-black text-amber-950">
+        Activate CS Master for your school
+      </h1>
+
+      <p className="mt-4 leading-7 text-amber-900">
+        Your school workspace is ready. Start your free 14-day School
+        Trial to unlock the full teacher platform, or choose a school
+        subscription.
+      </p>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => void startTrial()}
+          disabled={startingTrial}
+          className="rounded-xl bg-indigo-600 px-5 py-3 font-black text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-400"
+        >
+          {startingTrial
+            ? "Starting trial..."
+            : "Start 14-Day Free Trial"}
+        </button>
+
+        <Link
+          href="/teacher/billing"
+          className="rounded-xl bg-amber-700 px-5 py-3 font-black text-white"
+        >
+          View plans
+        </Link>
+
+        <Link
+          href="/teacher/school"
+          className="rounded-xl border border-amber-300 bg-white px-5 py-3 font-black text-amber-900"
+        >
+          School settings
+        </Link>
+      </div>
+
+      <p className="mt-4 text-sm font-semibold text-amber-800">
+        No payment card required for the 14-day trial.
+      </p>
+    </section>
+  );
+}
 
   return (
     <section className="mx-auto max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 p-8">
