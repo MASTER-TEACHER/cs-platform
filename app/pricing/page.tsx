@@ -1,170 +1,36 @@
 import Link from "next/link";
 
-const plans = [
-  {
-    name: "Teacher Trial",
-    description:
-      "Explore the teacher workspace, assignments, analytics and CS Master classroom workflows before choosing a school plan.",
-    features: [
-      "Teacher dashboard",
-      "Assignment Centre",
-      "Student progress monitoring",
-      "Quiz and lesson assignment workflows",
-    ],
-    action: "Start teacher access",
-    href: "/teacher-access",
-  },
-  {
-    name: "School",
-    description:
-      "For Computer Science departments that want curriculum-aligned learning, assessment and teacher intelligence in one workspace.",
-    features: [
-      "Teacher and student accounts",
-      "Curriculum and exam-board pathways",
-      "Interactive lessons and quizzes",
-      "Assignment and markbook workflows",
-      "Teacher analytics and interventions",
-      "Exam and programming tools",
-    ],
-    action: "Explore teacher access",
-    href: "/teacher-access",
-    featured: true,
-  },
-  {
-    name: "Multi-class / Department",
-    description:
-      "Designed for departments that need CS Master across multiple classes and year groups.",
-    features: [
-      "Multiple classes",
-      "Centralised teacher workflows",
-      "Progress and attainment intelligence",
-      "Assignment reporting",
-      "Curriculum coverage visibility",
-    ],
-    action: "Get started",
-    href: "/teacher-access",
-  },
+const studentPlans = [
+  { name: "Free Individual", price: "£0", period: "forever", description: "Core Computer Science learning and basic practice with no subscription required.", features: ["Curriculum learning", "Core quizzes and practice", "Exam-board-aware pathways", "Progress tracking"], action: "Create free account", href: "/register" },
+  { name: "Student Premium Monthly", price: "£6.99", period: "/month", description: "Flexible monthly access to the complete individual student platform.", features: ["Full GCSE and A-level curriculum", "Adaptive Learning and AI Tutor", "Exam Trainer and Exam Mode", "Full programming practice", "Knowledge Map and revision planning", "Detailed analytics and feedback"], action: "Get Premium", href: "/register", featured: true },
+  { name: "Student Premium Annual", price: "£59.99", period: "/year", description: "The complete Premium experience at the best individual value.", features: ["Everything in Student Premium Monthly", "One annual payment", "Equivalent to about £5/month", "Manage or cancel through Stripe Billing Portal"], action: "Get annual Premium", href: "/register" },
+];
+
+const schoolPlans = [
+  { name: "School Starter", price: "£499", period: "/year", description: "For smaller departments starting with CS Master.", features: ["Up to 100 student seats", "Full Student Premium access for licensed students", "Teacher workspace", "Classes, assignments and analytics", "Curriculum and programming tools"] },
+  { name: "School Standard", price: "£999", period: "/year", description: "For most secondary-school Computer Science departments.", features: ["Up to 300 student seats", "Everything in School Starter", "Full teacher intelligence", "Exam Mode and integrity monitoring", "Interventions and reporting", "AI Tutor and adaptive learning"], featured: true },
+  { name: "School Pro", price: "£1,499", period: "/year", description: "For larger schools, trusts and high-usage departments.", features: ["Up to 1,000 student seats", "Everything in School Standard", "Full CS Master platform", "Advanced analytics and interventions", "Large-scale licence capacity", "Priority commercial support"] },
 ];
 
 export default function PricingPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-900 px-6 py-16 text-white">
-        <div className="mx-auto max-w-6xl">
-          <Link
-            href="/"
-            className="text-sm font-bold text-blue-200 transition hover:text-white"
-          >
-            ← Back to CS Master
-          </Link>
-
-          <p className="mt-10 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">
-            CS Master for schools
-          </p>
-
-          <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl">
-            Computer Science learning, assessment and teacher intelligence in
-            one platform.
-          </h1>
-
-          <p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">
-            Choose the level of access that fits your department. School
-            licensing and final commercial arrangements can be confirmed
-            before activation.
-          </p>
-        </div>
+        <div className="mx-auto max-w-7xl"><Link href="/landing" className="text-sm font-bold text-blue-200 hover:text-white">← Back to CS Master</Link><p className="mt-10 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Simple, transparent access</p><h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl">Choose the CS Master access that fits you.</h1><p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">Start free as an individual student, unlock Premium when you need advanced tools, or license CS Master for your school.</p></div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-6 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <article
-              key={plan.name}
-              className={`flex flex-col rounded-3xl border bg-white p-7 shadow-sm ${
-                plan.featured
-                  ? "border-indigo-400 ring-2 ring-indigo-100"
-                  : "border-slate-200"
-              }`}
-            >
-              {plan.featured && (
-                <span className="mb-5 w-fit rounded-full bg-indigo-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-indigo-700">
-                  School workspace
-                </span>
-              )}
+      <section className="mx-auto max-w-7xl px-6 py-12">
+        <Header eyebrow="Individual students" title="Learn for free. Upgrade when you want more." />
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">{studentPlans.map((p) => <Plan key={p.name} {...p} />)}</div>
 
-              <h2 className="text-2xl font-black text-slate-950">
-                {plan.name}
-              </h2>
+        <div className="mt-16"><Header eyebrow="Schools" title="Whole-department Computer Science access." /></div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">{schoolPlans.map((p) => <Plan key={p.name} {...p} action="Teacher & school access" href="/teacher-access" />)}</div>
 
-              <p className="mt-3 leading-7 text-slate-600">
-                {plan.description}
-              </p>
-
-              <ul className="mt-6 flex-1 space-y-3">
-                {plan.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className="flex items-start gap-3 text-sm font-semibold text-slate-700"
-                  >
-                    <span
-                      className="mt-0.5 text-emerald-600"
-                      aria-hidden="true"
-                    >
-                      ✓
-                    </span>
-
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href={plan.href}
-                className={`mt-8 flex min-h-12 items-center justify-center rounded-xl px-5 py-3 text-center font-black transition ${
-                  plan.featured
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                    : "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
-                }`}
-              >
-                {plan.action}
-              </Link>
-            </article>
-          ))}
-        </div>
-
-        <div className="mt-10 rounded-3xl border border-blue-200 bg-blue-50 p-7">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-700">
-            School licensing
-          </p>
-
-          <h2 className="mt-2 text-2xl font-black text-slate-950">
-            Need access for your department?
-          </h2>
-
-          <p className="mt-3 max-w-3xl leading-7 text-slate-700">
-            CS Master can support individual Computer Science classes through
-            to wider departmental use. Final plan configuration and licensing
-            can be agreed around the number of teachers, students and classes
-            required.
-          </p>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="/teacher-access"
-              className="rounded-xl bg-blue-600 px-6 py-3 font-black text-white transition hover:bg-blue-700"
-            >
-              Teacher access →
-            </Link>
-
-            <Link
-              href="/login"
-              className="rounded-xl border border-blue-300 bg-white px-6 py-3 font-black text-blue-700 transition hover:bg-blue-100"
-            >
-              Existing user login
-            </Link>
-          </div>
-        </div>
+        <div className="mt-10 rounded-3xl border border-blue-200 bg-blue-50 p-7"><h2 className="text-2xl font-black">Already have an account?</h2><p className="mt-2 text-slate-700">Individual Premium is purchased from the Upgrade page after login. School billing is managed from the authorised teacher workspace.</p><div className="mt-5 flex flex-wrap gap-3"><Link href="/login" className="rounded-xl bg-blue-600 px-6 py-3 font-black text-white">Login</Link><Link href="/about" className="rounded-xl border border-blue-300 bg-white px-6 py-3 font-black text-blue-700">About CS Master</Link></div></div>
       </section>
     </main>
   );
 }
+
+function Header({ eyebrow, title }: { eyebrow: string; title: string }) { return <div><p className="text-xs font-black uppercase tracking-[0.18em] text-indigo-700">{eyebrow}</p><h2 className="mt-2 text-3xl font-black text-slate-950">{title}</h2></div>; }
+function Plan({ name, price, period, description, features, action, href, featured = false }: { name: string; price: string; period: string; description: string; features: string[]; action: string; href: string; featured?: boolean }) { return <article className={`flex flex-col rounded-3xl border bg-white p-7 shadow-sm ${featured ? "border-indigo-400 ring-2 ring-indigo-100" : "border-slate-200"}`}>{featured && <span className="mb-4 w-fit rounded-full bg-indigo-100 px-3 py-1 text-xs font-black uppercase text-indigo-700">Popular</span>}<h3 className="text-xl font-black">{name}</h3><div className="mt-3"><span className="text-4xl font-black">{price}</span><span className="font-bold text-slate-500">{period}</span></div><p className="mt-4 leading-7 text-slate-600">{description}</p><ul className="mt-6 flex-1 space-y-3">{features.map((f) => <li key={f} className="flex gap-3 text-sm font-semibold text-slate-700"><span className="text-emerald-600">✓</span><span>{f}</span></li>)}</ul><Link href={href} className={`mt-8 flex min-h-12 items-center justify-center rounded-xl px-5 py-3 text-center font-black ${featured ? "bg-indigo-600 text-white hover:bg-indigo-700" : "border border-slate-300 hover:bg-slate-50"}`}>{action}</Link></article>; }
