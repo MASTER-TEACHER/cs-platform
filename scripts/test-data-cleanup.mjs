@@ -1,4 +1,4 @@
-/**
+﻿/**
  * CS Master production test-data cleanup - Stage 2.
  *
  * SAFETY:
@@ -28,13 +28,31 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 
 const PROTECTED_EMAILS = new Set([
+  // Paid lifecycle QA accounts — keep until October downgrade checks.
   "newstudent2@test.com",
   "newstudent3@test.com",
+
+  // Permanent production admin.
   "admin@csmaster.co.uk",
+
+  // Permanent production QA accounts.
+  "cs26master@gmail.com",
+  "kr7brown@gmail.com",
+  "07dr3eamz@gmail.com",
 ]);
 
 const PROTECTED_UIDS = new Set([
+  // Permanent production admin.
   "JGZEL80mWlVJJaceIlMX5UrPzlw2",
+
+  // Master Teacher.
+  "VOYu5312QUXRXWIl3iGkXQ7lP0C2",
+
+  // Master Student — permanent Free individual QA student.
+  "W9YpA4giL9d5FivC3r1k0YVHj713",
+
+  // Master Student1 — permanent school QA student.
+  "ZQNnPua0eIVlxHXm7rihnikvMNk2",
 ]);
 
 const EXECUTE_CONFIRMATION = "DELETE-NONPROTECTED-TEST-DATA";
@@ -688,3 +706,4 @@ main().catch((error) => {
   );
   process.exitCode = 1;
 });
+
