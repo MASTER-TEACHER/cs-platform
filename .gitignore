@@ -89,3 +89,5 @@ P1-LINT-PASS*-SUMMARY.txt
 P1-LINT-PASS*-INVENTORY.txt
 P1-BACKUPS/
 .p1-lint-backup-*/
+# Local production cleanup audit reports
+cleanup-reports/
