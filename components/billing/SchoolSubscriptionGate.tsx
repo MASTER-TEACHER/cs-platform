@@ -60,6 +60,12 @@ export default function SchoolSubscriptionGate({
   ] =
     useState("");
 
+  const [
+    trialAccessActive,
+    setTrialAccessActive,
+  ] =
+    useState(false);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -71,11 +77,44 @@ export default function SchoolSubscriptionGate({
       return;
     }
 
-    void getSchoolSubscription()
-      .then((value) => {
+    void Promise.all([
+      getSchoolSubscription(),
+      user.getIdToken().then(async (token) => {
+        const response = await fetch(
+          "/api/billing/trial/status",
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            "School Trial status could not be checked.",
+          );
+        }
+
+        return response.json() as Promise<{
+          entitlement?: {
+            teacherSchoolAccess?: boolean;
+          };
+          trial?: {
+            active?: boolean;
+            status?: string;
+          };
+        }>;
+      }),
+    ])
+      .then(([value, trialStatus]) => {
         if (!cancelled) {
-          setSubscription(
-            value,
+          setSubscription(value);
+          setTrialAccessActive(
+            trialStatus.entitlement?.teacherSchoolAccess === true ||
+              (trialStatus.trial?.active === true &&
+                trialStatus.trial?.status === "active"),
           );
           setError("");
         }
@@ -85,7 +124,7 @@ export default function SchoolSubscriptionGate({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Subscription status could not be checked.",
+              : "School access status could not be checked.",
           );
         }
       })
@@ -154,7 +193,7 @@ export default function SchoolSubscriptionGate({
     return <>{children}</>;
   }
 
-  if (subscription.active) {
+  if (subscription.active || trialAccessActive) {
     return <>{children}</>;
   }
 
