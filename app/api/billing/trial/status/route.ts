@@ -31,6 +31,43 @@ export async function GET(
         request,
       );
 
+    /*
+     * -----------------------------------------------------
+     * STUDENT ACCESS
+     * -----------------------------------------------------
+     *
+     * Students are allowed to retrieve only their resolved
+     * entitlement.
+     *
+     * They must not receive the teacher-owned School Trial
+     * record or synthetic demo-class metadata.
+     *
+     * getUserEntitlementSummary() resolves an active school
+     * trial through the student's school membership, so this
+     * enables the Student Premium experience during a valid
+     * School Trial without weakening strict billing.
+     */
+
+    if (
+      actor.role ===
+      "student"
+    ) {
+      const entitlement =
+        await getUserEntitlementSummary(
+          actor.uid,
+        );
+
+      return NextResponse.json({
+        entitlement,
+      });
+    }
+
+    /*
+     * -----------------------------------------------------
+     * TEACHER / ADMIN ACCESS
+     * -----------------------------------------------------
+     */
+
     if (
       actor.role !==
         "teacher" &&
@@ -40,7 +77,7 @@ export async function GET(
       return NextResponse.json(
         {
           error:
-            "School Trial information is available to teacher accounts.",
+            "School Trial information is not available to this account.",
         },
         {
           status: 403,

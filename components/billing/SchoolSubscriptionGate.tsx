@@ -24,6 +24,7 @@ const TEACHER_EXEMPT_PATHS = [
 type TrialStatusResponse = {
   entitlement?: {
     teacherSchoolAccess?: boolean;
+    premiumStudentAccess?: boolean;
   };
   trial?: {
     active?: boolean;
@@ -119,41 +120,33 @@ async function startTrial() {
     const loadAccess = async () => {
       try {
         const subscriptionStatus = await getSchoolSubscription();
-        let teacherTrialActive = false;
+        const token = await user.getIdToken();
+        const response = await fetch("/api/billing/trial/status", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        });
 
-        /*
-         * The School Trial endpoint is restricted to teacher/admin accounts.
-         * Students must never call it. Student access is based only on the
-         * active school subscription, while teachers may additionally use an
-         * active 14-day School Trial entitlement.
-         */
-        if (profile.role === "teacher") {
-          const token = await user.getIdToken();
-          const response = await fetch("/api/billing/trial/status", {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            cache: "no-store",
-          });
-
-          if (!response.ok) {
-            throw new Error("School Trial status could not be checked.");
-          }
-
-          const trialStatus = (await response.json()) as TrialStatusResponse;
-
-          teacherTrialActive =
-            trialStatus.entitlement?.teacherSchoolAccess === true ||
-            (trialStatus.trial?.active === true &&
-              trialStatus.trial?.status === "active");
+        if (!response.ok) {
+          throw new Error("School Trial status could not be checked.");
         }
+
+        const trialStatus = (await response.json()) as TrialStatusResponse;
+
+        const trialAccessActive =
+          profile.role === "student"
+            ? trialStatus.entitlement?.premiumStudentAccess === true
+            : trialStatus.entitlement?.teacherSchoolAccess === true ||
+              (trialStatus.trial?.active === true &&
+                trialStatus.trial?.status === "active");
 
         if (!cancelled) {
           setAccessState({
             key: accessKey,
             subscription: subscriptionStatus,
-            trialAccessActive: teacherTrialActive,
+            trialAccessActive,
             error: "",
           });
         }
