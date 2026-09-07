@@ -47,7 +47,7 @@ export default function LandingPage() {
             <Link href="/about" className="hover:text-white">About</Link><Link href="/pricing" className="hover:text-white">Pricing</Link><Link href="/privacy" className="hover:text-white">Privacy</Link><Link href="/terms" className="hover:text-white">Terms</Link><Link href="/contact" className="hover:text-white">Contact</Link>
           </div>
           <p className="mt-4">CS Master — Computer Science Learning Platform</p>
-          <p className="mt-1">Built by Chris Brown · Version 1.0 Public Beta</p>
+          <p className="mt-1">Built by Master Teacher (Mr. Richards) · Version 1.0 Public Beta</p>
         </footer>
       </section>
     </main>
