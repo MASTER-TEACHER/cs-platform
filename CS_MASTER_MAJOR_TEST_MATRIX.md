@@ -152,3 +152,15 @@ Hardening can be closed when:
 - No new permissions regressions are introduced after Firestore rules deployment.
 - No genuine CS Master console/network errors remain in the production smoke test.
 - Teacher/student results and completion counts agree across both sides.
+
+## v1.1 Trust, Feedback & Class Lifecycle — targeted acceptance
+
+Run after `npm run verify`; this supplements rather than repeats the already-passed v1.0 regression suite.
+
+- Student: Notifications opens and reflects current outstanding assignments/due dates.
+- Student/Teacher: Feedback page submits one test report successfully.
+- Admin: Feedback & Issues shows the submitted report; priority/status/note update persists.
+- Teacher: Manage Classes can archive a test class and restore it.
+- Teacher: An empty test class can be permanently deleted and disappears after refresh.
+- Teacher: Delete is blocked for a class containing students or assignment history; archive remains available.
+- Public: Privacy page renders the retention, security and data-rights sections.

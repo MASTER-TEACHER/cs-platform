@@ -16,8 +16,11 @@ import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 
 import {
+  archiveTeacherClass,
   createTeacherClass,
+  deleteTeacherClass,
   getTeacherClasses,
+  restoreTeacherClass,
   type TeacherClass,
 } from "@/services/classService";
 
@@ -425,6 +428,36 @@ export default function TeacherClassesPage() {
     }
   }
 
+  async function handleClassStatus(classItem: TeacherClass) {
+    try {
+      if (classItem.status === "active") {
+        await archiveTeacherClass(classItem.id);
+        toast.success("Class archived. Its history has been preserved.");
+      } else {
+        await restoreTeacherClass(classItem.id);
+        toast.success("Class restored.");
+      }
+      await loadClasses();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update the class.");
+    }
+  }
+
+  async function handleDeleteEmptyClass(classItem: TeacherClass) {
+    if (classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0) {
+      toast.error("This class contains students or assignment history. Archive it instead.");
+      return;
+    }
+    if (!window.confirm(`Permanently delete ${classItem.name} from Firestore? This cannot be undone.`)) return;
+    try {
+      await deleteTeacherClass(classItem.id);
+      toast.success("Class permanently deleted from Firestore.");
+      await loadClasses();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not delete the class.");
+    }
+  }
+
   if (
     authLoading ||
     !profileReady ||
@@ -796,6 +829,25 @@ export default function TeacherClassesPage() {
                     >
                       Open class
                     </Link>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => void handleClassStatus(classItem)}
+                      className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100"
+                    >
+                      {classItem.status === "active" ? "Archive" : "Restore"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteEmptyClass(classItem)}
+                      disabled={classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0}
+                      title={classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0 ? "Archive classes with students or assignment history" : "Permanently delete this empty class from Firestore"}
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Delete
+                    </button>
                   </div>
 
                   <div className="mt-5 grid grid-cols-2 gap-3">

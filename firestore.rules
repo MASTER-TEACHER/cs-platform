@@ -2065,6 +2065,18 @@ match /users/{userId}/examTrainerResults/{resultId} {
 
 
     // ------------------------------------------------------------
+    // Feedback reports
+    // ------------------------------------------------------------
+    // Feedback is written and reviewed only through authenticated
+    // server routes using the Admin SDK. Client-side Firestore access
+    // is deliberately denied so reporter identity/status cannot be
+    // forged or browsed by another user.
+    match /feedbackReports/{reportId} {
+      allow read, write: if false;
+    }
+
+
+    // ------------------------------------------------------------
     // User notifications - future alerts phase
     // ------------------------------------------------------------
 

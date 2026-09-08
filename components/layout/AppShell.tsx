@@ -26,26 +26,25 @@ export default function AppShell({
   const [
     mobileSidebarOpen,
     setMobileSidebarOpen,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const publicPages = [
-  "/",
-  "/landing",
-  "/login",
-  "/register",
-  "/forgot-password",
-  "/pricing",
-  "/onboarding",
-  "/teacher-verification",
-  "/cookies",
-  "/terms",
-  "/privacy",
-  "/help",
-  "/contact",
-  "/about",
-  "/teacher-access",
-];
+    "/",
+    "/landing",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/pricing",
+    "/onboarding",
+    "/teacher-verification",
+    "/cookies",
+    "/terms",
+    "/privacy",
+    "/help",
+    "/contact",
+    "/about",
+    "/teacher-access",
+  ];
 
   const isPublicPage =
     publicPages.includes(
@@ -65,6 +64,15 @@ export default function AppShell({
     pathname.startsWith(
       "/admin/",
     );
+
+  /*
+   * Shared authenticated pages can be used by more than one
+   * authenticated role. They should use the normal application
+   * shell without being forced through StudentAccessGate.
+   */
+  const isSharedAuthenticatedWorkspace =
+    pathname ===
+      "/feedback";
 
   /*
    * Written-exam attempts deliberately remove the ordinary
@@ -185,7 +193,8 @@ export default function AppShell({
 
   if (
     isTeacherWorkspace ||
-    isAdminWorkspace
+    isAdminWorkspace ||
+    isSharedAuthenticatedWorkspace
   ) {
     return applicationShell;
   }

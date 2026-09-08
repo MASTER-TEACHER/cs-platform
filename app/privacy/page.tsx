@@ -53,6 +53,42 @@ export default function PrivacyPage() {
           ),
         },
         {
+          title: "Retention and deletion",
+          content: (
+            <p>
+              CS Master aims to keep personal information only for as long as it is needed
+              for the learning, school-management, security, legal or operational purpose
+              for which it was collected. School-managed records may need to be retained in
+              line with the school&apos;s own requirements. Account and data requests are
+              reviewed before deletion so records that must legitimately be retained are not
+              removed incorrectly.
+            </p>
+          ),
+        },
+        {
+          title: "Security and access",
+          content: (
+            <p>
+              Access is controlled through authenticated accounts, roles and school-scoped
+              permissions. CS Master applies technical safeguards intended to prevent users
+              from accessing another school&apos;s protected information and reviews security
+              controls as the service develops. No online service can guarantee absolute
+              security.
+            </p>
+          ),
+        },
+        {
+          title: "Your data protection rights",
+          content: (
+            <p>
+              Depending on the circumstances, UK data protection law may provide rights to
+              access, correct, restrict, object to, erase or obtain a copy of personal data.
+              For school-managed accounts, the school may be the appropriate first contact
+              for a request. Requests may require identity verification.
+            </p>
+          ),
+        },
+        {
           title: "Requests and questions",
           content: (
             <p>
