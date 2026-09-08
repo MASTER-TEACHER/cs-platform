@@ -69,6 +69,11 @@ const studentLinks: SidebarLink[] = [
     icon: "📋",
   },
   {
+    href: "/notifications",
+    label: "Notifications",
+    icon: "🔔",
+  },
+  {
     href: "/exam",
     label: "Exam Mode",
     icon: "🎯",
@@ -107,6 +112,11 @@ const studentLinks: SidebarLink[] = [
     href: "/profile",
     label: "Profile",
     icon: "👤",
+  },
+  {
+    href: "/feedback",
+    label: "Feedback / Report a Problem",
+    icon: "💬",
   },
 ];
 
@@ -198,6 +208,11 @@ const teacherLinks: SidebarLink[] = [
     label: "Reports",
     icon: "📈",
   },
+  {
+    href: "/feedback",
+    label: "Feedback / Report a Problem",
+    icon: "💬",
+  },
 ];
 
 const adminLinks: SidebarLink[] = [
@@ -227,6 +242,11 @@ const adminLinks: SidebarLink[] = [
     href: "/admin/schools",
     label: "Schools",
     icon: "🏫",
+  },
+  {
+    href: "/admin/feedback",
+    label: "Feedback & Issues",
+    icon: "💬",
   },
 ];
 
