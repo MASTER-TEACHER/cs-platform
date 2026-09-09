@@ -109,10 +109,19 @@ export default function JoinSchoolPage() {
         </h1>
 
         <p className="mt-3 leading-7 text-slate-600">
-          Enter the single-use code provided by your school. Your existing
-          lessons, quiz results, XP, analytics and personal plan history remain
-          attached to this same CS Master account.
+          Enter the single-use code provided by your school. Students use student
+          invitation codes; approved teachers use teacher invitation codes. Your
+          existing lessons, quiz results, XP, analytics and personal plan history
+          remain attached to this same CS Master account.
         </p>
+
+        {profile?.role === "teacher" && (
+          <div className="mt-5 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm leading-6 text-violet-800">
+            Your teacher account is approved. Ask the school administrator or an
+            authorised teacher at the school to generate a Teacher Join Code from
+            Teacher → School → Invitations.
+          </div>
+        )}
       </Card>
 
       <Card className="rounded-3xl border border-slate-200 p-7">

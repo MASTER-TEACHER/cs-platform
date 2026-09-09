@@ -18,8 +18,6 @@ import {
 import {
   countStudentSeats,
   getSchoolSubscriptionSummary,
-  getSchoolTrialSeatLimit,
-  getSchoolTrialSummaryBySchoolId,
 } from "@/lib/billing/subscription";
 
 export const runtime = "nodejs";
@@ -159,6 +157,43 @@ export async function POST(
       );
     }
 
+    const schoolRef =
+      adminDb
+        .collection("schools")
+        .doc(schoolId);
+
+    const schoolSnapshot =
+      await schoolRef.get();
+
+    if (!schoolSnapshot.exists) {
+      return NextResponse.json(
+        {
+          error:
+            "The school linked to this invitation could not be found.",
+        },
+        {
+          status: 404,
+        },
+      );
+    }
+
+    const schoolStatus =
+      typeof schoolSnapshot.data()?.status === "string"
+        ? schoolSnapshot.data()?.status
+        : "active";
+
+    if (schoolStatus !== "active") {
+      return NextResponse.json(
+        {
+          error:
+            "This school is not currently accepting new members.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
     if (
       actor.schoolId &&
       actor.schoolId !==
@@ -200,32 +235,17 @@ export async function POST(
           schoolId,
         );
 
-      const schoolTrial =
-        subscription.active
-          ? null
-          : await getSchoolTrialSummaryBySchoolId(
-              schoolId,
-            );
-
-      if (
-        !subscription.active &&
-        !schoolTrial?.active
-      ) {
+      if (!subscription.active) {
         return NextResponse.json(
           {
             error:
-              "This school's CS Master subscription or School Trial is not active.",
+              "This school's CS Master subscription is not active.",
           },
           {
             status: 402,
           },
         );
       }
-
-      const seatLimit =
-        subscription.active
-          ? subscription.seatLimit
-          : getSchoolTrialSeatLimit();
 
       const existingSeatCount =
         await countStudentSeats(
@@ -234,7 +254,7 @@ export async function POST(
 
       if (
         existingSeatCount >=
-        seatLimit
+        subscription.seatLimit
       ) {
         return NextResponse.json(
           {
@@ -267,6 +287,11 @@ export async function POST(
             inviteRef,
           );
 
+        const freshSchool =
+          await transaction.get(
+            schoolRef,
+          );
+
         if (
           !freshInvite.exists ||
           freshInvite.data()
@@ -275,6 +300,17 @@ export async function POST(
         ) {
           throw new Error(
             "INVITE_ALREADY_USED",
+          );
+        }
+
+        if (
+          !freshSchool.exists ||
+          freshSchool.data()
+            ?.status !==
+            "active"
+        ) {
+          throw new Error(
+            "SCHOOL_NOT_ACTIVE",
           );
         }
 
@@ -342,6 +378,22 @@ export async function POST(
         {
           error:
             "This school join code has already been used.",
+        },
+        {
+          status: 409,
+        },
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message ===
+        "SCHOOL_NOT_ACTIVE"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This school is not currently accepting new members.",
         },
         {
           status: 409,

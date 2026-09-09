@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 
 import Card from "@/components/ui/Card";
@@ -487,64 +488,96 @@ export default function TeacherSchoolPage() {
     !school
   ) {
     return (
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6">
         <Card className="rounded-3xl border border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 p-8">
           <p className="text-sm font-black uppercase tracking-[0.16em] text-teal-700">
             School setup
           </p>
 
           <h1 className="mt-3 text-3xl font-black text-slate-950">
-            Create your school organisation
+            Connect your approved teacher account to a school
           </h1>
 
-          <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-            Creating a school separates your teachers and students from every
-            other organisation in CS Master. Student directories and class
-            enrolment will be scoped to this school.
+          <p className="mt-3 max-w-3xl leading-7 text-slate-600">
+            If your school already uses CS Master, join it with a single-use teacher
+            invitation code. If you are setting up a new organisation, create the
+            school here instead.
           </p>
         </Card>
 
-        <Card className="rounded-3xl border border-slate-200 p-7">
-          <label className="block">
-            <span className="text-sm font-bold text-slate-700">
-              School name
-            </span>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="rounded-3xl border border-violet-200 bg-violet-50 p-7">
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-violet-700">
+              Existing school
+            </p>
 
-            <input
-              type="text"
-              value={
-                schoolName
-              }
-              onChange={(
-                event,
-              ) =>
-                setSchoolName(
-                  event
-                    .target
-                    .value,
-                )
-              }
-              placeholder="e.g. The Norwood School"
-              className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
-            />
-          </label>
+            <h2 className="mt-2 text-2xl font-black text-violet-950">
+              Join an existing school
+            </h2>
 
-          <button
-            type="button"
-            onClick={() =>
-              void handleCreateSchool()
-            }
-            disabled={
-              creating ||
-              !schoolName.trim()
-            }
-            className="mt-5 rounded-xl bg-teal-600 px-6 py-3 font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {creating
-              ? "Creating school..."
-              : "Create school"}
-          </button>
-        </Card>
+            <p className="mt-3 leading-6 text-violet-800">
+              Ask a school administrator or authorised teacher at the school to
+              generate a Teacher Join Code. Your approved teacher account can then
+              use that code to become part of the school organisation.
+            </p>
+
+            <Link
+              href="/join-school"
+              className="mt-5 inline-flex rounded-xl bg-violet-700 px-6 py-3 font-bold text-white transition hover:bg-violet-800"
+            >
+              Enter teacher join code →
+            </Link>
+          </Card>
+
+          <Card className="rounded-3xl border border-slate-200 p-7">
+            <p className="text-sm font-black uppercase tracking-[0.14em] text-teal-700">
+              New school
+            </p>
+
+            <h2 className="mt-2 text-2xl font-black text-slate-950">
+              Create a school organisation
+            </h2>
+
+            <p className="mt-3 leading-6 text-slate-600">
+              Use this only when the school does not already exist in CS Master.
+              Creating a school makes this account the initial school administrator.
+            </p>
+
+            <label className="mt-5 block">
+              <span className="text-sm font-bold text-slate-700">
+                School name
+              </span>
+
+              <input
+                type="text"
+                value={schoolName}
+                onChange={(event) =>
+                  setSchoolName(
+                    event.target.value,
+                  )
+                }
+                placeholder="e.g. The Norwood School"
+                className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={() =>
+                void handleCreateSchool()
+              }
+              disabled={
+                creating ||
+                !schoolName.trim()
+              }
+              className="mt-5 rounded-xl bg-teal-600 px-6 py-3 font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {creating
+                ? "Creating school..."
+                : "Create school"}
+            </button>
+          </Card>
+        </div>
       </div>
     );
   }
