@@ -31,100 +31,103 @@ type SidebarProps = {
 };
 
 const studentLinks: SidebarLink[] = [
-  {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: "🏠",
-  },
-  {
-    href: "/adaptive-learning",
-    label: "Adaptive Learning",
-    icon: "🧬",
-  },
-  {
-    href: "/knowledge-map",
-    label: "Knowledge Map",
-    icon: "🗺️",
-  },
-  {
-    href: "/analytics",
-    label: "Analytics",
-    icon: (
-      <BarChart3 className="h-4 w-4" />
-    ),
-  },
-  {
-    href: "/tutor",
-    label: "AI Tutor",
-    icon: "🤖",
-  },
-  {
-    href: "/revision-plan",
-    label: "Revision Plan",
-    icon: "🧭",
-  },
-  {
-    href: "/assignments",
-    label: "Assignments",
-    icon: "📋",
-  },
-  {
-    href: "/notifications",
-    label: "Notifications",
-    icon: "🔔",
-  },
-  {
-    href: "/exam",
-    label: "Exam Mode",
-    icon: "🎯",
-  },
-  {
-    href: "/learn",
-    label: "Learn",
-    icon: "📚",
-  },
-  {
-    href: "/quiz",
-    label: "Quiz",
-    icon: "📝",
-  },
-  {
-    href: "/programming",
-    label: "Programming",
-    icon: "💻",
-  },
-  {
-    href: "/visualisers",
-    label: "Visualisers",
-    icon: "🧠",
-  },
-  {
-    href: "/exam-trainer",
-    label: "Exam Trainer",
-    icon: "🧪",
-  },
-  {
-    href: "/join-school",
-    label: "Join School",
-    icon: "🏫",
-  },
-  {
-    href: "/profile",
-    label: "Profile",
-    icon: "👤",
-  },
-  {
-    href: "/feedback",
-    label: "Feedback / Report a Problem",
-    icon: "💬",
-  },
+  // STUDENT LINKS
+
+{
+  href: "/dashboard",
+  label: "Dashboard",
+  icon: "\u{1F3E0}", // 🏠
+},
+{
+  href: "/adaptive-learning",
+  label: "Adaptive Learning",
+  icon: "\u{1F9EC}", // 🧬
+},
+{
+  href: "/knowledge-map",
+  label: "Knowledge Map",
+  icon: "\u{1F5FA}\u{FE0F}", // 🗺️
+},
+
+// Analytics stays as BarChart3
+
+{
+  href: "/tutor",
+  label: "AI Tutor",
+  icon: "\u{1F916}", // 🤖
+},
+{
+  href: "/revision-plan",
+  label: "Revision Plan",
+  icon: "\u{1F9ED}", // 🧭
+},
+{
+  href: "/assignments",
+  label: "Assignments",
+  icon: "\u{1F4CB}", // 📋
+},
+{
+  href: "/notifications",
+  label: "Notifications",
+  icon: "\u{1F514}", // 🔔
+},
+{
+  href: "/exam",
+  label: "Exam Mode",
+  icon: "\u{1F3AF}", // 🎯
+},
+{
+  href: "/learn",
+  label: "Learn",
+  icon: "\u{1F4DA}", // 📚
+},
+{
+  href: "/quiz",
+  label: "Quiz",
+  icon: "\u{1F4DD}", // 📝
+},
+{
+  href: "/programming",
+  label: "Programming",
+  icon: "\u{1F4BB}", // 💻
+},
+{
+  href: "/visualisers",
+  label: "Visualisers",
+  icon: "\u{1F9E0}", // 🧠
+},
+{
+  href: "/exam-trainer",
+  label: "Exam Trainer",
+  icon: "\u{1F9EA}", // 🧪
+},
+{
+  href: "/join-school",
+  label: "Join School",
+  icon: "\u{1F3EB}", // 🏫
+},
+{
+  href: "/profile",
+  label: "Profile",
+  icon: "\u{1F464}", // 👤
+},
+{
+  href: "/data-rights",
+  label: "Data Rights",
+  icon: "\u{1F510}", // 🔐
+},
+{
+  href: "/feedback",
+  label: "Feedback / Report a Problem",
+  icon: "\u{1F4AC}", // 💬
+},
 ];
 
 const teacherLinks: SidebarLink[] = [
   {
     href: "/teacher",
     label: "Dashboard",
-    icon: "📊",
+    icon: "ðŸ“Š",
   },
   {
     href: "/teacher/analytics",
@@ -136,118 +139,123 @@ const teacherLinks: SidebarLink[] = [
   {
     href: "/teacher/knowledge-map",
     label: "Class Knowledge Map",
-    icon: "🗺️",
+    icon: "ðŸ—ºï¸",
   },
   {
     href: "/teacher/interventions",
     label: "Interventions",
-    icon: "🧭",
+    icon: "ðŸ§­",
   },
   {
     href: "/teacher/students",
     label: "Students",
-    icon: "👨‍🎓",
+    icon: "ðŸ‘¨â€ðŸŽ“",
   },
   {
     href: "/teacher/classes",
     label: "Classes",
-    icon: "🏫",
+    icon: "ðŸ«",
   },
   {
     href: "/teacher/school",
     label: "School",
-    icon: "🏢",
+    icon: "ðŸ¢",
   },
   {
     href: "/teacher/billing",
     label: "Billing",
-    icon: "💳",
+    icon: "ðŸ’³",
   },
   {
     href: "/teacher/assignments",
     label: "Assignments",
-    icon: "📋",
+    icon: "ðŸ“‹",
   },
   {
     href: "/teacher/exam-assignments",
     label: "Exam Assignments",
-    icon: "📝",
+    icon: "ðŸ“",
   },
   {
     href: "/teacher/assignment-wizard",
     label: "Assignment Wizard",
-    icon: "🪄",
+    icon: "ðŸª„",
   },
   {
     href: "/teacher/quiz-generator",
     label: "AI Quiz Generator",
-    icon: "🤖",
+    icon: "ðŸ¤–",
   },
   {
     href: "/teacher/quiz-library",
     label: "Quiz Library",
-    icon: "🧠",
+    icon: "ðŸ§ ",
   },
   {
     href: "/teacher/assistant",
     label: "AI Teacher Assistant",
-    icon: "✨",
+    icon: "âœ¨",
   },
   {
     href: "/teacher/content",
     label: "Content Hub",
-    icon: "🗂️",
+    icon: "\u{1F782}\u{FE0F}", // 🗂️
   },
   {
     href: "/teacher/resources",
     label: "Resource Library",
-    icon: "📚",
+    icon: "ðŸ“š",
   },
   {
     href: "/teacher/reports",
     label: "Reports",
-    icon: "📈",
+    icon: "ðŸ“ˆ",
   },
   {
     href: "/feedback",
     label: "Feedback / Report a Problem",
-    icon: "💬",
+    icon: "ðŸ’¬",
   },
 ];
 
 const adminLinks: SidebarLink[] = [
-  {
-    href: "/admin",
-    label: "Admin Dashboard",
-    icon: "🛡️",
-  },
-  {
-    href:
-      "/admin/teacher-verification-reviews",
-    label:
-      "Teacher Verification Reviews",
-    icon: "🔐",
-  },
-  {
-    href: "/admin/teachers",
-    label: "Teachers",
-    icon: "👩‍🏫",
-  },
-  {
-    href: "/admin/users",
-    label: "Users",
-    icon: "👥",
-  },
-  {
-    href: "/admin/schools",
-    label: "Schools",
-    icon: "🏫",
-  },
-  {
-    href: "/admin/feedback",
-    label: "Feedback & Issues",
-    icon: "💬",
-  },
+  // ADMIN LINKS
+
+{
+  href: "/admin",
+  label: "Admin Dashboard",
+  icon: "\u{1F6E1}\u{FE0F}", // 🛡️
+},
+{
+  href: "/admin/teacher-verification-reviews",
+  label: "Teacher Verification Reviews",
+  icon: "\u{1F510}", // 🔐
+},
+{
+  href: "/admin/teachers",
+  label: "Teachers",
+  icon: "\u{1F469}\u{200D}\u{1F3EB}", // 👩‍🏫
+},
+{
+  href: "/admin/users",
+  label: "Users",
+  icon: "\u{1F465}", // 👥
+},
+{
+  href: "/admin/schools",
+  label: "Schools",
+  icon: "\u{1F3EB}", // 🏫
+},
+{
+  href: "/admin/privacy-requests",
+  label: "Privacy Requests",
+  icon: "\u{1F510}", // 🔐
+},
+{
+  href: "/admin/feedback",
+  label: "Feedback & Issues",
+  icon: "\u{1F4AC}", // 💬
+},
 ];
 
 export default function Sidebar({
@@ -298,7 +306,7 @@ export default function Sidebar({
       ? "Administration"
       : isTeacher
         ? "Teacher Portal"
-        : "Learn • Practice • Master";
+       : "Learn \u2022 Practice \u2022 Master";
 
   const accountName =
     profile?.name ||

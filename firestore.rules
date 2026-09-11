@@ -264,9 +264,9 @@ service cloud.firestore {
         currentUserId() in
           examAssignmentData(assignmentId).studentIds;
     }
-    
-    
-    
+
+
+
     match /studentTargets/{studentId} {
   function signedInForTarget() {
     return request.auth != null;
@@ -423,7 +423,7 @@ allow update: if signedIn() &&
       "personalPlan",
       "updatedAt"
     ]);
-    
+
   allow update: if signedIn() &&
     currentUserId() == userId &&
     request.resource.data.uid == currentUserId() &&
@@ -862,7 +862,7 @@ allow list: if signedIn() &&
         "completedAt",
         "updatedAt"
       ]);
-      
+
       /*
  * Programming-assignment evidence.
  *
@@ -1600,7 +1600,7 @@ match /studentTutorConversations/{conversationId} {
     request.resource.data.studentId == resource.data.studentId &&
     request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title", "messages", "updatedAt"]);
   allow delete: if signedIn() && (resource.data.studentId == currentUserId() || isAdmin());
-  
+
   }
 
 
@@ -2066,6 +2066,26 @@ match /users/{userId}/examTrainerResults/{resultId} {
 
     // ------------------------------------------------------------
     // Feedback reports
+
+    // ------------------------------------------------------------
+    // Privacy/data-rights requests and platform audit logs
+    // ------------------------------------------------------------
+    // These collections are intentionally server-managed via
+    // authenticated Admin SDK routes. Direct browser Firestore
+    // access is denied to prevent request identity/status/audit
+    // evidence from being forged or browsed.
+    match /privacyRequests/{requestId} {
+      allow read, write: if false;
+    }
+
+    match /adminAuditLogs/{logId} {
+      allow read, write: if false;
+    }
+
+    match /stripeWebhookEvents/{eventId} {
+      allow read, write: if false;
+    }
+
     // ------------------------------------------------------------
     // Feedback is written and reviewed only through authenticated
     // server routes using the Admin SDK. Client-side Firestore access
@@ -2143,4 +2163,5 @@ match /users/{userId}/examTrainerResults/{resultId} {
     }
   }
 }
+
 

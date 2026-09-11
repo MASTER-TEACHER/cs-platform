@@ -21,15 +21,31 @@ function bearer(request: Request): string {
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
-export async function requireAuthenticatedUser(request: Request): Promise<AuthenticatedActor> {
+export async function requireAuthenticatedUser(
+  request: Request,
+): Promise<AuthenticatedActor> {
   const idToken = bearer(request);
-  if (!idToken) throw new Error("AUTH_REQUIRED");
 
-  const token = await adminAuth.verifyIdToken(idToken);
+  if (!idToken) {
+    throw new Error("AUTH_REQUIRED");
+  }
+
+  let token: DecodedIdToken;
+
+  try {
+    token = await adminAuth.verifyIdToken(idToken);
+  } catch {
+    throw new Error("AUTH_INVALID");
+  }
+
   const snapshot = await adminDb.collection("users").doc(token.uid).get();
-  if (!snapshot.exists) throw new Error("PROFILE_NOT_FOUND");
+
+  if (!snapshot.exists) {
+    throw new Error("PROFILE_NOT_FOUND");
+  }
 
   const profile = snapshot.data() ?? {};
+
   return {
     uid: token.uid,
     token,
@@ -40,9 +56,33 @@ export async function requireAuthenticatedUser(request: Request): Promise<Authen
   };
 }
 
-export function authenticatedUserError(error: unknown) {
+export function authenticatedUserError(error: unknown): {
+  status: number;
+  message: string;
+} {
   const code = error instanceof Error ? error.message : "";
-  if (code === "AUTH_REQUIRED") return { status: 401, message: "Sign in to continue." };
-  if (code === "PROFILE_NOT_FOUND") return { status: 403, message: "Your CS Master profile could not be found." };
-  return { status: 500, message: error instanceof Error ? error.message : "The request could not be completed." };
+
+  switch (code) {
+    case "AUTH_REQUIRED":
+      return { status: 401, message: "Sign in to continue." };
+
+    case "AUTH_INVALID":
+      return {
+        status: 401,
+        message: "Your sign-in session is invalid or has expired. Please sign in again.",
+      };
+
+    case "PROFILE_NOT_FOUND":
+      return {
+        status: 403,
+        message: "Your CS Master profile could not be found.",
+      };
+
+    default:
+      console.error("[Authenticated route] Internal request failure:", error);
+      return {
+        status: 500,
+        message: "The request could not be completed.",
+      };
+  }
 }

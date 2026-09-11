@@ -29,6 +29,7 @@ export default function PublicInformationPage({
           <Link href="/help">Help</Link>
           <Link href="/contact">Contact</Link>
           <Link href="/privacy">Privacy</Link>
+          <Link href="/security">Security</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/cookies">Cookies</Link>
         </nav>

@@ -40,6 +40,7 @@ export default function AppShell({
     "/cookies",
     "/terms",
     "/privacy",
+    "/security",
     "/help",
     "/contact",
     "/about",
@@ -71,8 +72,8 @@ export default function AppShell({
    * shell without being forced through StudentAccessGate.
    */
   const isSharedAuthenticatedWorkspace =
-    pathname ===
-      "/feedback";
+    pathname === "/feedback" ||
+    pathname === "/data-rights";
 
   /*
    * Written-exam attempts deliberately remove the ordinary
