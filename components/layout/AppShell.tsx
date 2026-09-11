@@ -70,10 +70,15 @@ export default function AppShell({
    * Shared authenticated pages can be used by more than one
    * authenticated role. They should use the normal application
    * shell without being forced through StudentAccessGate.
+   *
+   * /join-school is shared because approved teachers without a
+   * school need to enter a teacher school-invitation code there,
+   * while students use the same page for school/class onboarding.
    */
   const isSharedAuthenticatedWorkspace =
     pathname === "/feedback" ||
-    pathname === "/data-rights";
+    pathname === "/data-rights" ||
+    pathname === "/join-school";
 
   /*
    * Written-exam attempts deliberately remove the ordinary

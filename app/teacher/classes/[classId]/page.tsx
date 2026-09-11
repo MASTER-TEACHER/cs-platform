@@ -615,6 +615,14 @@ function OverviewTab({
             />
 
             <InformationRow label="Status" value={teacherClass.status} />
+
+            <InformationRow
+              label="Class join code"
+              value={
+                teacherClass.joinCode ||
+                "Open Settings to create"
+              }
+            />
           </dl>
         </section>
 

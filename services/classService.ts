@@ -51,6 +51,13 @@ export type TeacherClass = {
 
   schoolId: string;
 
+  /*
+   * Permanent reusable class join code.
+   * Unlike schoolInvites, this code is NOT consumed when a student joins.
+   */
+  joinCode: string;
+  joinCodeEnabled: boolean;
+
   studentIds: string[];
   students?: ClassStudent[];
 
@@ -169,6 +176,54 @@ function normaliseStringArray(
     : [];
 }
 
+const CLASS_JOIN_CODE_ALPHABET =
+  "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+export function normaliseClassJoinCode(
+  value: unknown,
+): string {
+  return normaliseString(
+    value,
+  )
+    .toUpperCase()
+    .replace(
+      /[^A-Z0-9]/g,
+      "",
+    )
+    .slice(0, 10);
+}
+
+export function generateClassJoinCode(
+  length = 8,
+): string {
+  const safeLength =
+    Math.max(
+      6,
+      Math.min(
+        length,
+        10,
+      ),
+    );
+
+  const randomValues =
+    new Uint32Array(
+      safeLength,
+    );
+
+  globalThis.crypto.getRandomValues(
+    randomValues,
+  );
+
+  return Array.from(
+    randomValues,
+    (value) =>
+      CLASS_JOIN_CODE_ALPHABET[
+        value %
+          CLASS_JOIN_CODE_ALPHABET.length
+      ],
+  ).join("");
+}
+
 function normaliseStudent(
   student: ClassStudent,
 ): ClassStudent {
@@ -242,6 +297,15 @@ function convertClassDocument(
       normaliseString(
         data.schoolId,
       ),
+
+    joinCode:
+      normaliseClassJoinCode(
+        data.joinCode,
+      ),
+
+    joinCodeEnabled:
+      data.joinCodeEnabled !==
+      false,
 
     studentIds:
       normaliseStringArray(
@@ -514,6 +578,9 @@ export async function createTeacherClass(
     );
   }
 
+  const joinCode =
+    generateClassJoinCode();
+
   const classReference =
     await addDoc(
       collection(
@@ -551,6 +618,10 @@ export async function createTeacherClass(
           "Teacher",
 
         schoolId,
+
+        joinCode,
+        joinCodeEnabled:
+          true,
 
         studentIds: [],
         students: [],
@@ -859,6 +930,124 @@ export async function updateTeacherClass(
     classReference,
     {
       ...updateData,
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+}
+
+export async function ensureClassJoinCode(
+  classId: string,
+): Promise<string> {
+  const cleanedClassId =
+    classId.trim();
+
+  if (!cleanedClassId) {
+    throw new Error(
+      "A valid class is required.",
+    );
+  }
+
+  const classReference =
+    doc(
+      db,
+      "classes",
+      cleanedClassId,
+    );
+
+  const snapshot =
+    await getDoc(
+      classReference,
+    );
+
+  if (!snapshot.exists()) {
+    throw new Error(
+      "The class could not be found.",
+    );
+  }
+
+  const currentCode =
+    normaliseClassJoinCode(
+      snapshot.data()
+        .joinCode,
+    );
+
+  if (currentCode) {
+    return currentCode;
+  }
+
+  const joinCode =
+    generateClassJoinCode();
+
+  await updateDoc(
+    classReference,
+    {
+      joinCode,
+      joinCodeEnabled:
+        true,
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+
+  return joinCode;
+}
+
+export async function regenerateClassJoinCode(
+  classId: string,
+): Promise<string> {
+  const cleanedClassId =
+    classId.trim();
+
+  if (!cleanedClassId) {
+    throw new Error(
+      "A valid class is required.",
+    );
+  }
+
+  const joinCode =
+    generateClassJoinCode();
+
+  await updateDoc(
+    doc(
+      db,
+      "classes",
+      cleanedClassId,
+    ),
+    {
+      joinCode,
+      joinCodeEnabled:
+        true,
+      updatedAt:
+        serverTimestamp(),
+    },
+  );
+
+  return joinCode;
+}
+
+export async function setClassJoinCodeEnabled(
+  classId: string,
+  enabled: boolean,
+): Promise<void> {
+  const cleanedClassId =
+    classId.trim();
+
+  if (!cleanedClassId) {
+    throw new Error(
+      "A valid class is required.",
+    );
+  }
+
+  await updateDoc(
+    doc(
+      db,
+      "classes",
+      cleanedClassId,
+    ),
+    {
+      joinCodeEnabled:
+        enabled,
       updatedAt:
         serverTimestamp(),
     },

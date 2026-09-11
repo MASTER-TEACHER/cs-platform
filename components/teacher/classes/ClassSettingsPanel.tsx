@@ -6,7 +6,10 @@ import toast from "react-hot-toast";
 import {
   archiveTeacherClass,
   deleteTeacherClass,
+  ensureClassJoinCode,
+  regenerateClassJoinCode,
   restoreTeacherClass,
+  setClassJoinCodeEnabled,
   updateTeacherClass,
   type TeacherClass,
 } from "@/services/classService";
@@ -88,6 +91,192 @@ export default function ClassSettingsPanel({
     deleting,
     setDeleting,
   ] = useState(false);
+
+  const [
+    joinCode,
+    setJoinCode,
+  ] = useState(
+    teacherClass.joinCode,
+  );
+
+  const [
+    joinCodeEnabled,
+    setJoinCodeEnabledState,
+  ] = useState(
+    teacherClass.joinCodeEnabled,
+  );
+
+  const [
+    updatingJoinCode,
+    setUpdatingJoinCode,
+  ] = useState(false);
+
+  async function createJoinCode() {
+    try {
+      setUpdatingJoinCode(
+        true,
+      );
+
+      const code =
+        await ensureClassJoinCode(
+          teacherClass.id,
+        );
+
+      setJoinCode(code);
+      setJoinCodeEnabledState(
+        true,
+      );
+
+      onUpdated({
+        ...teacherClass,
+        joinCode:
+          code,
+        joinCodeEnabled:
+          true,
+      });
+
+      toast.success(
+        "Permanent class code is ready.",
+      );
+    } catch (error) {
+      console.error(
+        "Unable to create class join code:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The class code could not be created.",
+      );
+    } finally {
+      setUpdatingJoinCode(
+        false,
+      );
+    }
+  }
+
+  async function regenerateJoinCode() {
+    const confirmed =
+      window.confirm(
+        "Generate a new permanent class code? The old code will stop working immediately.",
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setUpdatingJoinCode(
+        true,
+      );
+
+      const code =
+        await regenerateClassJoinCode(
+          teacherClass.id,
+        );
+
+      setJoinCode(code);
+      setJoinCodeEnabledState(
+        true,
+      );
+
+      onUpdated({
+        ...teacherClass,
+        joinCode:
+          code,
+        joinCodeEnabled:
+          true,
+      });
+
+      toast.success(
+        "Class join code regenerated.",
+      );
+    } catch (error) {
+      console.error(
+        "Unable to regenerate class join code:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The class code could not be regenerated.",
+      );
+    } finally {
+      setUpdatingJoinCode(
+        false,
+      );
+    }
+  }
+
+  async function toggleJoinCode() {
+    try {
+      setUpdatingJoinCode(
+        true,
+      );
+
+      const next =
+        !joinCodeEnabled;
+
+      await setClassJoinCodeEnabled(
+        teacherClass.id,
+        next,
+      );
+
+      setJoinCodeEnabledState(
+        next,
+      );
+
+      onUpdated({
+        ...teacherClass,
+        joinCode,
+        joinCodeEnabled:
+          next,
+      });
+
+      toast.success(
+        next
+          ? "Class code enabled."
+          : "Class code disabled.",
+      );
+    } catch (error) {
+      console.error(
+        "Unable to change class code status:",
+        error,
+      );
+
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The class code status could not be changed.",
+      );
+    } finally {
+      setUpdatingJoinCode(
+        false,
+      );
+    }
+  }
+
+  async function copyJoinCode() {
+    if (!joinCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(
+        joinCode,
+      );
+
+      toast.success(
+        "Class code copied.",
+      );
+    } catch {
+      toast.error(
+        "Copy the class code manually.",
+      );
+    }
+  }
 
   async function save() {
     if (
@@ -407,6 +596,105 @@ export default function ClassSettingsPanel({
             ? "Saving..."
             : "Save class details"}
         </button>
+      </section>
+
+      <section className="rounded-3xl border border-blue-200 bg-blue-50 p-6">
+        <p className="text-sm font-black uppercase tracking-[0.14em] text-blue-700">
+          Permanent class code
+        </p>
+
+        <h2 className="mt-2 text-xl font-black text-blue-950">
+          Student self-enrolment
+        </h2>
+
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-800">
+          Share this code with the whole class. It is reusable and is not consumed
+          when a student joins. It remains the class code until you regenerate it.
+          You can temporarily disable it without changing the code.
+        </p>
+
+        {joinCode ? (
+          <>
+            <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-blue-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                  Class join code
+                </p>
+
+                <p className="mt-2 font-mono text-3xl font-black tracking-[0.18em] text-slate-950">
+                  {joinCode}
+                </p>
+
+                <p className={`mt-2 text-sm font-bold ${
+                  joinCodeEnabled
+                    ? "text-emerald-700"
+                    : "text-red-700"
+                }`}>
+                  {joinCodeEnabled
+                    ? "Active - students can join"
+                    : "Disabled - students cannot join"}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void copyJoinCode()
+                }
+                className="rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+              >
+                Copy code
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  void toggleJoinCode()
+                }
+                disabled={
+                  updatingJoinCode
+                }
+                className="rounded-xl border border-blue-300 bg-white px-5 py-3 font-bold text-blue-800 hover:bg-blue-100 disabled:opacity-60"
+              >
+                {updatingJoinCode
+                  ? "Updating..."
+                  : joinCodeEnabled
+                    ? "Disable joining"
+                    : "Enable joining"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void regenerateJoinCode()
+                }
+                disabled={
+                  updatingJoinCode
+                }
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Generate new code
+              </button>
+            </div>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() =>
+              void createJoinCode()
+            }
+            disabled={
+              updatingJoinCode
+            }
+            className="mt-5 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800 disabled:opacity-60"
+          >
+            {updatingJoinCode
+              ? "Creating..."
+              : "Create permanent class code"}
+          </button>
+        )}
       </section>
 
       <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
