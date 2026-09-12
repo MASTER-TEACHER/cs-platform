@@ -1019,7 +1019,8 @@ function InvitationsPanel({
           </h2>
 
           <p className="mt-3 leading-6 text-blue-800">
-            Generate a single-use code for an existing CS Master student account.
+            Generate a single-use school membership code for one existing CS Master student account.
+            Permanent reusable class codes are managed inside each class.
           </p>
 
           <button
@@ -1111,8 +1112,9 @@ function InvitationsPanel({
 
       <Card className="rounded-3xl border border-slate-200 p-6">
         <p className="text-sm leading-6 text-slate-600">
-          Join codes are single-use and expire after 14 days. Generate a new code
-          whenever you need to invite another student or approved teacher.
+          School invitation codes are single-use and expire after 14 days. Generate a
+          new school code for each person. Class join codes are separate: each class has
+          one reusable permanent code that can be shared with the whole class.
         </p>
       </Card>
     </div>
