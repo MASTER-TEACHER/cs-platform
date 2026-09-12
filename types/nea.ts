@@ -7,8 +7,20 @@ export type NeaStageId =
 
 export type NeaProjectStatus =
   | "active"
+  | "submitted"
   | "completed"
   | "archived";
+
+export type NeaMilestoneStatus =
+  | "not_started"
+  | "in_progress"
+  | "complete";
+
+export type NeaEvidenceReferenceType =
+  | "none"
+  | "link"
+  | "file-reference"
+  | "other";
 
 export type NeaStageProgress = Record<NeaStageId, number>;
 
@@ -16,7 +28,10 @@ export type NeaMilestone = {
   id: string;
   stage: NeaStageId;
   title: string;
+  status: NeaMilestoneStatus;
   completed: boolean;
+  dueDate: string | null;
+  completedAt: string | null;
 };
 
 export type NeaProject = {
@@ -38,7 +53,11 @@ export type NeaProject = {
   milestones: NeaMilestone[];
   evidenceCount: number;
   teacherFeedbackCount: number;
+  teacherNoteCount: number;
   latestReflection: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  archivedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
 };
@@ -50,7 +69,11 @@ export type NeaEvidence = {
   stage: NeaStageId;
   title: string;
   description: string;
+  referenceType: NeaEvidenceReferenceType;
+  referenceLabel: string;
+  referenceValue: string;
   createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type NeaFeedback = {
@@ -60,10 +83,22 @@ export type NeaFeedback = {
   teacherName: string;
   message: string;
   createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type NeaTeacherNote = {
+  id: string;
+  projectId: string;
+  teacherId: string;
+  teacherName: string;
+  message: string;
+  createdAt: string | null;
+  updatedAt: string | null;
 };
 
 export type NeaProjectDetail = {
   project: NeaProject;
   evidence: NeaEvidence[];
   feedback: NeaFeedback[];
+  teacherNotes: NeaTeacherNote[];
 };

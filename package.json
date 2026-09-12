@@ -11,10 +11,11 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "hardening:audit": "node scripts/hardening-audit.mjs",
-    "verify": "npm run lint && npm run typecheck && npm run encoding:audit && npm run a-level:curriculum-audit && npm run a-level:question-audit && npm run hardening:audit && npm run build",
+    "verify": "npm run lint && npm run typecheck && npm run encoding:audit && npm run a-level:curriculum-audit && npm run a-level:question-audit && npm run nea:production-audit && npm run hardening:audit && npm run build",
     "encoding:audit": "node scripts/encoding-audit.mjs",
     "a-level:question-audit": "node scripts/a-level-question-audit.mjs",
-    "a-level:curriculum-audit": "node scripts/a-level-curriculum-audit.mjs"
+    "a-level:curriculum-audit": "node scripts/a-level-curriculum-audit.mjs",
+    "nea:production-audit": "node scripts/nea-production-audit.mjs"
   },
   "dependencies": {
     "docx": "^9.7.1",
