@@ -91,3 +91,15 @@ P1-BACKUPS/
 .p1-lint-backup-*/
 # Local production cleanup audit reports
 cleanup-reports/
+
+# CS Master local patch / migration artifacts
+CS-MASTER-*-FIX/
+CS-MASTER-*-HYGIENE/
+CS-MASTER-*-COLLECTION.zip
+CS-MASTER-*.zip
+*_current.zip
+*_CURRENT.zip
+APPLY-CS-MASTER-*.ps1
+CS_MASTER_*_COLLECTION.txt
+CS_MASTER_UPDATE_README.txt
+README_APPLY_*.md
