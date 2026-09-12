@@ -28,6 +28,9 @@ import { functionalProgrammingTopic } from "./a-level/functional-programming";
 import { legalEthicalALevelTopic } from "./a-level/legal-ethical-a-level";
 import { softwareDevelopmentTopic } from "./a-level/software-development";
 import { theoryComputationTopic } from "./a-level/theory-computation";
+import {
+  withSupplementalALevelLessons,
+} from "./a-level/supplemental-lessons";
 
 import type { Topic } from "@/types/curriculum";
 
@@ -38,6 +41,23 @@ function createTopicLibrary(
     topics.map((topic) => [topic.id, topic]),
   );
 }
+
+const aLevelTopics = [
+  advancedProgrammingTopic,
+  advancedDataRepresentationTopic,
+  advancedSystemsTopic,
+  advancedNetworksTopic,
+  advancedDatabasesTopic,
+  dataStructuresTopic,
+  computationalThinkingTopic,
+  theoryComputationTopic,
+  functionalProgrammingTopic,
+  softwareDevelopmentTopic,
+  bigDataTopic,
+  legalEthicalALevelTopic,
+].map(
+  withSupplementalALevelLessons,
+);
 
 export const publishedTopics: Topic[] = [
   binaryTopic,
@@ -57,23 +77,13 @@ export const publishedTopics: Topic[] = [
   booleanLogicTopic,
   ethicalLegalTopic,
   programmingLanguagesTopic,
-
-  advancedProgrammingTopic,
-  advancedDataRepresentationTopic,
-  advancedSystemsTopic,
-  advancedNetworksTopic,
-  advancedDatabasesTopic,
-  dataStructuresTopic,
-  computationalThinkingTopic,
-  theoryComputationTopic,
-  functionalProgrammingTopic,
-  softwareDevelopmentTopic,
-  bigDataTopic,
-  legalEthicalALevelTopic,
+  ...aLevelTopics,
 ];
 
 export const topicLibrary =
-  createTopicLibrary(publishedTopics);
+  createTopicLibrary(
+    publishedTopics,
+  );
 
 export function getTopicById(
   topicId: string,
@@ -84,14 +94,16 @@ export function getTopicById(
 export function getPublishedTopics(): Topic[] {
   return publishedTopics.filter(
     (topic) =>
-      topic.status !== "coming-soon",
+      topic.status !==
+      "coming-soon",
   );
 }
 
 export function getTotalPublishedLessons(): number {
   return getPublishedTopics().reduce(
     (total, topic) =>
-      total + topic.lessons.length,
+      total +
+      topic.lessons.length,
     0,
   );
 }

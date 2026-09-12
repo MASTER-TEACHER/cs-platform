@@ -70,6 +70,6 @@ Version: 1.0 Public Beta
 
 ---
 
-Built by Chris Brown
+Built by Master Teacher (Mr. Richards)
 CS Master
 Version 1.0 Public Beta

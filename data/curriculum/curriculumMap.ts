@@ -261,71 +261,108 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
     qualification: "A_LEVEL",
     examBoard: "AQA",
     title: "AQA A-level Computer Science",
-    specificationLabel: "AQA A-level Computer Science",
+    specificationLabel: "AQA 7517",
     units: [
       {
-        id: "aqa-al-programming",
-        title: "Programming",
+        id: "aqa-al-4-1",
+        title: "4.1 Fundamentals of Programming",
         description:
-          "Develop advanced procedural, object-oriented, recursive and functional programming skills together with robust solution design.",
+          "Develop data types, program structures, subroutines, recursion, object orientation and robust programming techniques.",
+        topicIds: ["advanced-programming"],
+      },
+      {
+        id: "aqa-al-4-2",
+        title: "4.2 Fundamentals of Data Structures",
+        description:
+          "Study queues, stacks, lists, graphs, trees, hash tables and abstract data types.",
+        topicIds: ["data-structures"],
+      },
+      {
+        id: "aqa-al-4-3",
+        title: "4.3 Fundamentals of Algorithms",
+        description:
+          "Study graph traversal, searching, sorting, shortest paths, complexity and algorithmic efficiency.",
+        topicIds: ["computational-thinking"],
+      },
+      {
+        id: "aqa-al-4-4",
+        title: "4.4 Theory of Computation",
+        description:
+          "Study finite-state machines, regular languages, Turing machines, computability and computational limits.",
+        topicIds: ["theory-computation"],
+      },
+      {
+        id: "aqa-al-4-5",
+        title: "4.5 Fundamentals of Data Representation",
+        description:
+          "Study signed binary, floating point, precision, range, character representation and compression.",
+        topicIds: ["advanced-data-representation"],
+      },
+      {
+        id: "aqa-al-4-6",
+        title: "4.6 Fundamentals of Computer Systems",
+        description:
+          "Study hardware, software, operating systems, translators, logic and system-level behaviour.",
+        topicIds: ["advanced-systems"],
+      },
+      {
+        id: "aqa-al-4-7",
+        title: "4.7 Computer Organisation and Architecture",
+        description:
+          "Study processor components, registers, buses, instruction execution, pipelining and processor design.",
+        topicIds: ["advanced-systems"],
+      },
+      {
+        id: "aqa-al-4-8",
+        title: "4.8 Consequences of Uses of Computing",
+        description:
+          "Evaluate legal, moral, ethical, cultural, privacy and environmental consequences of computing.",
+        topicIds: ["legal-ethical-a-level"],
+      },
+      {
+        id: "aqa-al-4-9",
+        title: "4.9 Communication and Networking",
+        description:
+          "Study protocols, layered models, routing, addressing, internet technologies and network security.",
+        topicIds: ["advanced-networks"],
+      },
+      {
+        id: "aqa-al-4-10",
+        title: "4.10 Fundamentals of Databases",
+        description:
+          "Study relational modelling, normalisation, SQL, transactions, indexing and integrity.",
+        topicIds: ["advanced-databases"],
+      },
+      {
+        id: "aqa-al-4-11",
+        title: "4.11 Big Data",
+        description:
+          "Study large-scale data, distributed processing, data quality, bias, privacy and analytical challenges.",
+        topicIds: ["big-data"],
+      },
+      {
+        id: "aqa-al-4-12",
+        title: "4.12 Functional Programming",
+        description:
+          "Study pure functions, immutability, higher-order functions, recursion and functional composition.",
+        topicIds: ["functional-programming"],
+      },
+      {
+        id: "aqa-al-4-13",
+        title: "4.13 Systematic Approach to Problem Solving",
+        description:
+          "Apply analysis, design, decomposition, testing, evaluation and structured development practice.",
         topicIds: [
-          "advanced-programming",
-          "functional-programming",
+          "computational-thinking",
           "software-development",
         ],
       },
       {
-        id: "aqa-al-data-structures-algorithms",
-        title: "Data Structures, Algorithms and Computational Thinking",
+        id: "aqa-al-4-14",
+        title: "4.14 Non-exam Assessment: Computing Practical Project",
         description:
-          "Study abstract data structures, algorithm design, complexity, computational thinking and theoretical models of computation.",
-        topicIds: [
-          "data-structures",
-          "computational-thinking",
-          "theory-computation",
-        ],
-      },
-      {
-        id: "aqa-al-data-representation",
-        title: "Data Representation",
-        description:
-          "Study signed binary, number systems, floating-point ideas, character encoding, images, sound and compression at A-level depth.",
-        topicIds: ["advanced-data-representation"],
-      },
-      {
-        id: "aqa-al-computer-systems",
-        title: "Computer Systems",
-        description:
-          "Study processor architecture, memory, storage, operating systems, translators and Boolean logic at A-level depth.",
-        topicIds: ["advanced-systems"],
-      },
-      {
-        id: "aqa-al-networks-security",
-        title: "Networks and Cyber Security",
-        description:
-          "Study layered network communication, routing, internet technologies, vulnerabilities and defensive security.",
-        topicIds: ["advanced-networks"],
-      },
-      {
-        id: "aqa-al-databases",
-        title: "Databases",
-        description:
-          "Study relational design, normalisation, SQL, transactions and database management.",
-        topicIds: ["advanced-databases"],
-      },
-      {
-        id: "aqa-al-big-data",
-        title: "Big Data",
-        description:
-          "Understand large-scale datasets, distributed processing, privacy, bias and the challenges created by volume, velocity and variety.",
-        topicIds: ["big-data"],
-      },
-      {
-        id: "aqa-al-ethical-legal",
-        title: "Consequences of Computing",
-        description:
-          "Evaluate legal, moral, cultural, ethical and environmental consequences of computer systems.",
-        topicIds: ["legal-ethical-a-level"],
+          "Apply a systematic approach to an independently developed computing project using analysis, design, implementation, testing and evaluation.",
+        topicIds: ["software-development"],
       },
     ],
   },
@@ -337,27 +374,28 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
     specificationLabel: "OCR H446",
     units: [
       {
-        id: "ocr-al-processors",
-        title: "The Characteristics of Contemporary Processors",
+        id: "ocr-al-1-1",
+        title: "1.1 Processors, Input, Output and Storage",
         description:
-          "Study processor architecture, memory hierarchy, low-level execution, storage and performance.",
+          "Study processor structure, the fetch-decode-execute cycle, processor types, performance, input/output and storage technologies.",
         topicIds: ["advanced-systems"],
       },
       {
-        id: "ocr-al-software-development",
-        title: "Software and Software Development",
+        id: "ocr-al-1-2",
+        title: "1.2 Software and Software Development",
         description:
-          "Study software-development practice, translators, programming methodologies, object orientation, recursion and robust program design.",
+          "Study operating systems, applications, translators, software methodologies, development practice and programming paradigms.",
         topicIds: [
+          "advanced-systems",
           "software-development",
           "advanced-programming",
         ],
       },
       {
-        id: "ocr-al-data-exchange",
-        title: "Exchanging Data",
+        id: "ocr-al-1-3",
+        title: "1.3 Exchanging Data",
         description:
-          "Study data representation, compression, relational databases, networks, protocols and communication technologies.",
+          "Study compression, encryption, databases, networks, internet technologies, web technologies and communication protocols.",
         topicIds: [
           "advanced-data-representation",
           "advanced-databases",
@@ -365,35 +403,53 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
         ],
       },
       {
-        id: "ocr-al-data-structures",
-        title: "Data Types, Data Structures and Algorithms",
+        id: "ocr-al-1-4",
+        title: "1.4 Data Types, Data Structures and Algorithms",
         description:
-          "Study advanced data structures, computational thinking, algorithm design and problem-solving techniques.",
+          "Study data representation, Boolean concepts, advanced structures, searching, sorting and algorithmic techniques.",
         topicIds: [
+          "advanced-data-representation",
           "data-structures",
           "computational-thinking",
         ],
       },
       {
-        id: "ocr-al-programming",
-        title: "Programming and Problem Solving",
+        id: "ocr-al-1-5",
+        title: "1.5 Legal, Moral, Cultural and Ethical Issues",
         description:
-          "Develop advanced programming, abstraction, object orientation, recursion and robust solution design.",
-        topicIds: ["advanced-programming"],
-      },
-      {
-        id: "ocr-al-networks-security",
-        title: "Networks and Security",
-        description:
-          "Study layered communication, routing, internet technologies, cyber-security principles and defensive measures.",
-        topicIds: ["advanced-networks"],
-      },
-      {
-        id: "ocr-al-ethical-legal",
-        title: "Legal, Moral, Cultural and Ethical Issues",
-        description:
-          "Evaluate the wider legal, moral, cultural, ethical and environmental impact of computer systems.",
+          "Evaluate legal responsibilities and the moral, cultural, ethical, privacy and environmental impact of computing.",
         topicIds: ["legal-ethical-a-level"],
+      },
+      {
+        id: "ocr-al-2-1",
+        title: "2.1 Elements of Computational Thinking",
+        description:
+          "Apply abstraction, decomposition, thinking ahead, thinking logically, thinking procedurally and thinking concurrently.",
+        topicIds: ["computational-thinking"],
+      },
+      {
+        id: "ocr-al-2-2",
+        title: "2.2 Problem Solving and Programming",
+        description:
+          "Develop algorithms and programs using suitable constructs, structures, paradigms, testing and robust solution design.",
+        topicIds: [
+          "advanced-programming",
+          "software-development",
+        ],
+      },
+      {
+        id: "ocr-al-2-3",
+        title: "2.3 Algorithms",
+        description:
+          "Study searching, sorting, graph algorithms, shortest paths, complexity and algorithm design.",
+        topicIds: ["computational-thinking"],
+      },
+      {
+        id: "ocr-al-3",
+        title: "03 Programming Project",
+        description:
+          "Apply analysis, design, development, testing, evaluation and documentation to an independent programming project.",
+        topicIds: ["software-development"],
       },
     ],
   },

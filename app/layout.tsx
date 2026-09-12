@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     "Education",
     "Revision",
   ],
-  authors: [{ name: "Chris Brown" }],
-  creator: "Chris Brown",
+  authors: [{ name: "Master Teacher (Mr. Richards)" }],
+  creator: "Master Teacher (Mr. Richards)",
   icons: {
     icon: "/favicon.png",
     shortcut: "/favicon.png",

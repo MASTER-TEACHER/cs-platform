@@ -11,7 +11,6 @@ import { useAuth } from "@/contexts/AuthContext";
 type SidebarLink = {
   href: string;
   label: string;
-  aLevelOnly?: boolean;
 };
 
 type SidebarProps = {
@@ -30,16 +29,6 @@ const studentLinks: SidebarLink[] = [
   { href: "/notifications", label: "Notifications" },
   { href: "/exam", label: "Exam Mode" },
   { href: "/learn", label: "Learn" },
-  {
-    href: "/a-level-practice",
-    label: "A-Level Practice",
-    aLevelOnly: true,
-  },
-  {
-    href: "/nea",
-    label: "NEA Project",
-    aLevelOnly: true,
-  },
   { href: "/quiz", label: "Quiz" },
   { href: "/programming", label: "Programming" },
   { href: "/visualisers", label: "Visualisers" },
@@ -57,10 +46,6 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher/interventions", label: "Interventions" },
   { href: "/teacher/students", label: "Students" },
   { href: "/teacher/classes", label: "Classes" },
-  {
-    href: "/teacher/nea",
-    label: "NEA Monitoring",
-  },
   { href: "/teacher/school", label: "School" },
   { href: "/teacher/billing", label: "Billing" },
   { href: "/teacher/assignments", label: "Assignments" },
@@ -97,24 +82,7 @@ export default function Sidebar({
   const isStudent = profile?.role === "student";
   const isIndividualStudent = isStudent && !profile?.schoolId;
 
-  const qualification =
-    (
-      profile as {
-        qualification?: string;
-      } | null
-    )?.qualification;
-
-  const links =
-    isAdmin
-      ? adminLinks
-      : isTeacher
-        ? teacherLinks
-        : studentLinks.filter(
-            (link) =>
-              !link.aLevelOnly ||
-              qualification ===
-                "A_LEVEL",
-          );
+  const links = isAdmin ? adminLinks : isTeacher ? teacherLinks : studentLinks;
 
   const homeHref = isAdmin ? "/admin" : isTeacher ? "/teacher" : "/dashboard";
 

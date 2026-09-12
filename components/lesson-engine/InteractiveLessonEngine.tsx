@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 
 import LessonAudioPlayer from "@/components/audio/LessonAudioPlayer";
+import ALevelLessonPracticeExtension from "@/components/lesson-engine/ALevelLessonPracticeExtension";
 import CompleteLessonButton from "@/components/lesson/CompleteLessonButton";
 import SimulatorRenderer from "@/components/lesson/SimulatorRenderer";
 import LessonExamQuestionStep from "@/components/lesson-engine/LessonExamQuestionStep";
@@ -38,7 +39,7 @@ export default function InteractiveLessonEngine({
   nextLessonId,
   topicSimulator,
 }: Props) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const definition = useMemo(
     () =>
@@ -536,6 +537,15 @@ export default function InteractiveLessonEngine({
               void updatePracticeResponses(responses);
             }}
           />
+
+          {profile?.qualification === "A_LEVEL" &&
+            (profile.examBoard === "AQA" || profile.examBoard === "OCR") && (
+              <ALevelLessonPracticeExtension
+                board={profile.examBoard}
+                topicId={topicId}
+                lessonTitle={lesson.title}
+              />
+            )}
         </>
       )}
 
