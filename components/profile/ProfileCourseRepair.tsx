@@ -26,41 +26,52 @@ export default function ProfileCourseRepair() {
     refreshProfile,
   } = useAuth();
 
-  const attempted = useRef(false);
+  const attemptedKey = useRef("");
 
   useEffect(() => {
     if (
-      attempted.current ||
       !profileReady ||
       !user ||
       !profile ||
       profile.role !== "student" ||
-      Boolean(profile.currentCourse?.trim()) ||
       !profile.qualification ||
       !profile.examBoard
     ) {
       return;
     }
 
-    /*
-     * Capture the already-validated values before entering
-     * the asynchronous function.
-     *
-     * This preserves TypeScript narrowing:
-     * - uid is definitely a string
-     * - qualification is definitely Qualification
-     * - examBoard is definitely ExamBoard
-     */
     const uid = user.uid;
     const qualification = profile.qualification;
     const examBoard = profile.examBoard;
 
-    const currentCourse = buildCourseLabel(
-      qualification,
-      examBoard,
-    );
+    const expectedCurrentCourse =
+      buildCourseLabel(
+        qualification,
+        examBoard,
+      );
 
-    attempted.current = true;
+    const existingCurrentCourse =
+      profile.currentCourse?.trim() || "";
+
+    if (
+      existingCurrentCourse ===
+      expectedCurrentCourse
+    ) {
+      return;
+    }
+
+    const repairKey =
+      `${uid}|${qualification}|${examBoard}|${existingCurrentCourse}`;
+
+    if (
+      attemptedKey.current ===
+      repairKey
+    ) {
+      return;
+    }
+
+    attemptedKey.current =
+      repairKey;
 
     async function repairLegacyCourseKey() {
       try {
@@ -69,17 +80,13 @@ export default function ProfileCourseRepair() {
           {
             qualification,
             examBoard,
-            currentCourse,
+            currentCourse:
+              expectedCurrentCourse,
           },
         );
 
         await refreshProfile();
       } catch (error) {
-        /*
-         * This is only a profile compatibility repair.
-         * The profile page should remain usable even if
-         * the repair write cannot be completed.
-         */
         console.warn(
           "Unable to repair legacy currentCourse:",
           error,

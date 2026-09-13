@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -123,8 +123,7 @@ export default function ProgrammingPage() {
             </p>
 
             <p className="mt-1 font-black">
-              {profile.examBoard} ·{" "}
-              {profile.qualification ===
+              {profile.examBoard} - {profile.qualification ===
               "A_LEVEL"
                 ? "A-level"
                 : "GCSE"}
@@ -137,3 +136,4 @@ export default function ProgrammingPage() {
     </div>
   );
 }
+

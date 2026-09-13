@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 
@@ -98,7 +98,7 @@ export default function StudentKnowledgeMapPage() {
               onClick={() => void refresh()}
               className="rounded-xl border border-white/20 px-5 py-3 font-bold"
             >
-              ↻ Refresh map
+              Refresh map
             </button>
 
             <Link
@@ -150,7 +150,7 @@ export default function StudentKnowledgeMapPage() {
             href="/adaptive-learning"
             className="rounded-xl bg-teal-600 px-5 py-3 font-bold text-white"
           >
-            Open Adaptive Learning →
+            Open Adaptive Learning
           </Link>
         </div>
 
@@ -214,3 +214,4 @@ export default function StudentKnowledgeMapPage() {
     </div>
   );
 }
+

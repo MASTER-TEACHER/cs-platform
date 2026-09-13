@@ -8,8 +8,38 @@ import { useUserProfile } from "@/hooks/useUserProfile";
 import { calculateCourseProgress } from "@/lib/progressEngine";
 import { getTotalLessonCount } from "@/lib/curriculumProgress";
 
+function buildCourseLabel(
+  qualification?: string | null,
+  examBoard?: string | null,
+): string {
+  const cleanedQualification =
+    qualification?.trim() || "";
+
+  const cleanedExamBoard =
+    examBoard?.trim() || "";
+
+  if (
+    !cleanedQualification ||
+    !cleanedExamBoard
+  ) {
+    return "";
+  }
+
+  const level =
+    cleanedQualification ===
+    "A_LEVEL"
+      ? "A Level"
+      : cleanedQualification ===
+          "GCSE"
+        ? "GCSE"
+        : cleanedQualification;
+
+  return `${cleanedExamBoard} ${level} Computer Science`;
+}
+
 export default function ProfilePage() {
-  const { profile, loading } = useUserProfile();
+  const { profile, loading } =
+    useUserProfile();
 
   if (loading) {
     return (
@@ -21,28 +51,49 @@ export default function ProfilePage() {
   }
 
   const xp = profile?.xp || 0;
-  const completedLessons = profile?.completedLessons || [];
+  const completedLessons =
+    profile?.completedLessons || [];
   const badges = profile?.badges || [];
   const streak = profile?.streak || 0;
 
-  const totalLessons = getTotalLessonCount();
-  const progress = calculateCourseProgress(completedLessons, totalLessons);
+  const totalLessons =
+    getTotalLessonCount();
+
+  const progress =
+    calculateCourseProgress(
+      completedLessons,
+      totalLessons,
+    );
+
+  const canonicalCourse =
+    buildCourseLabel(
+      profile?.qualification,
+      profile?.examBoard,
+    );
+
+  const displayedCourse =
+    canonicalCourse ||
+    profile?.currentCourse?.trim() ||
+    "No course selected";
 
   return (
     <div className="space-y-8">
       <Card className="border-0 bg-gradient-to-r from-slate-900 to-blue-700 text-white">
-        <div className="text-6xl">👤</div>
+        <div className="text-sm font-black uppercase tracking-[0.16em] text-blue-100">
+          Student profile
+        </div>
 
         <h1 className="mt-6 text-4xl font-bold">
           {profile?.name || "Student"}
         </h1>
 
         <p className="mt-2 text-blue-100">
-          {profile?.email || "No email found"}
+          {profile?.email ||
+            "No email found"}
         </p>
 
         <p className="mt-4 inline-flex rounded-full bg-white/20 px-4 py-2 text-sm font-semibold">
-          {profile?.currentCourse?.toUpperCase() || "No course selected"}
+          {displayedCourse.toUpperCase()}
         </p>
       </Card>
 
