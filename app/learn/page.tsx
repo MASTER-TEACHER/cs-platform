@@ -71,9 +71,17 @@ export default function LearnPage() {
     router,
   ]);
 
+    const subject =
+    profile?.subject ===
+    "CREATIVE_IMEDIA"
+      ? "CREATIVE_IMEDIA"
+      : "COMPUTER_SCIENCE";
+
   const coverage =
-    profile?.qualification && profile.examBoard
+    profile?.qualification &&
+    profile.examBoard
       ? getCurriculumCoverage(
+          subject,
           profile.qualification,
           profile.examBoard,
         )
@@ -158,7 +166,7 @@ export default function LearnPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-slate-600">
-              Your Learn page is filtered from the qualification and exam board stored in your student profile.
+              Your Learn page is filtered from the subject, qualification and exam board stored in your student profile.
             </p>
           </div>
 
@@ -284,10 +292,11 @@ export default function LearnPage() {
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div>
-                            <p className="text-xs font-black uppercase tracking-widest text-blue-600">
-                              {profile.examBoard}{" "}
-                              {levelLabel}
-                            </p>
+                            <p className="text-sm font-black uppercase tracking-widest text-blue-600">
+  {subject === "CREATIVE_IMEDIA"
+    ? "OCR Creative iMedia"
+    : `${profile.examBoard} ${levelLabel} curriculum`}
+</p>
 
                             <h3 className="mt-2 text-2xl font-black text-slate-950">
                               {topic.title}

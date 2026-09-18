@@ -4,12 +4,30 @@ import { useEffect, useRef } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserCourseSelection } from "@/services/userService";
-import type { ExamBoard, Qualification } from "@/types/user";
+
+import type {
+  ExamBoard,
+  Qualification,
+  Subject,
+} from "@/types/user";
+
+function getCanonicalSubject(
+  subject: Subject | undefined,
+): Subject {
+  return subject === "CREATIVE_IMEDIA"
+    ? "CREATIVE_IMEDIA"
+    : "COMPUTER_SCIENCE";
+}
 
 function buildCourseLabel(
+  subject: Subject,
   qualification: Qualification,
   examBoard: ExamBoard,
 ): string {
+  if (subject === "CREATIVE_IMEDIA") {
+    return "OCR Cambridge National Creative iMedia J834";
+  }
+
   const level =
     qualification === "A_LEVEL"
       ? "A Level"
@@ -41,27 +59,53 @@ export default function ProfileCourseRepair() {
     }
 
     const uid = user.uid;
-    const qualification = profile.qualification;
-    const examBoard = profile.examBoard;
+
+    const subject =
+      getCanonicalSubject(
+        profile.subject,
+      );
+
+    const qualification =
+      profile.qualification;
+
+    const examBoard =
+      profile.examBoard;
 
     const expectedCurrentCourse =
       buildCourseLabel(
+        subject,
         qualification,
         examBoard,
       );
 
     const existingCurrentCourse =
-      profile.currentCourse?.trim() || "";
+      profile.currentCourse?.trim() ||
+      "";
+
+          const subjectNeedsRepair =
+      profile.subject !== subject;
+
+    const courseIsCurrent =
+      existingCurrentCourse ===
+      expectedCurrentCourse;
+
+    const courseNeedsRepair =
+      !courseIsCurrent;
 
     if (
-      existingCurrentCourse ===
-      expectedCurrentCourse
+      !subjectNeedsRepair &&
+      !courseNeedsRepair
     ) {
       return;
     }
-
-    const repairKey =
-      `${uid}|${qualification}|${examBoard}|${existingCurrentCourse}`;
+    const repairKey = [
+      uid,
+      subject,
+      qualification,
+      examBoard,
+      profile.subject || "NO_SUBJECT",
+      existingCurrentCourse,
+    ].join("|");
 
     if (
       attemptedKey.current ===
@@ -78,6 +122,7 @@ export default function ProfileCourseRepair() {
         await updateUserCourseSelection(
           uid,
           {
+            subject,
             qualification,
             examBoard,
             currentCourse:
@@ -88,7 +133,7 @@ export default function ProfileCourseRepair() {
         await refreshProfile();
       } catch (error) {
         console.warn(
-          "Unable to repair legacy currentCourse:",
+          "Unable to repair legacy curriculum profile:",
           error,
         );
       }

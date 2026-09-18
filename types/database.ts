@@ -4,6 +4,7 @@ import type {
   ExamBoard,
   PersonalPlan,
   Qualification,
+  Subject,
 } from "@/types/user";
 
 export type UserRole =
@@ -94,6 +95,8 @@ export interface UserProfile {
   /*
    * Student curriculum
    */
+  subject?: Subject;
+
   onboardingComplete:
     boolean;
 

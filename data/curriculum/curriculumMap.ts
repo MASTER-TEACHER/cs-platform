@@ -1,4 +1,4 @@
-import type { ExamBoard, Qualification } from "@/types/user";
+import type { ExamBoard, Qualification, Subject } from "@/types/user";
 
 export type CurriculumUnitDefinition = {
   id: string;
@@ -8,6 +8,7 @@ export type CurriculumUnitDefinition = {
 };
 
 export type CurriculumDefinition = {
+  subject: Subject;
   qualification: Qualification;
   examBoard: ExamBoard;
   title: string;
@@ -17,6 +18,7 @@ export type CurriculumDefinition = {
 
 export const curriculumDefinitions: CurriculumDefinition[] = [
   {
+    subject: "COMPUTER_SCIENCE",
     qualification: "GCSE",
     examBoard: "AQA",
     title: "AQA GCSE Computer Science",
@@ -94,6 +96,7 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
   },
 
   {
+    subject: "COMPUTER_SCIENCE",
     qualification: "GCSE",
     examBoard: "OCR",
     title: "OCR GCSE Computer Science",
@@ -188,6 +191,7 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
   },
 
   {
+    subject: "COMPUTER_SCIENCE",
     qualification: "GCSE",
     examBoard: "EDEXCEL",
     title: "Pearson Edexcel GCSE Computer Science",
@@ -258,6 +262,7 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
   },
 
   {
+    subject: "COMPUTER_SCIENCE",
     qualification: "A_LEVEL",
     examBoard: "AQA",
     title: "AQA A-level Computer Science",
@@ -368,6 +373,7 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
   },
 
   {
+    subject: "COMPUTER_SCIENCE",
     qualification: "A_LEVEL",
     examBoard: "OCR",
     title: "OCR A-level Computer Science",
@@ -453,15 +459,37 @@ export const curriculumDefinitions: CurriculumDefinition[] = [
       },
     ],
   },
-];
 
+  {
+    subject: "CREATIVE_IMEDIA",
+    qualification: "GCSE",
+    examBoard: "OCR",
+    title: "OCR Cambridge National in Creative iMedia",
+    specificationLabel: "OCR J834",
+    units: [
+      { id: "imedia-r093", title: "R093 Creative iMedia in the Media Industry", description: "Understand the media industry, products, sectors, job roles, legal considerations and distribution.", topicIds: ["imedia-r093"] },
+      { id: "imedia-r094", title: "R094 Visual Identity and Digital Graphics", description: "Plan, create, review and evaluate visual identity and digital graphics.", topicIds: ["imedia-r094"] },
+      { id: "imedia-r095", title: "R095 Characters and Comics", description: "Plan, create and review characters and comic products.", topicIds: ["imedia-r095"] },
+      { id: "imedia-r096", title: "R096 Animation with Audio", description: "Plan, create, test and review animation with audio.", topicIds: ["imedia-r096"] },
+      { id: "imedia-r097", title: "R097 Interactive Digital Media", description: "Plan, create, test and review interactive digital media.", topicIds: ["imedia-r097"] },
+      { id: "imedia-r098", title: "R098 Visual Imaging", description: "Plan and create visual imaging products using appropriate techniques.", topicIds: ["imedia-r098"] },
+      { id: "imedia-r099", title: "R099 Digital Games", description: "Plan, create, test and review a digital game product.", topicIds: ["imedia-r099"] },
+    ],
+  },];
+
+export function getCurriculumDefinition(qualification: Qualification, examBoard: ExamBoard): CurriculumDefinition | undefined;
+export function getCurriculumDefinition(subject: Subject, qualification: Qualification, examBoard: ExamBoard): CurriculumDefinition | undefined;
 export function getCurriculumDefinition(
-  qualification: Qualification,
-  examBoard: ExamBoard,
+  subjectOrQualification: Subject | Qualification,
+  qualificationOrExamBoard: Qualification | ExamBoard,
+  maybeExamBoard?: ExamBoard,
 ): CurriculumDefinition | undefined {
-  return curriculumDefinitions.find(
-    (curriculum) =>
-      curriculum.qualification === qualification &&
-      curriculum.examBoard === examBoard,
+  const subject: Subject = maybeExamBoard === undefined ? "COMPUTER_SCIENCE" : subjectOrQualification as Subject;
+  const qualification: Qualification = maybeExamBoard === undefined ? subjectOrQualification as Qualification : qualificationOrExamBoard as Qualification;
+  const examBoard: ExamBoard = maybeExamBoard === undefined ? qualificationOrExamBoard as ExamBoard : maybeExamBoard;
+  return curriculumDefinitions.find((curriculum) =>
+    curriculum.subject === subject &&
+    curriculum.qualification === qualification &&
+    curriculum.examBoard === examBoard
   );
 }

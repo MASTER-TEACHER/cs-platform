@@ -24,6 +24,7 @@ import type {
   ExamBoard,
   PersonalPlan,
   Qualification,
+  Subject,
 } from "@/types/user";
 
 type FirestoreUserProfile = Omit<
@@ -31,6 +32,7 @@ type FirestoreUserProfile = Omit<
   | "createdAt"
   | "updatedAt"
   | "qualification"
+  | "subject"
   | "examBoard"
   | "accountIntent"
   | "teacherAccessStatus"
@@ -45,6 +47,9 @@ type FirestoreUserProfile = Omit<
   | "personalPlan"
   | "schoolId"
 > & {
+  subject?:
+    string | null;
+
   qualification?:
     string | null;
 
@@ -113,6 +118,7 @@ export type CreateUserProfileInput = {
 };
 
 export type UserCourseSelection = {
+  subject?: Subject;
   qualification: string;
   examBoard: string;
   currentCourse?: string;
@@ -132,6 +138,14 @@ function normaliseEmail(
   return normaliseString(
     value,
   ).toLowerCase();
+}
+
+function normaliseSubject(
+  value: unknown,
+): Subject {
+  return value === "CREATIVE_IMEDIA"
+    ? "CREATIVE_IMEDIA"
+    : "COMPUTER_SCIENCE";
 }
 
 function normaliseQualification(
@@ -373,6 +387,11 @@ function convertUserProfile(
   const email =
     normaliseEmail(data.email);
 
+  const subject =
+    normaliseSubject(
+      data.subject,
+    );
+
   const qualification =
     normaliseQualification(
       data.qualification,
@@ -501,6 +520,8 @@ teacherVerificationRejectedAt:
       normaliseStringArray(
         data.classIds,
       ),
+
+    subject,
 
     qualification,
 
@@ -668,6 +689,7 @@ teacherVerificationRejectedAt:
 
       classIds: [],
 
+      subject: "COMPUTER_SCIENCE",
       qualification: null,
       examBoard: null,
       currentCourse: "",
@@ -749,10 +771,19 @@ export async function updateUserCourseSelection(
     );
   }
 
-  const selection =
+  /*
+   * Legacy callers that still use the positional arguments
+   * belong to the original Computer Science flow.
+   *
+   * New subject-aware callers pass UserCourseSelection.
+   */
+  const selection: UserCourseSelection =
     typeof selectionOrQualification ===
     "string"
       ? {
+          subject:
+            "COMPUTER_SCIENCE",
+
           qualification:
             selectionOrQualification,
 
@@ -763,6 +794,12 @@ export async function updateUserCourseSelection(
             currentCourse || "",
         }
       : selectionOrQualification;
+
+  const cleanedSubject: Subject =
+    selection.subject ===
+    "CREATIVE_IMEDIA"
+      ? "CREATIVE_IMEDIA"
+      : "COMPUTER_SCIENCE";
 
   const cleanedQualification =
     selection.qualification.trim();
@@ -795,10 +832,35 @@ export async function updateUserCourseSelection(
     );
   }
 
+  /*
+   * Creative iMedia V1.3 currently represents
+   * OCR Cambridge National in Creative iMedia J834.
+   *
+   * It therefore uses the existing GCSE qualification
+   * storage value while remaining a distinct subject.
+   */
+  if (
+    cleanedSubject ===
+      "CREATIVE_IMEDIA" &&
+    (
+      cleanedQualification !==
+        "GCSE" ||
+      cleanedExamBoard !==
+        "OCR"
+    )
+  ) {
+    throw new Error(
+      "Creative iMedia is currently available as OCR Cambridge National J834.",
+    );
+  }
+
   const updateData: Record<
     string,
     unknown
   > = {
+    subject:
+      cleanedSubject,
+
     qualification:
       cleanedQualification,
 
@@ -1038,6 +1100,13 @@ export async function ensureUserProfile(
     )
   ) {
     repairData.classIds = [];
+  }
+
+  if (
+    existing.subject !== "COMPUTER_SCIENCE" &&
+    existing.subject !== "CREATIVE_IMEDIA"
+  ) {
+    repairData.subject = "COMPUTER_SCIENCE";
   }
 
   if (

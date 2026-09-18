@@ -1,9 +1,23 @@
-export type Qualification = "GCSE" | "A_LEVEL";
+export type Subject =
+  | "COMPUTER_SCIENCE"
+  | "CREATIVE_IMEDIA";
 
-export type ExamBoard = "AQA" | "OCR" | "EDEXCEL";
+export type Qualification =
+  | "GCSE"
+  | "A_LEVEL";
 
-export type AccountType = "individual" | "school";
+export type ExamBoard =
+  | "AQA"
+  | "OCR"
+  | "EDEXCEL";
 
-export type PersonalPlan = "free" | "premium";
+export type AccountType =
+  | "individual"
+  | "school";
 
-export type AccountPlan = PersonalPlan | "school";
+export type PersonalPlan =
+  | "free"
+  | "premium";
+
+export type AccountPlan =
+  PersonalPlan | "school";

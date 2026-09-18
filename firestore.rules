@@ -169,6 +169,13 @@ service cloud.firestore {
         ).data.status == "active";
     }
 
+    function validSubject(data) {
+  return !("subject" in data) ||
+    data.subject == null ||
+    data.subject == "COMPUTER_SCIENCE" ||
+    data.subject == "CREATIVE_IMEDIA";
+}
+
     function validQualification(data) {
       return !("qualification" in data) ||
         data.qualification == null ||
@@ -453,6 +460,7 @@ allow update: if signedIn() &&
       request.resource.data.teacherAccessStatus == "not_submitted" ||
       request.resource.data.teacherAccessStatus == "pending"
     ) &&
+    validSubject(request.resource.data) &&
     validQualification(request.resource.data) &&
     validExamBoard(request.resource.data) &&
     validOnboardingStatus(request.resource.data) &&
@@ -487,6 +495,7 @@ allow update: if signedIn() &&
         "personalPlan",
         "schoolId",
         "currentCourse",
+        "subject",
         "qualification",
         "examBoard",
         "onboardingComplete",
