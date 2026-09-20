@@ -212,6 +212,8 @@ export default function DashboardPage() {
       false;
 
   const journey = buildStudentJourney({
+    subject:
+      profile.subject ?? "COMPUTER_SCIENCE",
     qualification:
       profile.qualification,
     examBoard:
@@ -254,11 +256,14 @@ export default function DashboardPage() {
         streak={streak}
         badges={badges.length}
         curriculum={`${journey.examBoard} ${
-          journey.qualification ===
-          "A_LEVEL"
-            ? "A-level"
-            : "GCSE"
-        }`}
+  journey.qualification === "A_LEVEL"
+    ? "A-level"
+    : "GCSE"
+} ${
+  journey.subject === "CREATIVE_IMEDIA"
+    ? "Creative iMedia"
+    : "Computer Science"
+}`}
       />
 
       {showPremiumUpgrade && (

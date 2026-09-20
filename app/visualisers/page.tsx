@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-
 import Link from "next/link";
-
 
 import { useAuth } from "@/contexts/AuthContext";
 import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
@@ -38,6 +36,7 @@ export default function VisualisersPage() {
   const coverage =
     profile?.qualification && profile.examBoard
       ? getCurriculumCoverage(
+          profile.subject ?? "COMPUTER_SCIENCE",
           profile.qualification,
           profile.examBoard,
         )
@@ -149,8 +148,8 @@ export default function VisualisersPage() {
         </h1>
 
         <p className="mt-3 text-amber-800">
-          Choose your qualification and exam board before opening interactive
-          visualisers.
+          Choose your subject, qualification and exam board before opening
+          interactive visualisers.
         </p>
 
         <Link
@@ -189,6 +188,9 @@ export default function VisualisersPage() {
             </p>
 
             <p className="mt-1 font-black">
+              {profile?.subject === "CREATIVE_IMEDIA"
+                ? "Creative iMedia · "
+                : "Computer Science · "}
               {profile?.examBoard} ·{" "}
               {profile?.qualification ===
               "A_LEVEL"

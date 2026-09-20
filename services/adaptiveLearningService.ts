@@ -1,4 +1,4 @@
-import {
+﻿import {
   collection,
   doc,
   getDoc,
@@ -386,6 +386,7 @@ export async function getAdaptiveLearningPlan(
   const curriculumCoverage =
     profile.qualification && profile.examBoard
       ? getCurriculumCoverage(
+          profile.subject ?? "COMPUTER_SCIENCE",
           profile.qualification,
           profile.examBoard,
         )
@@ -798,3 +799,4 @@ programmingPracticeSnapshot.docs.forEach(
     topics,
   };
 }
+

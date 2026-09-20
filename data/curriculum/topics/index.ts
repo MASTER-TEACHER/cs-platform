@@ -9,6 +9,13 @@ import { databasesTopic } from "./databases";
 import { ethicalLegalTopic } from "./ethical-legal";
 import { hexadecimalTopic } from "./hexadecimal";
 import { imagesTopic } from "./images";
+import { imediaR093Topic } from "./imedia-r093";
+import { imediaR094Topic } from "./imedia-r094";
+import { imediaR095Topic } from "./imedia-r095";
+import { imediaR096Topic } from "./imedia-r096";
+import { imediaR097Topic } from "./imedia-r097";
+import { imediaR098Topic } from "./imedia-r098";
+import { imediaR099Topic } from "./imedia-r099";
 import { memoryStorageTopic } from "./memory-storage";
 import { networksTopic } from "./networks";
 import { programmingLanguagesTopic } from "./programming-languages";
@@ -28,18 +35,12 @@ import { functionalProgrammingTopic } from "./a-level/functional-programming";
 import { legalEthicalALevelTopic } from "./a-level/legal-ethical-a-level";
 import { softwareDevelopmentTopic } from "./a-level/software-development";
 import { theoryComputationTopic } from "./a-level/theory-computation";
-import {
-  withSupplementalALevelLessons,
-} from "./a-level/supplemental-lessons";
+import { withSupplementalALevelLessons } from "./a-level/supplemental-lessons";
 
 import type { Topic } from "@/types/curriculum";
 
-function createTopicLibrary(
-  topics: Topic[],
-): Record<string, Topic> {
-  return Object.fromEntries(
-    topics.map((topic) => [topic.id, topic]),
-  );
+function createTopicLibrary(topics: Topic[]): Record<string, Topic> {
+  return Object.fromEntries(topics.map((topic) => [topic.id, topic]));
 }
 
 const aLevelTopics = [
@@ -55,9 +56,7 @@ const aLevelTopics = [
   softwareDevelopmentTopic,
   bigDataTopic,
   legalEthicalALevelTopic,
-].map(
-  withSupplementalALevelLessons,
-);
+].map(withSupplementalALevelLessons);
 
 export const publishedTopics: Topic[] = [
   binaryTopic,
@@ -77,33 +76,29 @@ export const publishedTopics: Topic[] = [
   booleanLogicTopic,
   ethicalLegalTopic,
   programmingLanguagesTopic,
+  imediaR093Topic,
+  imediaR094Topic,
+  imediaR095Topic,
+  imediaR096Topic,
+  imediaR097Topic,
+  imediaR098Topic,
+  imediaR099Topic,
   ...aLevelTopics,
 ];
 
-export const topicLibrary =
-  createTopicLibrary(
-    publishedTopics,
-  );
+export const topicLibrary = createTopicLibrary(publishedTopics);
 
-export function getTopicById(
-  topicId: string,
-): Topic | null {
+export function getTopicById(topicId: string): Topic | null {
   return topicLibrary[topicId] ?? null;
 }
 
 export function getPublishedTopics(): Topic[] {
-  return publishedTopics.filter(
-    (topic) =>
-      topic.status !==
-      "coming-soon",
-  );
+  return publishedTopics.filter((topic) => topic.status !== "coming-soon");
 }
 
 export function getTotalPublishedLessons(): number {
   return getPublishedTopics().reduce(
-    (total, topic) =>
-      total +
-      topic.lessons.length,
+    (total, topic) => total + topic.lessons.length,
     0,
   );
 }

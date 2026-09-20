@@ -33,6 +33,7 @@ import type {
 import type {
   ExamBoard,
   Qualification,
+  Subject,
 } from "@/types/user";
 
 export const runtime =
@@ -46,6 +47,7 @@ const ATTEMPT_LIFETIME_MS =
 
 type RequestIdentity = {
   uid: string;
+  subject: Subject;
   qualification: Qualification;
   examBoard: ExamBoard;
 };
@@ -143,6 +145,12 @@ async function getIdentity(
     profileSnapshot.data() ||
     {};
 
+  const subject =
+    (profile.subject as
+      | Subject
+      | undefined) ??
+    "COMPUTER_SCIENCE";
+
   const qualification =
     profile.qualification as
       | Qualification
@@ -165,6 +173,8 @@ async function getIdentity(
   return {
     uid:
       decoded.uid,
+
+    subject,
 
     qualification,
 
@@ -806,6 +816,7 @@ async function loadQuiz({
   const builtIn =
     getCurriculumQuizByTopic(
       topic,
+      identity.subject,
       identity.qualification,
       identity.examBoard,
     );
@@ -1358,6 +1369,7 @@ export async function GET(
     if (!topic) {
       const quizzes =
         getCurriculumQuizzes(
+          identity.subject,
           identity.qualification,
           identity.examBoard,
         ).map(

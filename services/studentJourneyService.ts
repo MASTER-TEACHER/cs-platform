@@ -3,6 +3,7 @@ import { getCurriculumCoverage } from "@/services/curriculumCoverageService";
 import type {
   ExamBoard,
   Qualification,
+  Subject,
 } from "@/types/user";
 
 export type StudentJourneyMission = {
@@ -17,6 +18,7 @@ export type StudentJourneyMission = {
 };
 
 export type StudentJourney = {
+  subject: Subject;
   qualification: Qualification;
   examBoard: ExamBoard;
   curriculumTitle: string;
@@ -43,22 +45,21 @@ function difficultyLabel(
 
 /**
  * Build the student's dashboard learning journey from the exact
- * qualification + exam board stored in their profile.
- *
- * This deliberately does not use the old global mission/lesson helpers.
- * Those helpers could select a lesson from outside the student's
- * curriculum because they did not have qualification/exam-board context.
+ * subject + qualification + exam board stored in their profile.
  */
 export function buildStudentJourney({
+  subject,
   qualification,
   examBoard,
   completedLessons,
 }: {
+  subject: Subject;
   qualification: Qualification;
   examBoard: ExamBoard;
   completedLessons: string[];
 }): StudentJourney | null {
   const coverage = getCurriculumCoverage(
+    subject,
     qualification,
     examBoard,
   );
@@ -108,6 +109,7 @@ export function buildStudentJourney({
       : 0;
 
   return {
+    subject,
     qualification,
     examBoard,
     curriculumTitle:

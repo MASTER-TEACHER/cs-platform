@@ -28,7 +28,7 @@ export default function DashboardHero({
           </h1>
 
           <p className="mt-3 max-w-xl text-blue-100">
-            Continue your {curriculum} Computer Science journey.
+            Continue your {curriculum} journey.
             Your dashboard recommendations are aligned to the
             curriculum stored in your profile.
           </p>

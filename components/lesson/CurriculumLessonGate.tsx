@@ -170,10 +170,12 @@ export default function CurriculumLessonGate({
       }
 
       const coverage =
-        getCurriculumCoverage(
-          profile.qualification,
-          profile.examBoard,
-        );
+  getCurriculumCoverage(
+    profile.subject ??
+      "COMPUTER_SCIENCE",
+    profile.qualification,
+    profile.examBoard,
+  );
 
       return Boolean(
         coverage?.units.some(
@@ -186,11 +188,12 @@ export default function CurriculumLessonGate({
         ),
       );
     }, [
-      profile?.examBoard,
-      profile?.qualification,
-      profile?.role,
-      topicId,
-    ]);
+  profile?.examBoard,
+  profile?.qualification,
+  profile?.role,
+  profile?.subject,
+  topicId,
+]);
 
   if (
     loading ||
