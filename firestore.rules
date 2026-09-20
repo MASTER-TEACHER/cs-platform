@@ -103,6 +103,80 @@ service cloud.firestore {
         );
     }
 
+function isActiveSchoolStaffMember(schoolId, userId) {
+  return schoolId is string &&
+    schoolId != "" &&
+    userId is string &&
+    userId != "" &&
+    schoolMemberExists(schoolId, userId) &&
+    schoolMemberData(schoolId, userId).status == "active" &&
+    schoolMemberData(schoolId, userId).role in [
+      "teacher",
+      "school_admin"
+    ];
+}
+
+function validCoTeacherChange(oldData, newData) {
+  let oldCoTeachers =
+    oldData.get("coTeacherIds", []);
+
+  let newCoTeachers =
+    newData.get("coTeacherIds", []);
+
+  let added =
+    newCoTeachers.toSet()
+      .difference(oldCoTeachers.toSet());
+
+  let removed =
+    oldCoTeachers.toSet()
+      .difference(newCoTeachers.toSet());
+
+  return newCoTeachers is list &&
+
+    // Prevent duplicate co-teacher UIDs.
+    newCoTeachers.size() ==
+      newCoTeachers.toSet().size() &&
+
+    (
+      // No co-teacher membership change.
+      (
+        added.size() == 0 &&
+        removed.size() == 0
+      ) ||
+
+      // Owner may remove one or more co-teachers.
+      (
+        added.size() == 0 &&
+        removed.size() > 0
+      ) ||
+
+      // Owner may add exactly one co-teacher at a time.
+      // The new list must contain exactly one additional
+      // UID, and that UID must be active school staff.
+      (
+        added.size() == 1 &&
+        removed.size() == 0 &&
+
+        newCoTeachers.size() ==
+          oldCoTeachers.size() + 1 &&
+
+        isActiveSchoolStaffMember(
+          newData.schoolId,
+          newCoTeachers[
+            newCoTeachers.size() - 1
+          ]
+        ) &&
+
+        !(
+          newCoTeachers[
+            newCoTeachers.size() - 1
+          ] in oldCoTeachers
+        )
+      )
+    );
+}
+
+
     function sameSchoolUser(userId) {
       return signedIn() &&
         currentUserHasSchool() &&
@@ -206,6 +280,25 @@ service cloud.firestore {
         ).data.teacherId == currentUserId();
     }
 
+function managesClass(classId) {
+  return isTeacher() &&
+    exists(
+      /databases/$(database)/documents/classes/$(classId)
+    ) &&
+    (
+      get(
+        /databases/$(database)/documents/classes/$(classId)
+      ).data.teacherId == currentUserId() ||
+      (
+        get(
+          /databases/$(database)/documents/classes/$(classId)
+        ).data.get("coTeacherIds", []) is list &&
+        currentUserId() in get(
+          /databases/$(database)/documents/classes/$(classId)
+        ).data.get("coTeacherIds", [])
+      )
+    );
+}
     function belongsToClass(classId) {
       return signedIn() &&
         exists(
@@ -234,9 +327,11 @@ service cloud.firestore {
           /databases/$(database)/documents/classAssignments/$(assignmentId)
         ) &&
         (
-          get(
-            /databases/$(database)/documents/classAssignments/$(assignmentId)
-          ).data.teacherId == currentUserId() ||
+          managesClass(
+            get(
+              /databases/$(database)/documents/classAssignments/$(assignmentId)
+            ).data.classId
+          ) ||
           isAdmin()
         );
     }
@@ -597,17 +692,36 @@ allow update: if signedIn() &&
 
     match /classes/{classId} {
 
-      allow get, list: if signedIn() &&
+      /*
+       * Individual class reads remain document-aware.
+       *
+       * Firestore security rules are not filters. The teacher class directory
+       * uses separate owner and co-teacher queries and merges them client-side.
+       */
+      allow get: if signedIn() &&
         (
           resource.data.teacherId == currentUserId() ||
+          (
+            resource.data.get("coTeacherIds", []) is list &&
+            currentUserId() in resource.data.get("coTeacherIds", [])
+          ) ||
           currentUserId() in resource.data.studentIds ||
           isAdmin()
         );
 
-      allow create: if isTeacher() &&
-        request.resource.data.teacherId == currentUserId() &&
-        request.resource.data.studentIds is list &&
-        request.resource.data.assignmentIds is list &&
+      /*
+       * Teachers/admins may run class collection queries. Application queries
+       * still constrain results to owned/co-taught classes; document updates
+       * remain protected by the stricter rules below.
+       */
+      allow list: if isTeacher();
+
+     allow create: if isTeacher() &&
+  request.resource.data.teacherId == currentUserId() &&
+  request.resource.data.coTeacherIds is list &&
+  request.resource.data.coTeacherIds.size() == 0 &&
+  request.resource.data.studentIds is list &&
+  request.resource.data.assignmentIds is list &&
         (
           isAdmin() ||
           (
@@ -616,26 +730,59 @@ allow update: if signedIn() &&
           )
         );
 
-      allow update: if isTeacher() &&
-        (
-          resource.data.teacherId == currentUserId() ||
-          isAdmin()
-        ) &&
-        request.resource.data.teacherId == resource.data.teacherId &&
-        (
-          isAdmin() ||
-          (
-            (
-              "schoolId" in resource.data &&
-              request.resource.data.schoolId == resource.data.schoolId
-            ) ||
-            (
-              !("schoolId" in resource.data) &&
-              currentUserHasSchool() &&
-              request.resource.data.schoolId == currentSchoolId()
-            )
-          )
-        );
+     allow update: if isTeacher() &&
+  (
+    resource.data.teacherId == currentUserId() ||
+    (
+      resource.data.get("coTeacherIds", []) is list &&
+      currentUserId() in resource.data.get("coTeacherIds", []) &&
+      request.resource.data.get("coTeacherIds", []) ==
+        resource.data.get("coTeacherIds", [])
+    ) ||
+    isAdmin()
+  ) &&
+
+  // The permanent class owner cannot be changed.
+  request.resource.data.teacherId ==
+    resource.data.teacherId &&
+
+  // Preserve the existing school tenancy boundary.
+  (
+    isAdmin() ||
+    (
+      (
+        "schoolId" in resource.data &&
+        request.resource.data.schoolId ==
+          resource.data.schoolId
+      ) ||
+      (
+        !("schoolId" in resource.data) &&
+        currentUserHasSchool() &&
+        request.resource.data.schoolId ==
+          currentSchoolId()
+      )
+    )
+  ) &&
+
+  // Co-teachers cannot alter teacher membership.
+  // Owners/admins may do so only through a valid
+  // same-school co-teacher change.
+  (
+    request.resource.data.get("coTeacherIds", []) ==
+      resource.data.get("coTeacherIds", []) ||
+
+    (
+      (
+        resource.data.teacherId ==
+          currentUserId() ||
+        isAdmin()
+      ) &&
+      validCoTeacherChange(
+        resource.data,
+        request.resource.data
+      )
+    )
+  );
 
       allow delete: if isTeacher() &&
         (
@@ -654,6 +801,7 @@ allow update: if signedIn() &&
       allow get: if signedIn() &&
   (
     resource.data.teacherId == currentUserId() ||
+    managesClass(resource.data.classId) ||
     currentUserId() in resource.data.get("studentIds", []) ||
     belongsToClass(resource.data.classId) ||
     isAdmin()
@@ -662,6 +810,7 @@ allow update: if signedIn() &&
 allow list: if signedIn() &&
   (
     resource.data.teacherId == currentUserId() ||
+    managesClass(resource.data.classId) ||
     currentUserId() in resource.data.get("studentIds", []) ||
     isAdmin()
   );
@@ -669,7 +818,7 @@ allow list: if signedIn() &&
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         request.resource.data.classId is string &&
-        ownsClass(request.resource.data.classId) &&
+        managesClass(request.resource.data.classId) &&
         request.resource.data.studentIds is list &&
         request.resource.data.studentIds.size() > 0 &&
         request.resource.data.studentIds.hasOnly(
@@ -681,7 +830,7 @@ allow list: if signedIn() &&
 
       allow update: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         ) &&
         request.resource.data.teacherId == resource.data.teacherId &&
@@ -693,7 +842,7 @@ allow list: if signedIn() &&
 
       allow delete: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         );
     }
@@ -713,6 +862,7 @@ allow list: if signedIn() &&
       allow get, list: if signedIn() &&
         (
           resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           currentUserId() in resource.data.studentIds ||
           isAdmin()
         );
@@ -720,7 +870,7 @@ allow list: if signedIn() &&
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         request.resource.data.classId is string &&
-        ownsClass(request.resource.data.classId) &&
+        managesClass(request.resource.data.classId) &&
         request.resource.data.studentIds is list &&
         request.resource.data.studentIds.size() > 0 &&
         request.resource.data.studentIds.hasOnly(
@@ -738,7 +888,7 @@ allow list: if signedIn() &&
        */
       allow update: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         ) &&
         request.resource.data.teacherId == resource.data.teacherId &&
@@ -769,7 +919,7 @@ allow list: if signedIn() &&
 
       allow delete: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         );
     }
@@ -987,8 +1137,7 @@ allow update: if signedIn() &&
         (
           resource.data.studentId ==
             currentUserId() ||
-          resource.data.teacherId ==
-            currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         )
       ) ||
@@ -1013,8 +1162,7 @@ allow update: if signedIn() &&
     (
       resource.data.studentId ==
         currentUserId() ||
-      resource.data.teacherId ==
-        currentUserId() ||
+      managesClass(resource.data.classId) ||
       isAdmin()
     );
 
@@ -1085,8 +1233,7 @@ allow update: if signedIn() &&
 
   allow delete: if isTeacher() &&
     (
-      resource.data.teacherId ==
-        currentUserId() ||
+      managesClass(resource.data.classId) ||
       isAdmin()
     );
 }
@@ -1371,13 +1518,14 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
       allow get, list: if signedIn() &&
         (
           resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           currentUserId() in resource.data.studentIds ||
           isAdmin()
         );
 
       allow create: if isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
-        ownsClass(request.resource.data.classId) &&
+        managesClass(request.resource.data.classId) &&
         request.resource.data.studentIds is list &&
         request.resource.data.studentIds.size() > 0 &&
         request.resource.data.studentIds.hasOnly(
@@ -1390,7 +1538,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
 
       allow update: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         ) &&
         request.resource.data.teacherId == resource.data.teacherId &&
@@ -1414,7 +1562,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
 
       allow delete: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         );
     }
@@ -1439,7 +1587,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
             resource != null &&
             (
               resource.data.studentId == currentUserId() ||
-              resource.data.teacherId == currentUserId() ||
+              managesClass(resource.data.classId) ||
               isAdmin()
             )
           ) ||
@@ -1452,7 +1600,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
       allow list: if signedIn() &&
         (
           resource.data.studentId == currentUserId() ||
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         );
 
@@ -1534,7 +1682,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
        */
       allow update: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         ) &&
         request.resource.data.studentId == resource.data.studentId &&
@@ -1561,7 +1709,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
 
       allow delete: if isTeacher() &&
         (
-          resource.data.teacherId == currentUserId() ||
+          managesClass(resource.data.classId) ||
           isAdmin()
         );
     }

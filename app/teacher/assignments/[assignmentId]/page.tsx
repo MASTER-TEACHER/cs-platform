@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -187,7 +188,26 @@ export default function TeacherResourceAssignmentPage() {
           return;
         }
 
-        if (loadedAssignment.teacherId !== teacherId) {
+        const classSnapshot = await getDoc(
+          doc(db, "classes", loadedAssignment.classId),
+        );
+
+        const classData = classSnapshot.exists()
+          ? classSnapshot.data()
+          : null;
+
+        const coTeacherIds = Array.isArray(classData?.coTeacherIds)
+          ? classData.coTeacherIds.filter(
+              (value: unknown): value is string =>
+                typeof value === "string",
+            )
+          : [];
+
+        const canManageClass =
+          classData?.teacherId === teacherId ||
+          coTeacherIds.includes(teacherId);
+
+        if (!canManageClass) {
           setAssignment(null);
           setRows([]);
           setError("You do not have permission to view this assignment.");

@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -12,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 
 import Card from "@/components/ui/Card";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   clearExamBoundaryConfiguration,
   saveExamBoundaryConfiguration,
@@ -34,6 +36,7 @@ export default function ExamGradeBoundaryCard({
   assignment: ExamAssignment;
   gradeIntelligence: ExamGradeIntelligence;
 }) {
+  const { user } = useAuth();
   const [source, setSource] =
     useState<AnalyticsBoundarySource>(
       gradeIntelligence.boundarySource,
@@ -111,7 +114,7 @@ export default function ExamGradeBoundaryCard({
         assignmentId:
           assignment.id,
         teacherId:
-          assignment.teacherId,
+          user?.uid || "",
         qualification:
           gradeIntelligence.qualification,
         examBoard:
@@ -156,7 +159,7 @@ export default function ExamGradeBoundaryCard({
         assignmentId:
           assignment.id,
         teacherId:
-          assignment.teacherId,
+          user?.uid || "",
       });
 
       toast.success(

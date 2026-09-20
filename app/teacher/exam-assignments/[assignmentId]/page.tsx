@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -253,11 +254,26 @@ export default function ExamAssignmentMarkbookPage() {
           return;
         }
 
-        /*
-         * Only the teacher who owns the exam should open its markbook or edit
-         * its integrity policy.
-         */
-        if (loadedAssignment.teacherId !== user.uid) {
+        const classSnapshot = await getDoc(
+          doc(db, "classes", loadedAssignment.classId),
+        );
+
+        const classData = classSnapshot.exists()
+          ? classSnapshot.data()
+          : null;
+
+        const coTeacherIds = Array.isArray(classData?.coTeacherIds)
+          ? classData.coTeacherIds.filter(
+              (value: unknown): value is string =>
+                typeof value === "string",
+            )
+          : [];
+
+        const canManageClass =
+          classData?.teacherId === user.uid ||
+          coTeacherIds.includes(user.uid);
+
+        if (!canManageClass) {
           throw new Error(
             "You do not have permission to view this exam markbook.",
           );

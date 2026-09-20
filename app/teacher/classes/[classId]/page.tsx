@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ClassStudentsManager from "@/components/teacher/classes/ClassStudentsManager";
+import ClassTeachersManager from "@/components/teacher/classes/ClassTeachersManager";
 import ClassSettingsPanel from "@/components/teacher/classes/ClassSettingsPanel";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,7 +16,13 @@ import {
   type UnifiedTeacherAssignment,
 } from "@/services/unifiedTeacherAssignmentService";
 
-type ClassTab = "overview" | "students" | "assignments" | "analytics" | "settings";
+type ClassTab =
+  | "overview"
+  | "students"
+  | "teachers"
+  | "assignments"
+  | "analytics"
+  | "settings";
 
 function formatDate(date: Date | null): string {
   if (!date) {
@@ -131,7 +138,13 @@ export default function ClassDetailsPage() {
           return;
         }
 
-        if (classRecord.teacherId !== user.uid) {
+        const isClassOwner =
+          classRecord.teacherId === user.uid;
+
+        const isCoTeacher =
+          classRecord.coTeacherIds.includes(user.uid);
+
+        if (!isClassOwner && !isCoTeacher) {
           setError("You do not have permission to view this class.");
           return;
         }
@@ -251,6 +264,9 @@ export default function ClassDetailsPage() {
     );
   }
 
+  const isClassOwner =
+    teacherClass.teacherId === user?.uid;
+
   const tabs: {
     id: ClassTab;
     label: string;
@@ -262,6 +278,10 @@ export default function ClassDetailsPage() {
     {
       id: "students",
       label: `Students (${students.length})`,
+    },
+    {
+      id: "teachers",
+      label: `Teachers (${1 + teacherClass.coTeacherIds.length})`,
     },
     {
       id: "assignments",
@@ -430,6 +450,16 @@ export default function ClassDetailsPage() {
               />
             )}
 
+            {activeTab === "teachers" && (
+              <ClassTeachersManager
+                teacherClass={teacherClass}
+                isClassOwner={isClassOwner}
+                onUpdated={(updatedClass) => {
+                  setTeacherClass(updatedClass);
+                }}
+              />
+            )}
+
             {activeTab === "assignments" && (
               <AssignmentsTab
                 assignments={assignments}
@@ -450,6 +480,7 @@ export default function ClassDetailsPage() {
             {activeTab === "settings" && (
               <ClassSettingsPanel
                 teacherClass={teacherClass}
+                isClassOwner={isClassOwner}
                 onUpdated={(updatedClass) => {
                   setTeacherClass(updatedClass);
                 }}

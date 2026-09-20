@@ -1,12 +1,15 @@
+
 "use client";
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 
 import ProgrammingAssignmentResults from "@/components/teacher/programming/ProgrammingAssignmentResults";
 import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
 import { getProgrammingAssignmentResults } from "@/services/programmingAssignmentService";
 import type { ProgrammingAssignmentResultsSummary } from "@/types/programmingAssignment";
 
@@ -35,6 +38,8 @@ export default function ProgrammingAssignmentResultsPage() {
       return;
     }
 
+    const teacherId = user.uid;
+    const assignmentId = params.assignmentId;
     let cancelled = false;
 
     async function load() {
@@ -44,7 +49,7 @@ export default function ProgrammingAssignmentResultsPage() {
 
         const loaded =
           await getProgrammingAssignmentResults(
-            params.assignmentId,
+            assignmentId,
           );
 
         if (cancelled) return;
@@ -56,9 +61,28 @@ export default function ProgrammingAssignmentResultsPage() {
           return;
         }
 
-        if (loaded.assignment.teacherId !== user?.uid) {
+        const classSnapshot = await getDoc(
+          doc(db, "classes", loaded.assignment.classId),
+        );
+
+        const classData = classSnapshot.exists()
+          ? classSnapshot.data()
+          : null;
+
+        const coTeacherIds = Array.isArray(classData?.coTeacherIds)
+          ? classData.coTeacherIds.filter(
+              (value: unknown): value is string =>
+                typeof value === "string",
+            )
+          : [];
+
+        const canManageClass =
+          classData?.teacherId === teacherId ||
+          coTeacherIds.includes(teacherId);
+
+        if (!canManageClass) {
           setError(
-            "You cannot view another teacher's programming assignment.",
+            "You do not have permission to view this programming assignment.",
           );
           return;
         }

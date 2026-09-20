@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
   query,
   runTransaction,
   serverTimestamp,
@@ -47,9 +46,15 @@ export type TeacherClass = {
     | "";
 
   teacherId: string;
-  teacherName?: string;
+teacherName?: string;
 
-  schoolId: string;
+/*
+ * Additional teachers who are permitted to manage this class.
+ * teacherId remains the permanent class owner for backwards compatibility.
+ */
+coTeacherIds: string[];
+
+schoolId: string;
 
   /*
    * Permanent reusable class join code.
@@ -288,15 +293,20 @@ function convertClassDocument(
         data.teacherId,
       ),
 
-    teacherName:
-      normaliseString(
-        data.teacherName,
-      ),
+   teacherName:
+  normaliseString(
+    data.teacherName,
+  ),
 
-    schoolId:
-      normaliseString(
-        data.schoolId,
-      ),
+coTeacherIds:
+  normaliseStringArray(
+    data.coTeacherIds,
+  ),
+
+schoolId:
+  normaliseString(
+    data.schoolId,
+  ),
 
     joinCode:
       normaliseClassJoinCode(
@@ -616,6 +626,7 @@ export async function createTeacherClass(
             teacherData.name,
           ) ||
           "Teacher",
+coTeacherIds: [],
 
         schoolId,
 
@@ -651,37 +662,99 @@ export async function getTeacherClasses(
     return [];
   }
 
-  const classesQuery =
+  const classesCollection =
+    collection(
+      db,
+      "classes",
+    );
+
+  const ownedClassesQuery =
     query(
-      collection(
-        db,
-        "classes",
-      ),
+      classesCollection,
       where(
         "teacherId",
         "==",
         cleanedTeacherId,
       ),
-      orderBy(
-        "createdAt",
-        "desc",
+    );
+
+  const coTaughtClassesQuery =
+    query(
+      classesCollection,
+      where(
+        "coTeacherIds",
+        "array-contains",
+        cleanedTeacherId,
       ),
     );
 
-  const snapshot =
-    await getDocs(
-      classesQuery,
-    );
+  const [
+    ownedSnapshot,
+    coTaughtSnapshot,
+  ] =
+    await Promise.all([
+      getDocs(
+        ownedClassesQuery,
+      ),
+      getDocs(
+        coTaughtClassesQuery,
+      ),
+    ]);
 
-  return snapshot.docs.map(
-    (
-      classDocument,
-    ) =>
+  const classesById =
+    new Map<
+      string,
+      TeacherClass
+    >();
+
+  for (
+    const classDocument of
+      ownedSnapshot.docs
+  ) {
+    const teacherClass =
       convertClassDocument(
         classDocument.id,
         classDocument.data() as
           Partial<FirestoreTeacherClass>,
-      ),
+      );
+
+    classesById.set(
+      teacherClass.id,
+      teacherClass,
+    );
+  }
+
+  for (
+    const classDocument of
+      coTaughtSnapshot.docs
+  ) {
+    const teacherClass =
+      convertClassDocument(
+        classDocument.id,
+        classDocument.data() as
+          Partial<FirestoreTeacherClass>,
+      );
+
+    classesById.set(
+      teacherClass.id,
+      teacherClass,
+    );
+  }
+
+  return Array.from(
+    classesById.values(),
+  ).sort(
+    (classA, classB) => {
+      const timeA =
+        classA.createdAt?.getTime() ??
+        0;
+
+      const timeB =
+        classB.createdAt?.getTime() ??
+        0;
+
+      return timeB - timeA;
+    },
   );
 }
 
@@ -1445,6 +1518,344 @@ export async function removeStudentFromClass(
           },
         );
       }
+    },
+  );
+}
+
+export async function addCoTeacherToClass(
+  classId: string,
+  ownerTeacherId: string,
+  coTeacherId: string,
+): Promise<void> {
+  const cleanedClassId =
+    classId.trim();
+
+  const cleanedOwnerTeacherId =
+    ownerTeacherId.trim();
+
+  const cleanedCoTeacherId =
+    coTeacherId.trim();
+
+  if (
+    !cleanedClassId ||
+    !cleanedOwnerTeacherId ||
+    !cleanedCoTeacherId
+  ) {
+    throw new Error(
+      "A valid class, owner and co-teacher are required.",
+    );
+  }
+
+  if (
+    cleanedOwnerTeacherId ===
+    cleanedCoTeacherId
+  ) {
+    throw new Error(
+      "The class owner cannot be added as a co-teacher.",
+    );
+  }
+
+  const classReference =
+    doc(
+      db,
+      "classes",
+      cleanedClassId,
+    );
+
+  const coTeacherReference =
+    doc(
+      db,
+      "users",
+      cleanedCoTeacherId,
+    );
+
+const ownerReference =
+  doc(
+    db,
+    "users",
+    cleanedOwnerTeacherId,
+  );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const [
+  classSnapshot,
+  ownerSnapshot,
+  coTeacherSnapshot,
+] =
+  await Promise.all([
+    transaction.get(
+      classReference,
+    ),
+    transaction.get(
+      ownerReference,
+    ),
+    transaction.get(
+      coTeacherReference,
+    ),
+  ]);
+
+
+  
+      if (
+        !classSnapshot.exists()
+      ) {
+        throw new Error(
+          "The selected class could not be found.",
+        );
+      }
+
+      if (
+        !coTeacherSnapshot.exists()
+      ) {
+        throw new Error(
+          "The teacher account could not be found.",
+        );
+      }
+
+if (
+  !ownerSnapshot.exists()
+) {
+  throw new Error(
+    "The class owner account could not be found.",
+  );
+}
+
+      const classData =
+        classSnapshot.data() as
+          Partial<FirestoreTeacherClass>;
+
+      const coTeacherData =
+        coTeacherSnapshot.data() as
+          FirestoreStudentProfile;
+
+      const classOwnerId =
+        normaliseString(
+          classData.teacherId,
+        );
+
+      if (
+        classOwnerId !==
+        cleanedOwnerTeacherId
+      ) {
+        throw new Error(
+          "Only the class owner can add co-teachers.",
+        );
+      }
+
+      if (
+        coTeacherData.role !==
+        "teacher"
+      ) {
+        throw new Error(
+          "Only teacher accounts can be added as co-teachers.",
+        );
+      }
+
+      const classSchoolId =
+        normaliseString(
+          classData.schoolId,
+        );
+
+const ownerData =
+  ownerSnapshot.data() as
+    FirestoreStudentProfile;
+
+const ownerSchoolId =
+  normaliseString(
+    ownerData.schoolId,
+  );
+
+      const coTeacherSchoolId =
+        normaliseString(
+          coTeacherData.schoolId,
+        );
+
+      if (!classSchoolId) {
+        throw new Error(
+          "This class is not linked to a school.",
+        );
+      }
+
+if (
+  !ownerSchoolId ||
+  ownerSchoolId !== classSchoolId
+) {
+  throw new Error(
+    "The class owner is not linked to this school's tenancy.",
+  );
+}
+
+const coTeacherMembershipReference =
+  doc(
+    db,
+    "schools",
+    classSchoolId,
+    "members",
+    cleanedCoTeacherId,
+  );
+
+const coTeacherMembershipSnapshot =
+  await transaction.get(
+    coTeacherMembershipReference,
+  );
+
+if (
+  !coTeacherMembershipSnapshot.exists()
+) {
+  throw new Error(
+    "The selected teacher is not an active member of this school.",
+  );
+}
+
+const coTeacherMembership =
+  coTeacherMembershipSnapshot.data();
+
+const membershipStatus =
+  normaliseString(
+    coTeacherMembership.status,
+  );
+
+if (
+  membershipStatus &&
+  membershipStatus !== "active"
+) {
+  throw new Error(
+    "The selected teacher does not have an active school membership.",
+  );
+}
+
+      if (!coTeacherSchoolId) {
+        throw new Error(
+          "The selected teacher is not linked to a school.",
+        );
+      }
+
+      if (
+        classSchoolId !==
+        coTeacherSchoolId
+      ) {
+        throw new Error(
+          "Only teachers from the same school can be added to this class.",
+        );
+      }
+
+      const existingCoTeacherIds =
+        normaliseStringArray(
+          classData.coTeacherIds,
+        );
+
+      if (
+        existingCoTeacherIds.includes(
+          cleanedCoTeacherId,
+        )
+      ) {
+        throw new Error(
+          "This teacher is already a co-teacher for the class.",
+        );
+      }
+
+      transaction.update(
+        classReference,
+        {
+          coTeacherIds: [
+            ...existingCoTeacherIds,
+            cleanedCoTeacherId,
+          ],
+
+          updatedAt:
+            serverTimestamp(),
+        },
+      );
+    },
+  );
+}
+
+export async function removeCoTeacherFromClass(
+  classId: string,
+  ownerTeacherId: string,
+  coTeacherId: string,
+): Promise<void> {
+  const cleanedClassId =
+    classId.trim();
+
+  const cleanedOwnerTeacherId =
+    ownerTeacherId.trim();
+
+  const cleanedCoTeacherId =
+    coTeacherId.trim();
+
+  if (
+    !cleanedClassId ||
+    !cleanedOwnerTeacherId ||
+    !cleanedCoTeacherId
+  ) {
+    throw new Error(
+      "A valid class, owner and co-teacher are required.",
+    );
+  }
+
+  const classReference =
+    doc(
+      db,
+      "classes",
+      cleanedClassId,
+    );
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const classSnapshot =
+        await transaction.get(
+          classReference,
+        );
+
+      if (
+        !classSnapshot.exists()
+      ) {
+        throw new Error(
+          "The selected class could not be found.",
+        );
+      }
+
+      const classData =
+        classSnapshot.data() as
+          Partial<FirestoreTeacherClass>;
+
+      const classOwnerId =
+        normaliseString(
+          classData.teacherId,
+        );
+
+      if (
+        classOwnerId !==
+        cleanedOwnerTeacherId
+      ) {
+        throw new Error(
+          "Only the class owner can remove co-teachers.",
+        );
+      }
+
+      const existingCoTeacherIds =
+        normaliseStringArray(
+          classData.coTeacherIds,
+        );
+
+      transaction.update(
+        classReference,
+        {
+          coTeacherIds:
+            existingCoTeacherIds.filter(
+              (teacherId) =>
+                teacherId !==
+                cleanedCoTeacherId,
+            ),
+
+          updatedAt:
+            serverTimestamp(),
+        },
+      );
     },
   );
 }

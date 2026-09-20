@@ -236,11 +236,21 @@ export async function createResourceAssignment(
 
   const classData = classSnapshot.data();
 
-  if (
-    typeof classData.teacherId !== "string" ||
-    classData.teacherId.trim() !== teacherId
-  ) {
-    throw new Error("You cannot assign work to another teacher's class.");
+  const ownerTeacherId =
+    typeof classData.teacherId === "string" ? classData.teacherId.trim() : "";
+
+  const coTeacherIds = Array.isArray(classData.coTeacherIds)
+    ? classData.coTeacherIds
+        .filter((value: unknown): value is string => typeof value === "string")
+        .map((value: string) => value.trim())
+        .filter(Boolean)
+    : [];
+
+  const canManageClass =
+    ownerTeacherId === teacherId || coTeacherIds.includes(teacherId);
+
+  if (!canManageClass) {
+    throw new Error("You cannot assign work to a class you do not manage.");
   }
 
   const enrolledStudentIds = uniqueStudentIds(
@@ -322,6 +332,36 @@ export async function getTeacherAssignments(
       assignmentDocument.data() as FirestoreResourceAssignment,
     ),
   );
+}
+
+export async function getClassAssignments(
+  classId: string,
+): Promise<ResourceAssignment[]> {
+  const cleanedClassId = classId.trim();
+
+  if (!cleanedClassId) {
+    return [];
+  }
+
+  const assignmentsQuery = query(
+    collection(db, "classAssignments"),
+    where("classId", "==", cleanedClassId),
+  );
+
+  const snapshot = await getDocs(assignmentsQuery);
+
+  return snapshot.docs
+    .map((assignmentDocument) =>
+      convertAssignmentDocument(
+        assignmentDocument.id,
+        assignmentDocument.data() as FirestoreResourceAssignment,
+      ),
+    )
+    .sort((a, b) => {
+      const aTime = a.createdAt?.getTime() ?? 0;
+      const bTime = b.createdAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
 }
 
 export async function getStudentAssignments(

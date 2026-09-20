@@ -1,4 +1,4 @@
-"use client";
+
 
 import { useState } from "react";
 import toast from "react-hot-toast";
@@ -22,6 +22,8 @@ import type {
 type Props = {
   teacherClass: TeacherClass;
 
+  isClassOwner: boolean;
+
   onUpdated: (
     updatedClass:
       TeacherClass,
@@ -32,6 +34,7 @@ type Props = {
 
 export default function ClassSettingsPanel({
   teacherClass,
+  isClassOwner,
   onUpdated,
   onDeleted,
 }: Props) {
@@ -733,7 +736,8 @@ export default function ClassSettingsPanel({
         </button>
       </section>
 
-      <section className="rounded-3xl border border-red-200 bg-red-50 p-6">
+      {isClassOwner && (
+        <section className="rounded-3xl border border-red-200 bg-red-50 p-6">
         <p className="text-sm font-black uppercase tracking-[0.14em] text-red-700">
           Danger zone
         </p>
@@ -762,6 +766,7 @@ export default function ClassSettingsPanel({
             : "Delete empty class"}
         </button>
       </section>
+      )}
     </div>
   );
 }

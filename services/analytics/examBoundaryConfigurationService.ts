@@ -1,3 +1,4 @@
+
 import {
   deleteField,
   doc,
@@ -75,7 +76,7 @@ function validateInput(
   }
 }
 
-async function assertTeacherOwnsAssignment({
+async function assertTeacherManagesAssignment({
   assignmentId,
   teacherId,
 }: {
@@ -94,10 +95,41 @@ async function assertTeacherOwnsAssignment({
     throw new Error("Exam assignment not found.");
   }
 
-  if (
-    snapshot.data().teacherId !==
-    teacherId.trim()
-  ) {
+  const assignment = snapshot.data();
+  const classId =
+    typeof assignment.classId === "string"
+      ? assignment.classId.trim()
+      : "";
+
+  if (!classId) {
+    throw new Error(
+      "This assessment is not linked to a valid class.",
+    );
+  }
+
+  const classSnapshot = await getDoc(
+    doc(db, "classes", classId),
+  );
+
+  if (!classSnapshot.exists()) {
+    throw new Error("The assessment class could not be found.");
+  }
+
+  const classData = classSnapshot.data();
+  const cleanedTeacherId = teacherId.trim();
+
+  const coTeacherIds = Array.isArray(classData.coTeacherIds)
+    ? classData.coTeacherIds.filter(
+        (value: unknown): value is string =>
+          typeof value === "string",
+      )
+    : [];
+
+  const canManageClass =
+    classData.teacherId === cleanedTeacherId ||
+    coTeacherIds.includes(cleanedTeacherId);
+
+  if (!canManageClass) {
     throw new Error(
       "You do not have permission to change this assessment.",
     );
@@ -109,7 +141,7 @@ export async function saveExamBoundaryConfiguration(
 ): Promise<void> {
   validateInput(input);
 
-  await assertTeacherOwnsAssignment({
+  await assertTeacherManagesAssignment({
     assignmentId: input.assignmentId,
     teacherId: input.teacherId,
   });
@@ -154,7 +186,7 @@ export async function clearExamBoundaryConfiguration({
   assignmentId: string;
   teacherId: string;
 }): Promise<void> {
-  await assertTeacherOwnsAssignment({
+  await assertTeacherManagesAssignment({
     assignmentId,
     teacherId,
   });

@@ -1,3 +1,4 @@
+
 import {
   addDoc,
   arrayUnion,
@@ -178,12 +179,20 @@ export async function createProgrammingAssignment({
     ? teacherSnapshot.data()
     : {};
 
-  if (
-    classData.teacherId &&
-    classData.teacherId !== cleanedTeacherId
-  ) {
+  const coTeacherIds = Array.isArray(classData.coTeacherIds)
+    ? classData.coTeacherIds.filter(
+        (value: unknown): value is string =>
+          typeof value === "string" && Boolean(value.trim()),
+      )
+    : [];
+
+  const canManageClass =
+    classData.teacherId === cleanedTeacherId ||
+    coTeacherIds.includes(cleanedTeacherId);
+
+  if (!canManageClass) {
     throw new Error(
-      "You cannot assign work to another teacher's class.",
+      "You cannot assign work to a class you do not manage.",
     );
   }
 
@@ -292,26 +301,58 @@ export async function getProgrammingAssignmentById(
 export async function getTeacherProgrammingAssignments(
   teacherId: string,
 ): Promise<ProgrammingAssignment[]> {
-  if (!teacherId.trim()) return [];
+  const cleanedTeacherId = teacherId.trim();
+  if (!cleanedTeacherId) return [];
 
-  const snapshot = await getDocs(
-    query(
-      collection(db, "classAssignments"),
-      where("teacherId", "==", teacherId),
+  const [ownedSnapshot, coTaughtSnapshot] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("teacherId", "==", cleanedTeacherId),
+      ),
     ),
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("coTeacherIds", "array-contains", cleanedTeacherId),
+      ),
+    ),
+  ]);
+
+  const managedClassIds = Array.from(
+    new Set([
+      ...ownedSnapshot.docs.map((item) => item.id),
+      ...coTaughtSnapshot.docs.map((item) => item.id),
+    ]),
   );
 
-  return snapshot.docs
-    .filter(
-      (item) =>
-        item.data().resourceType === PROGRAMMING_RESOURCE_TYPE,
-    )
-    .map((item) =>
-      convertAssignment(
-        item.id,
-        item.data() as Record<string, unknown>,
-      ),
-    )
+  if (managedClassIds.length === 0) return [];
+
+  const assignmentGroups = await Promise.all(
+    managedClassIds.map(async (classId) => {
+      const snapshot = await getDocs(
+        query(
+          collection(db, "classAssignments"),
+          where("classId", "==", classId),
+        ),
+      );
+
+      return snapshot.docs
+        .filter(
+          (item) =>
+            item.data().resourceType === PROGRAMMING_RESOURCE_TYPE,
+        )
+        .map((item) =>
+          convertAssignment(
+            item.id,
+            item.data() as Record<string, unknown>,
+          ),
+        );
+    }),
+  );
+
+  return assignmentGroups
+    .flat()
     .sort(
       (a, b) =>
         (b.createdAt?.getTime() ?? 0) -

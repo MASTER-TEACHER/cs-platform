@@ -1,3 +1,4 @@
+
 import "server-only";
 
 import { NextResponse } from "next/server";
@@ -111,15 +112,38 @@ export async function POST(request: Request) {
       const assignment = assignmentSnapshot.data() || {};
       const submission = submissionSnapshot.data() || {};
 
-      const assignmentTeacherId = cleanString(
-        assignment.teacherId,
+      const classId = cleanString(
+        assignment.classId,
       );
 
-      if (
-        role !== "admin" &&
-        assignmentTeacherId !== decoded.uid
-      ) {
+      if (!classId) {
         throw new Error("FORBIDDEN");
+      }
+
+      if (role !== "admin") {
+        const classSnapshot = await transaction.get(
+          adminDb.collection("classes").doc(classId),
+        );
+
+        if (!classSnapshot.exists) {
+          throw new Error("FORBIDDEN");
+        }
+
+        const classData = classSnapshot.data() || {};
+        const coTeacherIds = Array.isArray(classData.coTeacherIds)
+          ? classData.coTeacherIds.filter(
+              (value: unknown): value is string =>
+                typeof value === "string",
+            )
+          : [];
+
+        const canManageClass =
+          cleanString(classData.teacherId) === decoded.uid ||
+          coTeacherIds.includes(decoded.uid);
+
+        if (!canManageClass) {
+          throw new Error("FORBIDDEN");
+        }
       }
 
       const studentIds = Array.isArray(assignment.studentIds)

@@ -596,6 +596,60 @@ export async function getAssignmentSubmissions(
     return [];
   }
 
+  const assignmentSnapshot = await getDoc(
+    doc(
+      db,
+      "examAssignments",
+      cleanedAssignmentId,
+    ),
+  );
+
+  if (!assignmentSnapshot.exists()) {
+    return [];
+  }
+
+  const assignmentData = assignmentSnapshot.data();
+  const classId =
+    typeof assignmentData.classId === "string"
+      ? assignmentData.classId.trim()
+      : "";
+
+  if (!classId) {
+    return [];
+  }
+
+  const classSnapshot = await getDoc(
+    doc(
+      db,
+      "classes",
+      classId,
+    ),
+  );
+
+  if (!classSnapshot.exists()) {
+    return [];
+  }
+
+  const classData = classSnapshot.data();
+  const ownerTeacherId =
+    typeof classData.teacherId === "string"
+      ? classData.teacherId.trim()
+      : "";
+
+  const coTeacherIds = Array.isArray(classData.coTeacherIds)
+    ? classData.coTeacherIds
+        .filter((value: unknown): value is string => typeof value === "string")
+        .map((value: string) => value.trim())
+        .filter(Boolean)
+    : [];
+
+  if (
+    ownerTeacherId !== cleanedTeacherId &&
+    !coTeacherIds.includes(cleanedTeacherId)
+  ) {
+    return [];
+  }
+
   const snapshot = await getDocs(
     query(
       collection(
@@ -608,9 +662,9 @@ export async function getAssignmentSubmissions(
         cleanedAssignmentId,
       ),
       where(
-        "teacherId",
+        "classId",
         "==",
-        cleanedTeacherId,
+        classId,
       ),
     ),
   );

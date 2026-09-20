@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   Timestamp,
@@ -155,41 +154,54 @@ function sameCalendarDay(
   );
 }
 
+function normaliseIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return Array.from(new Set(
+    value.filter((item: unknown): item is string => typeof item === "string")
+      .map((item: string) => item.trim()).filter(Boolean),
+  ));
+}
+
+function canTeacherManageClass(
+  classData: Record<string, unknown>,
+  teacherId: string,
+): boolean {
+  const cleanedTeacherId = teacherId.trim();
+  if (!cleanedTeacherId) return false;
+  const ownerTeacherId =
+    typeof classData.teacherId === "string" ? classData.teacherId.trim() : "";
+  const coTeacherIds = normaliseIds(classData.coTeacherIds);
+  return ownerTeacherId === cleanedTeacherId ||
+    coTeacherIds.includes(cleanedTeacherId);
+}
+
 async function findExistingExamAssignment(
   input: CreateExamAssignmentInput,
 ): Promise<ExamAssignment | null> {
+  const classId = input.classId.trim();
+  if (!classId) return null;
+
   const snapshot = await getDocs(
     query(
       collection(db, "examAssignments"),
-      where(
-        "teacherId",
-        "==",
-        input.teacherId.trim(),
-      ),
+      where("classId", "==", classId),
     ),
   );
 
-  const assignments = snapshot.docs.map(
-    (document) =>
-      convertAssignment(
-        document.id,
-        document.data() as FirestoreExamAssignment,
-      ),
+  const assignments = snapshot.docs.map((document) =>
+    convertAssignment(
+      document.id,
+      document.data() as FirestoreExamAssignment,
+    ),
   );
 
-  return (
-    assignments.find(
-      (assignment) =>
-        assignment.status === "active" &&
-        assignment.classId === input.classId.trim() &&
-        assignment.questionSetId ===
-          input.questionSetId.trim() &&
-        sameCalendarDay(
-          assignment.dueDate,
-          input.dueDate,
-        ),
-    ) || null
-  );
+  return assignments.find(
+    (assignment) =>
+      assignment.status === "active" &&
+      assignment.classId === classId &&
+      assignment.questionSetId === input.questionSetId.trim() &&
+      sameCalendarDay(assignment.dueDate, input.dueDate),
+  ) || null;
 }
 
 export async function createExamAssignment(
@@ -221,11 +233,8 @@ export async function createExamAssignment(
 
   const classData = classSnapshot.data();
 
-  if (
-    typeof classData.teacherId !== "string" ||
-    classData.teacherId.trim() !== teacherId
-  ) {
-    throw new Error("You cannot assign an exam to another teacher's class.");
+  if (!canTeacherManageClass(classData, teacherId)) {
+    throw new Error("You cannot assign an exam to a class you do not manage.");
   }
 
   const enrolledStudentIds = Array.from(
@@ -323,27 +332,67 @@ export async function getExamAssignmentById(
   );
 }
 
-export async function getTeacherExamAssignments(
-  teacherId: string,
+export async function getClassExamAssignments(
+  classId: string,
 ): Promise<ExamAssignment[]> {
-  if (!teacherId.trim()) {
-    return [];
-  }
+  const cleanedClassId = classId.trim();
+  if (!cleanedClassId) return [];
 
   const snapshot = await getDocs(
     query(
       collection(db, "examAssignments"),
-      where("teacherId", "==", teacherId),
-      orderBy("createdAt", "desc"),
+      where("classId", "==", cleanedClassId),
     ),
   );
 
-  return snapshot.docs.map(
-    (document) =>
+  return snapshot.docs
+    .map((document) =>
       convertAssignment(
         document.id,
         document.data() as FirestoreExamAssignment,
       ),
+    )
+    .sort(
+      (first, second) =>
+        (second.createdAt?.getTime() ?? 0) -
+        (first.createdAt?.getTime() ?? 0),
+    );
+}
+
+export async function getTeacherExamAssignments(
+  teacherId: string,
+): Promise<ExamAssignment[]> {
+  const cleanedTeacherId = teacherId.trim();
+  if (!cleanedTeacherId) return [];
+
+  const [ownedClassesSnapshot, coTaughtClassesSnapshot] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("teacherId", "==", cleanedTeacherId),
+      ),
+    ),
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("coTeacherIds", "array-contains", cleanedTeacherId),
+      ),
+    ),
+  ]);
+
+  const managedClassIds = Array.from(new Set([
+    ...ownedClassesSnapshot.docs.map((classDocument) => classDocument.id),
+    ...coTaughtClassesSnapshot.docs.map((classDocument) => classDocument.id),
+  ]));
+
+  const assignmentGroups = await Promise.all(
+    managedClassIds.map((classId) => getClassExamAssignments(classId)),
+  );
+
+  return assignmentGroups.flat().sort(
+    (first, second) =>
+      (second.createdAt?.getTime() ?? 0) -
+      (first.createdAt?.getTime() ?? 0),
   );
 }
 
@@ -362,17 +411,21 @@ export async function getStudentExamAssignments(
         "array-contains",
         studentId,
       ),
-      orderBy("dueDate", "asc"),
     ),
   );
 
-  return snapshot.docs.map(
-    (document) =>
+  return snapshot.docs
+    .map((document) =>
       convertAssignment(
         document.id,
         document.data() as FirestoreExamAssignment,
       ),
-  );
+    )
+    .sort(
+      (first, second) =>
+        (first.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER) -
+        (second.dueDate?.getTime() ?? Number.MAX_SAFE_INTEGER),
+    );
 }
 
 export async function updateExamAssignmentStatus(
@@ -415,9 +468,30 @@ export async function updateExamIntegrityPolicy({
     );
   }
 
+  const assignmentData =
+    snapshot.data() as FirestoreExamAssignment;
+
+  const classId =
+    typeof assignmentData.classId === "string"
+      ? assignmentData.classId.trim()
+      : "";
+
+  if (!classId) {
+    throw new Error(
+      "This exam assignment is not linked to a valid class.",
+    );
+  }
+
+  const classSnapshot = await getDoc(
+    doc(db, "classes", classId),
+  );
+
   if (
-    snapshot.data().teacherId !==
-    teacherId.trim()
+    !classSnapshot.exists() ||
+    !canTeacherManageClass(
+      classSnapshot.data(),
+      teacherId,
+    )
   ) {
     throw new Error(
       "You do not have permission to change this exam.",

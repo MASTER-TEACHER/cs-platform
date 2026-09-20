@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -583,13 +584,28 @@ export default function AssignmentWizardPage() {
 
           const classData = classSnapshot.data();
 
-          if (
-            typeof classData.teacherId === "string" &&
-            classData.teacherId &&
-            classData.teacherId !== user.uid
-          ) {
+          const ownerTeacherId =
+            typeof classData.teacherId === "string"
+              ? classData.teacherId.trim()
+              : "";
+
+          const coTeacherIds = Array.isArray(classData.coTeacherIds)
+            ? classData.coTeacherIds
+                .filter(
+                  (value: unknown): value is string =>
+                    typeof value === "string",
+                )
+                .map((value: string) => value.trim())
+                .filter(Boolean)
+            : [];
+
+          const canManageClass =
+            ownerTeacherId === user.uid ||
+            coTeacherIds.includes(user.uid);
+
+          if (!canManageClass) {
             throw new Error(
-              "You cannot assign work to another teacher's class.",
+              "You cannot assign work to a class you do not manage.",
             );
           }
 
@@ -1092,3 +1108,4 @@ function WizardProgress({
     </Card>
   );
 }
+

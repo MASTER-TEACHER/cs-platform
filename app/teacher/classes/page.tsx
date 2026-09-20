@@ -34,6 +34,7 @@ import {
   type UnifiedTeacherAssignment,
 } from "@/services/unifiedTeacherAssignmentService";
 
+
 type StatusFilter =
   | "active"
   | "archived"
@@ -167,30 +168,36 @@ export default function TeacherClassesPage() {
 
     const teacherId = user.uid;
 
-    return Promise.resolve()
-      .then(() => {
-        setLoadingClasses(true);
+    setLoadingClasses(true);
 
-        return Promise.all([
-          getTeacherClasses(
-            teacherId,
-          ),
-          getUnifiedTeacherAssignments(
-            teacherId,
-          ),
-        ]);
-      })
-      .then(([
-        loaded,
-        assignmentSummary,
-      ]) => {
-        setClasses(
-          loaded,
-        );
+    return getTeacherClasses(teacherId)
+      .then(async (loadedClasses) => {
+        /*
+         * Classes are the primary data for this page. Render them as soon as
+         * they are available so an assignment-summary problem can never make
+         * valid classes disappear from the class directory.
+         */
+        setClasses(loadedClasses);
 
-        setUnifiedAssignments(
-          assignmentSummary.assignments,
-        );
+        try {
+          const assignmentSummary =
+            await getUnifiedTeacherAssignments(teacherId);
+
+          setUnifiedAssignments(
+            assignmentSummary.assignments,
+          );
+        } catch (error) {
+          console.error(
+            "Failed to load class assignment summary:",
+            error,
+          );
+
+          setUnifiedAssignments([]);
+
+          toast.error(
+            "Classes loaded, but assignment totals could not be refreshed.",
+          );
+        }
       })
       .catch((error) => {
         console.error(
@@ -198,14 +205,15 @@ export default function TeacherClassesPage() {
           error,
         );
 
+        setClasses([]);
+        setUnifiedAssignments([]);
+
         toast.error(
           "Could not load your classes.",
         );
       })
       .finally(() => {
-        setLoadingClasses(
-          false,
-        );
+        setLoadingClasses(false);
       });
   }, [user]);
 
@@ -217,7 +225,19 @@ export default function TeacherClassesPage() {
       return;
     }
 
-    void loadClasses();
+    let cancelled = false;
+
+    void Promise.resolve().then(() => {
+      if (!cancelled) {
+        return loadClasses();
+      }
+
+      return undefined;
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     authLoading,
     profileReady,

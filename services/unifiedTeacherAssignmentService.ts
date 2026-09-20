@@ -7,18 +7,18 @@ import {
 import { db } from "@/lib/firebase";
 
 import {
-  getTeacherAssignments,
+  getClassAssignments,
   type AssignmentStatus,
   type ResourceAssignment,
 } from "@/services/resourceAssignmentService";
 
 import {
-  getTeacherQuizAssignments,
+  getClassQuizAssignments,
   type QuizAssignmentStatus,
   type TeacherQuizAssignmentSummary,
 } from "@/services/teacherQuizAssignmentService";
 
-import { getTeacherExamAssignments } from "@/services/examAssignmentService";
+import { getClassExamAssignments } from "@/services/examAssignmentService";
 import { getTeacherClasses } from "@/services/classService";
 import { getAssignmentSubmissions } from "@/services/examSubmissionService";
 
@@ -192,48 +192,61 @@ function summariseExam(
   };
 }
 
+function emptySummary(): UnifiedTeacherAssignmentSummary {
+  return {
+    assignments: [],
+    totalAssignments: 0,
+    activeAssignments: 0,
+    overdueAssignments: 0,
+    completedStudentCount: 0,
+    totalStudentCount: 0,
+    awaitingMarkingCount: 0,
+  };
+}
+
 export async function getUnifiedTeacherAssignments(
   teacherId: string,
 ): Promise<UnifiedTeacherAssignmentSummary> {
   const cleanedTeacherId = teacherId.trim();
 
   if (!cleanedTeacherId) {
-    return {
-      assignments: [],
-      totalAssignments: 0,
-      activeAssignments: 0,
-      overdueAssignments: 0,
-      completedStudentCount: 0,
-      totalStudentCount: 0,
-      awaitingMarkingCount: 0,
-    };
+    return emptySummary();
   }
 
-  const [
-    classes,
-    resources,
-    quizzes,
-    exams,
-  ] = await Promise.all([
-    getTeacherClasses(cleanedTeacherId),
-    getTeacherAssignments(cleanedTeacherId),
-    getTeacherQuizAssignments(cleanedTeacherId),
-    getTeacherExamAssignments(cleanedTeacherId),
-  ]);
-
   /*
-   * T1G integrity boundary:
-   * even though each assignment query is teacher-scoped, only assignments
-   * attached to a class owned by the authenticated teacher are admitted to
-   * the unified teacher portfolio. This prevents stale/corrupt class links
-   * from leaking into dashboard and reporting totals.
+   * V1.3.2B shared-class boundary:
+   * getTeacherClasses() returns classes the teacher owns OR co-teaches.
+   * Every assignment family is then loaded by classId rather than by the
+   * assignment creator's teacherId. teacherId remains audit/creator identity.
    */
-  const ownedClassIds =
-    new Set(
-      classes.map(
-        (item) => item.id,
-      ),
-    );
+  const classes = await getTeacherClasses(cleanedTeacherId);
+
+  if (classes.length === 0) {
+    return emptySummary();
+  }
+
+  const classAssignmentGroups = await Promise.all(
+    classes.map(async (teacherClass) => {
+      const [resources, quizzes, exams] = await Promise.all([
+        getClassAssignments(teacherClass.id),
+        getClassQuizAssignments(teacherClass.id),
+        getClassExamAssignments(teacherClass.id),
+      ]);
+
+      return {
+        classId: teacherClass.id,
+        resources,
+        quizzes,
+        exams,
+      };
+    }),
+  );
+
+  const resources = classAssignmentGroups.flatMap((group) => group.resources);
+  const quizzes = classAssignmentGroups.flatMap((group) => group.quizzes);
+  const exams = classAssignmentGroups.flatMap((group) => group.exams);
+
+  const managedClassIds = new Set(classes.map((item) => item.id));
 
   const examAssignments = await Promise.all(
     exams.map(async (assignment) => {
@@ -251,17 +264,12 @@ export async function getUnifiedTeacherAssignments(
     ...quizzes.map(convertQuizAssignment),
     ...examAssignments,
   ]
-    .filter(
-      (assignment) =>
-        ownedClassIds.has(
-          assignment.classId,
-        ),
-    )
+    .filter((assignment) => managedClassIds.has(assignment.classId))
     .sort(
-    (first, second) =>
-      (second.createdAt?.getTime() ?? 0) -
-      (first.createdAt?.getTime() ?? 0),
-  );
+      (first, second) =>
+        (second.createdAt?.getTime() ?? 0) -
+        (first.createdAt?.getTime() ?? 0),
+    );
 
   return {
     assignments,

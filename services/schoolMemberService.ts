@@ -210,3 +210,98 @@ export async function getSchoolMembers(
       ),
   );
 }
+
+export async function getEligibleCoTeachers(
+  schoolId: string,
+  ownerTeacherId: string,
+  existingCoTeacherIds: string[] = [],
+): Promise<SchoolMemberRecord[]> {
+  const cleanedSchoolId =
+    schoolId.trim();
+
+  const cleanedOwnerTeacherId =
+    ownerTeacherId.trim();
+
+  if (
+    !cleanedSchoolId ||
+    !cleanedOwnerTeacherId
+  ) {
+    return [];
+  }
+
+  const existingCoTeacherSet =
+    new Set(
+      existingCoTeacherIds
+        .map((teacherId) =>
+          teacherId.trim(),
+        )
+        .filter(Boolean),
+    );
+
+  const members =
+    await getSchoolMembers(
+      cleanedSchoolId,
+    );
+
+  return members.filter(
+    (member) => {
+      /*
+       * The permanent class owner must never appear
+       * in the list of teachers who can be added.
+       */
+      if (
+        member.uid ===
+        cleanedOwnerTeacherId
+      ) {
+        return false;
+      }
+
+      /*
+       * Do not offer teachers who already manage
+       * this class.
+       */
+      if (
+        existingCoTeacherSet.has(
+          member.uid,
+        )
+      ) {
+        return false;
+      }
+
+      /*
+       * Only active school members may be added
+       * as co-teachers.
+       */
+      if (
+        member.status &&
+        member.status !== "active"
+      ) {
+        return false;
+      }
+
+      /*
+       * CS Master has two related role systems:
+       *
+       * users/{uid}.role
+       *   - teacher
+       *   - admin
+       *
+       * schools/{schoolId}/members/{uid}.role
+       *   - teacher
+       *   - school_admin
+       *
+       * Either teacher/staff representation is
+       * valid for co-teaching.
+       */
+      const isSchoolStaff =
+        member.role === "teacher" ||
+        member.role === "admin" ||
+        member.membershipRole ===
+          "teacher" ||
+        member.membershipRole ===
+          "school_admin";
+
+      return isSchoolStaff;
+    },
+  );
+}

@@ -1,3 +1,4 @@
+
 import {
   collection,
   doc,
@@ -216,18 +217,18 @@ function calculateAveragePercentage(results: FirestoreResult[]) {
 
 async function getQuizAssignmentResults(
   assignmentId: string,
-  teacherId: string,
+  classId: string,
 ): Promise<FirestoreResult[]> {
   const cleanedAssignmentId = assignmentId.trim();
-  const cleanedTeacherId = teacherId.trim();
+  const cleanedClassId = classId.trim();
 
-  if (!cleanedAssignmentId || !cleanedTeacherId) return [];
+  if (!cleanedAssignmentId || !cleanedClassId) return [];
 
   const snapshot = await getDocs(
     query(
       collection(db, "assignmentResults"),
+      where("classId", "==", cleanedClassId),
       where("assignmentId", "==", cleanedAssignmentId),
-      where("teacherId", "==", cleanedTeacherId),
     ),
   );
 
@@ -237,7 +238,7 @@ async function getQuizAssignmentResults(
       (result) =>
         result.assignmentType === "quiz" &&
         result.status === "completed" &&
-        result.teacherId === cleanedTeacherId &&
+        result.classId === cleanedClassId &&
         result.assignmentId === cleanedAssignmentId,
     );
 }
@@ -245,17 +246,29 @@ async function getQuizAssignmentResults(
 async function getClassInformation(classId: string): Promise<{
   className: string;
   studentIds: string[];
+  teacherId: string;
+  coTeacherIds: string[];
 }> {
   const cleanedClassId = classId.trim();
 
   if (!cleanedClassId) {
-    return { className: "Unknown class", studentIds: [] };
+    return {
+      className: "Unknown class",
+      studentIds: [],
+      teacherId: "",
+      coTeacherIds: [],
+    };
   }
 
   const snapshot = await getDoc(doc(db, "classes", cleanedClassId));
 
   if (!snapshot.exists()) {
-    return { className: "Unknown class", studentIds: [] };
+    return {
+      className: "Unknown class",
+      studentIds: [],
+      teacherId: "",
+      coTeacherIds: [],
+    };
   }
 
   const data = snapshot.data();
@@ -266,13 +279,114 @@ async function getClassInformation(classId: string): Promise<{
       )
     : [];
 
+  const teacherId =
+    typeof data.teacherId === "string" ? data.teacherId.trim() : "";
+
+  const coTeacherIds = Array.isArray(data.coTeacherIds)
+    ? uniqueIds(
+        data.coTeacherIds.filter(
+          (value: unknown): value is string => typeof value === "string",
+        ),
+      )
+    : [];
+
   return {
     className:
       typeof data.name === "string" && data.name.trim()
         ? data.name
         : "Untitled class",
     studentIds: uniqueIds(studentIds),
+    teacherId,
+    coTeacherIds,
   };
+}
+
+async function buildQuizAssignmentSummary(
+  assignmentDocument: {
+    id: string;
+    data: () => FirestoreAssignment;
+  },
+): Promise<TeacherQuizAssignmentSummary> {
+  const assignment = assignmentDocument.data();
+  const classId = assignment.classId || "";
+
+  const [classInformation, results] = await Promise.all([
+    getClassInformation(classId),
+    getQuizAssignmentResults(assignmentDocument.id, classId),
+  ]);
+
+  const recipients = assignmentStudentIds(
+    assignment,
+    classInformation.studentIds,
+  );
+
+  const recipientSet = new Set(recipients);
+  const recipientResults = results.filter(
+    (result) => result.studentId && recipientSet.has(result.studentId),
+  );
+
+  const completedCount = new Set(
+    recipientResults
+      .map((result) => result.studentId || "")
+      .filter(Boolean),
+  ).size;
+
+  return {
+    id: assignmentDocument.id,
+    teacherId: assignment.teacherId || "",
+    classId,
+    className: classInformation.className,
+    title: assignment.title || "Untitled Quiz",
+    description: assignment.description || "",
+    resourceId: assignment.resourceId || "",
+    dueDate: convertDate(assignment.dueDate),
+    createdAt: convertDate(assignment.createdAt),
+    status: normaliseStatus(assignment.status),
+    deliveryMode: normaliseDeliveryMode(assignment.deliveryMode),
+    studentCount: recipients.length,
+    completedCount,
+    completionPercentage: calculateCompletionPercentage(
+      completedCount,
+      recipients.length,
+    ),
+    averagePercentage: calculateAveragePercentage(recipientResults),
+    integrityTerminatedCount: recipientResults.filter(
+      (result) => result.integrityTerminated === true,
+    ).length,
+  } satisfies TeacherQuizAssignmentSummary;
+}
+
+export async function getClassQuizAssignments(
+  classId: string,
+): Promise<TeacherQuizAssignmentSummary[]> {
+  const cleanedClassId = classId.trim();
+  if (!cleanedClassId) return [];
+
+  const assignmentsSnapshot = await getDocs(
+    query(
+      collection(db, "assignments"),
+      where("classId", "==", cleanedClassId),
+    ),
+  );
+
+  const quizDocuments = assignmentsSnapshot.docs.filter((document) => {
+    const data = document.data();
+    return data.type === "quiz" && data.classId === cleanedClassId;
+  });
+
+  const summaries = await Promise.all(
+    quizDocuments.map((assignmentDocument) =>
+      buildQuizAssignmentSummary({
+        id: assignmentDocument.id,
+        data: () => assignmentDocument.data() as FirestoreAssignment,
+      }),
+    ),
+  );
+
+  return summaries.sort(
+    (a, b) =>
+      (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+  );
 }
 
 export async function getTeacherQuizAssignments(
@@ -281,66 +395,35 @@ export async function getTeacherQuizAssignments(
   const cleanedTeacherId = teacherId.trim();
   if (!cleanedTeacherId) return [];
 
-  const assignmentsSnapshot = await getDocs(
-    query(
-      collection(db, "assignments"),
-      where("teacherId", "==", cleanedTeacherId),
+  const [ownedSnapshot, coTaughtSnapshot] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("teacherId", "==", cleanedTeacherId),
+      ),
     ),
+    getDocs(
+      query(
+        collection(db, "classes"),
+        where("coTeacherIds", "array-contains", cleanedTeacherId),
+      ),
+    ),
+  ]);
+
+  const managedClassIds = Array.from(
+    new Set([
+      ...ownedSnapshot.docs.map((classDocument) => classDocument.id),
+      ...coTaughtSnapshot.docs.map((classDocument) => classDocument.id),
+    ]),
   );
 
-  const quizDocuments = assignmentsSnapshot.docs.filter((document) => {
-    const data = document.data();
-    return data.type === "quiz" && data.teacherId === cleanedTeacherId;
-  });
+  if (managedClassIds.length === 0) return [];
 
-  const summaries = await Promise.all(
-    quizDocuments.map(async (assignmentDocument) => {
-      const assignment = assignmentDocument.data() as FirestoreAssignment;
-      const classId = assignment.classId || "";
-      const [classInformation, results] = await Promise.all([
-        getClassInformation(classId),
-        getQuizAssignmentResults(assignmentDocument.id, cleanedTeacherId),
-      ]);
-
-      const recipients = assignmentStudentIds(
-        assignment,
-        classInformation.studentIds,
-      );
-      const recipientSet = new Set(recipients);
-      const recipientResults = results.filter(
-        (result) => result.studentId && recipientSet.has(result.studentId),
-      );
-      const completedCount = new Set(
-        recipientResults
-          .map((result) => result.studentId || "")
-          .filter(Boolean),
-      ).size;
-
-      return {
-        id: assignmentDocument.id,
-        teacherId: assignment.teacherId || "",
-        classId,
-        className: classInformation.className,
-        title: assignment.title || "Untitled Quiz",
-        description: assignment.description || "",
-        resourceId: assignment.resourceId || "",
-        dueDate: convertDate(assignment.dueDate),
-        createdAt: convertDate(assignment.createdAt),
-        status: normaliseStatus(assignment.status),
-        deliveryMode: normaliseDeliveryMode(assignment.deliveryMode),
-        studentCount: recipients.length,
-        completedCount,
-        completionPercentage: calculateCompletionPercentage(
-          completedCount,
-          recipients.length,
-        ),
-        averagePercentage: calculateAveragePercentage(recipientResults),
-        integrityTerminatedCount: recipientResults.filter(
-          (result) => result.integrityTerminated === true,
-        ).length,
-      } satisfies TeacherQuizAssignmentSummary;
-    }),
+  const assignmentGroups = await Promise.all(
+    managedClassIds.map((classId) => getClassQuizAssignments(classId)),
   );
+
+  const summaries = assignmentGroups.flat();
 
   return summaries.sort(
     (a, b) =>
@@ -365,15 +448,25 @@ export async function getTeacherQuizAssignmentDetail(
 
   const assignment = assignmentSnapshot.data() as FirestoreAssignment;
 
-  if (assignment.type !== "quiz" || assignment.teacherId !== cleanedTeacherId) {
+  if (assignment.type !== "quiz") {
     return null;
   }
 
   const classId = assignment.classId || "";
-  const [classInformation, results] = await Promise.all([
-    getClassInformation(classId),
-    getQuizAssignmentResults(cleanedAssignmentId, cleanedTeacherId),
-  ]);
+  const classInformation = await getClassInformation(classId);
+
+  const canManageClass =
+    classInformation.teacherId === cleanedTeacherId ||
+    classInformation.coTeacherIds.includes(cleanedTeacherId);
+
+  if (!canManageClass) {
+    return null;
+  }
+
+  const results = await getQuizAssignmentResults(
+    cleanedAssignmentId,
+    classId,
+  );
 
   const recipients = assignmentStudentIds(
     assignment,
@@ -465,7 +558,7 @@ export async function getTeacherQuizAssignmentDetail(
       averagePercentage: calculateAveragePercentage(recipientResults),
       integrityTerminatedCount: students.filter(
         (student) => student.integrityTerminated,
-      ).length,
+  ).length,
     },
     students,
   };

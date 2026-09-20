@@ -7,7 +7,7 @@ import {
 } from "@/services/analytics/teacherAnalyticsService";
 
 import {
-  getTeacherExamAssignments,
+  getClassExamAssignments,
 } from "@/services/examAssignmentService";
 
 import {
@@ -404,16 +404,13 @@ export async function buildClassProgressReport({
    * ---------------------------------------------------------
    */
 
-  const teacherExamAssignments =
-    await getTeacherExamAssignments(
-      cleanedTeacherId,
-    );
-
   const classExamAssignments =
-    teacherExamAssignments.filter(
+    (
+      await getClassExamAssignments(
+        cleanedClassId,
+      )
+    ).filter(
       (assignment) =>
-        assignment.classId ===
-          cleanedClassId &&
         assignment.status !==
           "cancelled",
     );
