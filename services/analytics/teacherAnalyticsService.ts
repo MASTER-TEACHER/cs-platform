@@ -365,18 +365,18 @@ async function getTeacherOwnedStudentAnalytics({
     ),
 
     getDocs(
-      query(
-        collection(
-          db,
-          "assignmentResults",
-        ),
-        where(
-          "teacherId",
-          "==",
-          teacherId,
-        ),
-      ),
+  query(
+    collection(
+      db,
+      "assignmentResults",
     ),
+    where(
+      "classId",
+      "==",
+      classItem.id,
+    ),
+  ),
+),
 
     getDocs(
       query(
@@ -393,18 +393,18 @@ async function getTeacherOwnedStudentAnalytics({
     ),
 
     getDocs(
-      query(
-        collection(
-          db,
-          "examSubmissions",
-        ),
-        where(
-          "teacherId",
-          "==",
-          teacherId,
-        ),
-      ),
+  query(
+    collection(
+      db,
+      "examSubmissions",
     ),
+    where(
+      "classId",
+      "==",
+      classItem.id,
+    ),
+  ),
+),
 
     getDocs(
       query(
