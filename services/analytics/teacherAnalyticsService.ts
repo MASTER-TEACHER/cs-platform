@@ -6,6 +6,8 @@ import {
   query,
   Timestamp,
   where,
+  type DocumentData,
+  type QuerySnapshot,
 } from "firebase/firestore";
 
 import { ANALYTICS_EVIDENCE_WEIGHTS } from "@/data/analytics/analyticsConfig";
@@ -326,100 +328,94 @@ async function getStudentIdentity(
  * with queries constrained by teacherId, then filters the
  * current class/student in memory.
  */
-async function getTeacherOwnedStudentAnalytics({
+type TeacherClassEvidenceBundle = {
+  quizAssignmentsSnapshot: QuerySnapshot<DocumentData>;
+  quizResultsSnapshot: QuerySnapshot<DocumentData>;
+  examAssignmentsSnapshot: QuerySnapshot<DocumentData>;
+  examSubmissionsSnapshot: QuerySnapshot<DocumentData>;
+  resourceAssignmentsSnapshot: QuerySnapshot<DocumentData>;
+};
+
+async function getTeacherClassEvidenceBundle({
   teacherId,
-  studentId,
   classItem,
 }: {
   teacherId: string;
-  studentId: string;
   classItem: TeacherClass;
-}): Promise<RichStudentAnalytics> {
+}): Promise<TeacherClassEvidenceBundle> {
   const [
-    profileSnapshot,
     quizAssignmentsSnapshot,
     quizResultsSnapshot,
     examAssignmentsSnapshot,
     examSubmissionsSnapshot,
     resourceAssignmentsSnapshot,
   ] = await Promise.all([
-    /*
-     * Student profile reads are optional for teacher analytics.
-     * Firestore may correctly deny this direct user-document read while still
-     * allowing the teacher to analyse teacher-owned class/assignment evidence.
-     * Returning null preserves the class snapshot + target-grade fallback.
-     */
-    getDoc(
-      doc(db, "users", studentId),
-    ).catch(() => null),
-
     getDocs(
       query(
         collection(db, "assignments"),
-        where(
-          "teacherId",
-          "==",
-          teacherId,
-        ),
+        where("teacherId", "==", teacherId),
       ),
     ),
-
-    getDocs(
-  query(
-    collection(
-      db,
-      "assignmentResults",
-    ),
-    where(
-      "classId",
-      "==",
-      classItem.id,
-    ),
-  ),
-),
-
     getDocs(
       query(
-        collection(
-          db,
-          "examAssignments",
-        ),
-        where(
-          "teacherId",
-          "==",
-          teacherId,
-        ),
+        collection(db, "assignmentResults"),
+        where("classId", "==", classItem.id),
       ),
     ),
-
-    getDocs(
-  query(
-    collection(
-      db,
-      "examSubmissions",
-    ),
-    where(
-      "classId",
-      "==",
-      classItem.id,
-    ),
-  ),
-),
-
     getDocs(
       query(
-        collection(
-          db,
-          "classAssignments",
-        ),
-        where(
-          "teacherId",
-          "==",
-          teacherId,
-        ),
+        collection(db, "examAssignments"),
+        where("teacherId", "==", teacherId),
+      ),
+    ),
+    getDocs(
+      query(
+        collection(db, "examSubmissions"),
+        where("classId", "==", classItem.id),
+      ),
+    ),
+    getDocs(
+      query(
+        collection(db, "classAssignments"),
+        where("teacherId", "==", teacherId),
       ),
     ),
   ]);
+
+  return {
+    quizAssignmentsSnapshot,
+    quizResultsSnapshot,
+    examAssignmentsSnapshot,
+    examSubmissionsSnapshot,
+    resourceAssignmentsSnapshot,
+  };
+}
+
+async function getTeacherOwnedStudentAnalytics({
+  studentId,
+  classItem,
+  evidenceBundle,
+}: {
+  studentId: string;
+  classItem: TeacherClass;
+  evidenceBundle: TeacherClassEvidenceBundle;
+}): Promise<RichStudentAnalytics> {
+  /*
+   * Teacher/class evidence is loaded once by buildClassAnalytics() and
+   * shared across every learner in the class. Only the optional profile
+   * document remains a per-student Firestore read here.
+   */
+  const profileSnapshot = await getDoc(
+    doc(db, "users", studentId),
+  ).catch(() => null);
+
+  const {
+    quizAssignmentsSnapshot,
+    quizResultsSnapshot,
+    examAssignmentsSnapshot,
+    examSubmissionsSnapshot,
+    resourceAssignmentsSnapshot,
+  } = evidenceBundle;
 
   const profile =
     profileSnapshot?.exists()
@@ -1407,6 +1403,14 @@ async function buildClassAnalytics(
     );
 
   /*
+   * Load teacher/class evidence once and reuse it for every enrolled learner.
+   */
+  const evidenceBundle = await getTeacherClassEvidenceBundle({
+    teacherId,
+    classItem,
+  });
+
+  /*
    * Every enrolled student gets a row.
    * We no longer discard a student merely because one
    * analytics evidence source is unavailable.
@@ -1422,11 +1426,11 @@ async function buildClassAnalytics(
             );
 
           const analytics =
-            await getTeacherOwnedStudentAnalytics({
-              teacherId,
-              studentId,
-              classItem,
-            });
+  await getTeacherOwnedStudentAnalytics({
+    studentId,
+    classItem,
+    evidenceBundle,
+  });
 
           const intervention =
             interventionFor(
