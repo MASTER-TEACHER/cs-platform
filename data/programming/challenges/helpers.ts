@@ -47,3 +47,4 @@ export function visible(id: string, label: string, input: string, expectedOutput
 export function hidden(id: string, label: string, input: string, expectedOutput: string): ProgrammingTestCase {
   return { id, label, input, expectedOutput, hidden: true };
 }
+

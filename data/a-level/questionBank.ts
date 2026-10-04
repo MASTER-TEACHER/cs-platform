@@ -3737,7 +3737,2486 @@ export const aLevelPracticeQuestions: ALevelPracticeQuestion[] =
       "ocr-2-3",
       "ocr-1-4"
     ]
-  }
+  },
+{
+  "id": "al-advanced-programming-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "Stack frames",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A recursive procedure is called three times before reaching its base case. Explain what information must be retained in each stack frame and why the frames are removed in reverse order.",
+  "markPoints": [
+    "Each call has its own frame",
+    "Return address retained",
+    "Parameters/local variables retained",
+    "Frames follow LIFO order",
+    "Deepest call returns first",
+    "Links stack behaviour to recursion"
+  ],
+  "modelAnswer": "Each call has its own frame Return address retained Parameters/local variables retained Frames follow LIFO order Deepest call returns first Links stack behaviour to recursion",
+  "lessonKeywords": [
+    "stack",
+    "frames"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-advanced-programming-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "OOP polymorphism",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "programming",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A list contains objects of subclasses Car and Bicycle, each overriding a method named move(). Write pseudocode that iterates through the list and calls the correct move() implementation. Explain why this demonstrates polymorphism.",
+  "markPoints": [
+    "Iterates through collection",
+    "Calls item.move()",
+    "No explicit type test required",
+    "Same interface/message used",
+    "Runtime/object determines implementation",
+    "Identifies overriding",
+    "Explains polymorphism"
+  ],
+  "modelAnswer": "Iterates through collection Calls item.move() No explicit type test required Same interface/message used Runtime/object determines implementation Identifies overriding Explains polymorphism",
+  "lessonKeywords": [
+    "oop",
+    "polymorphism"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-advanced-programming-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "Reference parameters",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A procedure receives a reference to a list and appends 9 to it. The caller then outputs the list. Explain why the caller can observe the change and contrast this with passing an immutable integer value.",
+  "markPoints": [
+    "Reference identifies same mutable object",
+    "Mutation affects shared object",
+    "Caller therefore sees appended value",
+    "Integer value is not the same mutable list object",
+    "Distinguishes mutation from rebinding"
+  ],
+  "modelAnswer": "Reference identifies same mutable object Mutation affects shared object Caller therefore sees appended value Integer value is not the same mutable list object Distinguishes mutation from rebinding",
+  "lessonKeywords": [
+    "reference",
+    "parameters"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-advanced-programming-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "Exception handling",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "programming",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Write pseudocode for reading an integer from a file where both a missing file and non-numeric data are handled without an uncontrolled crash.",
+  "markPoints": [
+    "Attempts file open",
+    "Handles missing-file exception",
+    "Attempts conversion",
+    "Handles conversion exception",
+    "Closes/resources handled appropriately",
+    "Useful error/recovery action",
+    "Program remains controlled"
+  ],
+  "modelAnswer": "Attempts file open Handles missing-file exception Attempts conversion Handles conversion exception Closes/resources handled appropriately Useful error/recovery action Program remains controlled",
+  "lessonKeywords": [
+    "exception",
+    "handling"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-advanced-programming-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "Class design",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A library system has Book, PrintedBook and EBook. Explain a suitable use of inheritance and one situation where composition would be preferable.",
+  "markPoints": [
+    "Common Book state/behaviour identified",
+    "PrintedBook/EBook are specialisations",
+    "Inheritance models is-a",
+    "Composition models has-a",
+    "Example component such as Licence/Publisher/Storage",
+    "Justified design choice"
+  ],
+  "modelAnswer": "Common Book state/behaviour identified PrintedBook/EBook are specialisations Inheritance models is-a Composition models has-a Example component such as Licence/Publisher/Storage Justified design choice",
+  "lessonKeywords": [
+    "class",
+    "design"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-advanced-programming-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-programming",
+  "topicTitle": "Advanced Programming",
+  "subtopic": "Recursion",
+  "specificationReferences": [
+    "AQA 4.1",
+    "OCR 2.2"
+  ],
+  "questionType": "programming",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "Write a recursive algorithm that returns the number of occurrences of target in a list. State the base case and explain how termination is guaranteed.",
+  "markPoints": [
+    "Base case empty/end of list",
+    "Returns 0 at base",
+    "Compares current item",
+    "Adds 1 on match",
+    "Recursive call on smaller remainder/index",
+    "Correct result propagation",
+    "Problem size decreases",
+    "Termination explained"
+  ],
+  "modelAnswer": "Base case empty/end of list Returns 0 at base Compares current item Adds 1 on match Recursive call on smaller remainder/index Correct result propagation Problem size decreases Termination explained",
+  "lessonKeywords": [
+    "recursion"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-1",
+    "ocr-2-2"
+  ]
+},
+{
+  "id": "al-functional-programming-x01",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "Function types",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 4,
+  "question": "For a function length : String → Integer, identify the domain and co-domain and state the result type of applying length to 'COMPUTER'.",
+  "markPoints": [
+    "Domain is String",
+    "Co-domain is Integer",
+    "Application returns an Integer",
+    "For COMPUTER result is 8"
+  ],
+  "modelAnswer": "Domain is String Co-domain is Integer Application returns an Integer For COMPUTER result is 8",
+  "lessonKeywords": [
+    "function",
+    "types"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-functional-programming-x02",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "Partial application",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "Given add : Integer → Integer → Integer and add x y = x + y, let add10 = add 10. Evaluate add10 7 and explain what add 10 returns.",
+  "markPoints": [
+    "add 10 returns a function",
+    "Returned function awaits one Integer",
+    "It adds 10 to its argument",
+    "add10 7 = 17",
+    "Explains partial application"
+  ],
+  "modelAnswer": "add 10 returns a function Returned function awaits one Integer It adds 10 to its argument add10 7 = 17 Explains partial application",
+  "lessonKeywords": [
+    "partial",
+    "application"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-functional-programming-x03",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "Composition",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "Let f(x)=x+3 and g(x)=2x. Calculate (g ○ f)(5) and (f ○ g)(5), showing the order of application.",
+  "markPoints": [
+    "f(5)=8",
+    "g(f(5))=16",
+    "g(5)=10",
+    "f(g(5))=13",
+    "Shows composition order matters"
+  ],
+  "modelAnswer": "f(5)=8 g(f(5))=16 g(5)=10 f(g(5))=13 Shows composition order matters",
+  "lessonKeywords": [
+    "composition"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-functional-programming-x04",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "First-class functions",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "programming",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Describe pseudocode for a function applyTwice(f, x) that returns f(f(x)). Explain which functional-programming property allows f to be passed in.",
+  "markPoints": [
+    "Function accepted as parameter",
+    "Calls f(x)",
+    "Calls f on first result",
+    "Returns result",
+    "Functions treated as first-class values",
+    "Higher-order function identified"
+  ],
+  "modelAnswer": "Function accepted as parameter Calls f(x) Calls f on first result Returns result Functions treated as first-class values Higher-order function identified",
+  "lessonKeywords": [
+    "first",
+    "class",
+    "functions"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-functional-programming-x05",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "Map/filter",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A list of temperatures must be converted from Celsius to Fahrenheit and then values below 32°F removed. Explain how map and filter could express this pipeline.",
+  "markPoints": [
+    "Map performs conversion on each item",
+    "Conversion formula/function applied",
+    "Filter applies predicate",
+    "Below-32 values removed",
+    "Operations compose as pipeline",
+    "No need for explicit shared mutable accumulator"
+  ],
+  "modelAnswer": "Map performs conversion on each item Conversion formula/function applied Filter applies predicate Below-32 values removed Operations compose as pipeline No need for explicit shared mutable accumulator",
+  "lessonKeywords": [
+    "map",
+    "filter"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-functional-programming-x06",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "functional-programming",
+  "topicTitle": "Functional Programming",
+  "subtopic": "Functional evaluation",
+  "specificationReferences": [
+    "AQA 4.12"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "Evaluate using immutable data and pure functions in a concurrent data-processing service.",
+  "markPoints": [
+    "Pure functions avoid hidden side effects",
+    "Immutability reduces shared-state races",
+    "Easier testing/reasoning",
+    "May allocate additional objects",
+    "I/O/state still needs handling",
+    "Performance trade-off",
+    "Concurrency benefit contextualised",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Pure functions avoid hidden side effects Immutability reduces shared-state races Easier testing/reasoning May allocate additional objects I/O/state still needs handling Performance trade-off Concurrency benefit contextualised Justified conclusion",
+  "lessonKeywords": [
+    "functional",
+    "evaluation"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-12"
+  ]
+},
+{
+  "id": "al-software-development-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Requirements",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A client says a search feature must be 'fast'. Rewrite this as a measurable success criterion and explain why the revised form is more testable.",
+  "markPoints": [
+    "Provides measurable threshold",
+    "Defines relevant conditions/data size",
+    "Can be objectively tested",
+    "Removes ambiguity",
+    "Links criterion to evaluation"
+  ],
+  "modelAnswer": "Provides measurable threshold Defines relevant conditions/data size Can be objectively tested Removes ambiguity Links criterion to evaluation",
+  "lessonKeywords": [
+    "requirements"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-software-development-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Black-box testing",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "compare",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Compare black-box and white-box testing for a function containing several branches.",
+  "markPoints": [
+    "Black-box based on inputs/outputs/specification",
+    "Does not require internal code knowledge",
+    "White-box uses internal structure",
+    "Can target branches/paths",
+    "Each can reveal different defects",
+    "Concludes complementary use"
+  ],
+  "modelAnswer": "Black-box based on inputs/outputs/specification Does not require internal code knowledge White-box uses internal structure Can target branches/paths Each can reveal different defects Concludes complementary use",
+  "lessonKeywords": [
+    "black",
+    "box",
+    "testing"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-software-development-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Boundary analysis",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A booking system accepts groups from 1 to 12 people. Design six tests that exercise normal, boundary and invalid cases.",
+  "markPoints": [
+    "Normal valid value",
+    "1 accepted",
+    "12 accepted",
+    "0 rejected",
+    "13 rejected",
+    "Non-integer/type-invalid case"
+  ],
+  "modelAnswer": "Normal valid value 1 accepted 12 accepted 0 rejected 13 rejected Non-integer/type-invalid case",
+  "lessonKeywords": [
+    "boundary",
+    "analysis"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-software-development-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Version control",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Two developers edit the same function on separate branches. Explain how version control supports their work and what a merge conflict means.",
+  "markPoints": [
+    "Branches isolate work",
+    "Commits record changes",
+    "Merge combines histories",
+    "Conflict when changes cannot be reconciled automatically",
+    "Developer resolves conflict",
+    "History supports rollback/audit"
+  ],
+  "modelAnswer": "Branches isolate work Commits record changes Merge combines histories Conflict when changes cannot be reconciled automatically Developer resolves conflict History supports rollback/audit",
+  "lessonKeywords": [
+    "version",
+    "control"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-software-development-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Prototyping",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A client is unsure how a new user interface should work. Evaluate using an iterative prototype before full implementation.",
+  "markPoints": [
+    "Early feedback",
+    "Clarifies requirements",
+    "Can expose usability issues",
+    "Reduces risk of building wrong interface",
+    "Prototype may create unrealistic expectations",
+    "Time/cost or throwaway-code risk",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Early feedback Clarifies requirements Can expose usability issues Reduces risk of building wrong interface Prototype may create unrealistic expectations Time/cost or throwaway-code risk Justified conclusion",
+  "lessonKeywords": [
+    "prototyping"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-software-development-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "software-development",
+  "topicTitle": "Software Development",
+  "subtopic": "Testing strategy",
+  "specificationReferences": [
+    "AQA 4.13",
+    "OCR 1.2"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A team has 95% unit-test coverage but has performed no integration or user-acceptance testing. Evaluate whether the software is ready for release.",
+  "markPoints": [
+    "Coverage is useful evidence",
+    "Coverage does not prove correctness",
+    "Unit tests may miss interface failures",
+    "Integration testing needed",
+    "Acceptance testing checks user requirements",
+    "Untested edge/nonfunctional concerns",
+    "Risk-based release judgement",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Coverage is useful evidence Coverage does not prove correctness Unit tests may miss interface failures Integration testing needed Acceptance testing checks user requirements Untested edge/nonfunctional concerns Risk-based release judgement Justified conclusion",
+  "lessonKeywords": [
+    "testing",
+    "strategy"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-13",
+    "ocr-1-2"
+  ]
+},
+{
+  "id": "al-data-structures-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "Stack trace",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "Starting with an empty stack, perform PUSH A, PUSH B, POP, PUSH C, PUSH D, POP. State both popped values and the final stack from bottom to top.",
+  "markPoints": [
+    "First pop returns B",
+    "Stack then A",
+    "Push C then D",
+    "Second pop returns D",
+    "Final stack A,C"
+  ],
+  "modelAnswer": "First pop returns B Stack then A Push C then D Second pop returns D Final stack A,C",
+  "lessonKeywords": [
+    "stack",
+    "trace"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-data-structures-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "Queue trace",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A queue initially contains [P,Q] with P at the front. Perform ENQUEUE R, DEQUEUE, ENQUEUE S, DEQUEUE. State the dequeued values and final queue.",
+  "markPoints": [
+    "First dequeue P",
+    "Queue Q,R",
+    "Enqueue S",
+    "Second dequeue Q",
+    "Final queue R,S"
+  ],
+  "modelAnswer": "First dequeue P Queue Q,R Enqueue S Second dequeue Q Final queue R,S",
+  "lessonKeywords": [
+    "queue",
+    "trace"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-data-structures-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "BST construction",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Insert 40, 25, 60, 10, 30, 50, 70 into an empty binary search tree. Describe the resulting parent-child relationships.",
+  "markPoints": [
+    "40 root",
+    "25 left of 40",
+    "60 right of 40",
+    "10 left of 25",
+    "30 right of 25",
+    "50 left of 60",
+    "70 right of 60"
+  ],
+  "modelAnswer": "40 root 25 left of 40 60 right of 40 10 left of 25 30 right of 25 50 left of 60 70 right of 60",
+  "lessonKeywords": [
+    "bst",
+    "construction"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-data-structures-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "Graph traversal",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A graph has adjacency lists A:[B,C], B:[D], C:[E], D:[], E:[]. Starting at A and visiting neighbours alphabetically, give BFS and DFS visit orders.",
+  "markPoints": [
+    "BFS begins A",
+    "BFS A,B,C,D,E",
+    "DFS begins A,B",
+    "DFS reaches D before backtracking",
+    "DFS then C,E",
+    "Correct DFS A,B,D,C,E"
+  ],
+  "modelAnswer": "BFS begins A BFS A,B,C,D,E DFS begins A,B DFS reaches D before backtracking DFS then C,E Correct DFS A,B,D,C,E",
+  "lessonKeywords": [
+    "graph",
+    "traversal"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-data-structures-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "Hashing",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A hash table of size 10 uses key MOD 10 with linear probing. Insert keys 23, 43, 13, 27. State the final index of each key.",
+  "markPoints": [
+    "23 hashes 3",
+    "43 collides then index 4",
+    "13 collides at 3 and 4 then index 5",
+    "27 hashes 7",
+    "Shows linear probing",
+    "Final mapping correct"
+  ],
+  "modelAnswer": "23 hashes 3 43 collides then index 4 13 collides at 3 and 4 then index 5 27 hashes 7 Shows linear probing Final mapping correct",
+  "lessonKeywords": [
+    "hashing"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-data-structures-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "data-structures",
+  "topicTitle": "Advanced Data Structures",
+  "subtopic": "Structure choice",
+  "specificationReferences": [
+    "AQA 4.2",
+    "OCR 1.4"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A text editor must support undo, a printer service must preserve arrival order, and a route planner stores weighted connections. Select and justify a suitable data structure for each.",
+  "markPoints": [
+    "Undo uses stack",
+    "LIFO justification",
+    "Printer uses queue",
+    "FIFO justification",
+    "Route network uses weighted graph",
+    "Vertices/edges justification",
+    "Recognises different access patterns",
+    "Coherent overall justification"
+  ],
+  "modelAnswer": "Undo uses stack LIFO justification Printer uses queue FIFO justification Route network uses weighted graph Vertices/edges justification Recognises different access patterns Coherent overall justification",
+  "lessonKeywords": [
+    "structure",
+    "choice"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-2",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-computational-thinking-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "Abstraction",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A railway route model stores stations, connections and journey times but not station paint colours or shop layouts. Explain why this is an appropriate abstraction.",
+  "markPoints": [
+    "Retains relevant stations",
+    "Retains connectivity",
+    "Retains journey cost/time",
+    "Omits irrelevant physical detail",
+    "Simplifies route computation"
+  ],
+  "modelAnswer": "Retains relevant stations Retains connectivity Retains journey cost/time Omits irrelevant physical detail Simplifies route computation",
+  "lessonKeywords": [
+    "abstraction"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-computational-thinking-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "Decomposition",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Decompose an online examination system into at least four meaningful subproblems and explain one interface between two of them.",
+  "markPoints": [
+    "Four valid components",
+    "Authentication valid",
+    "Question delivery valid",
+    "Submission/marking/storage valid",
+    "Interface identified",
+    "Data exchanged across interface explained"
+  ],
+  "modelAnswer": "Four valid components Authentication valid Question delivery valid Submission/marking/storage valid Interface identified Data exchanged across interface explained",
+  "lessonKeywords": [
+    "decomposition"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-computational-thinking-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "State modelling",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A vending machine can be Idle, HasCredit or Dispensing. Explain how state-based decomposition can help design its behaviour.",
+  "markPoints": [
+    "States represent meaningful conditions",
+    "Inputs/events trigger transitions",
+    "Actions depend on current state",
+    "Prevents impossible behaviour",
+    "Simplifies reasoning/testing",
+    "Applies to scenario"
+  ],
+  "modelAnswer": "States represent meaningful conditions Inputs/events trigger transitions Actions depend on current state Prevents impossible behaviour Simplifies reasoning/testing Applies to scenario",
+  "lessonKeywords": [
+    "state",
+    "modelling"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-computational-thinking-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "Heuristic",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A route finder uses straight-line distance to the destination as a heuristic. Explain why the quality of this estimate matters.",
+  "markPoints": [
+    "Heuristic estimates remaining cost",
+    "More informative estimate can reduce explored states",
+    "Must not overestimate if optimal A* required",
+    "Poor heuristic approaches uninformed search",
+    "Accuracy/performance trade-off",
+    "Links to route finding"
+  ],
+  "modelAnswer": "Heuristic estimates remaining cost More informative estimate can reduce explored states Must not overestimate if optimal A* required Poor heuristic approaches uninformed search Accuracy/performance trade-off Links to route finding",
+  "lessonKeywords": [
+    "heuristic"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-computational-thinking-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "Parallel thinking",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A problem contains four independent image-processing tasks followed by one final aggregation step. Explain which work can be parallelised and what dependency remains.",
+  "markPoints": [
+    "Four independent tasks can run concurrently",
+    "Aggregation waits for required results",
+    "Dependency/synchronisation identified",
+    "Potential speed-up",
+    "Limited by final serial work/overheads",
+    "Correct decomposition"
+  ],
+  "modelAnswer": "Four independent tasks can run concurrently Aggregation waits for required results Dependency/synchronisation identified Potential speed-up Limited by final serial work/overheads Correct decomposition",
+  "lessonKeywords": [
+    "parallel",
+    "thinking"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-computational-thinking-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "computational-thinking",
+  "topicTitle": "Computational Thinking",
+  "subtopic": "Problem solving",
+  "specificationReferences": [
+    "AQA 4.3",
+    "OCR 2.1"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "Evaluate whether the most computationally efficient algorithm is always the best engineering choice.",
+  "markPoints": [
+    "Efficiency important at scale",
+    "Development complexity matters",
+    "Maintainability/readability matter",
+    "Memory trade-offs",
+    "Input sizes matter",
+    "Correctness/reliability matter",
+    "Hardware/context matters",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Efficiency important at scale Development complexity matters Maintainability/readability matter Memory trade-offs Input sizes matter Correctness/reliability matter Hardware/context matters Justified conclusion",
+  "lessonKeywords": [
+    "problem",
+    "solving"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-3",
+    "ocr-2-1"
+  ]
+},
+{
+  "id": "al-theory-computation-x01",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "FSM trace",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "An FSM has state S0 (start) and S1 (accept). Reading 1 toggles state; reading 0 leaves the state unchanged. Trace input 10111 and state whether it is accepted.",
+  "markPoints": [
+    "Start S0",
+    "1 -> S1",
+    "0 -> S1",
+    "1 -> S0",
+    "1 -> S1 then 1 -> S0",
+    "Ends S0 so rejected"
+  ],
+  "modelAnswer": "Start S0 1 -> S1 0 -> S1 1 -> S0 1 -> S1 then 1 -> S0 Ends S0 so rejected",
+  "lessonKeywords": [
+    "fsm",
+    "trace"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-theory-computation-x02",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "Regular expression",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "programming",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "Write a regular expression over {0,1} for strings that begin with 1 and are followed by zero or more binary digits. Explain each part.",
+  "markPoints": [
+    "Begins with literal 1",
+    "Character choice/group for 0 or 1",
+    "Kleene star/repetition",
+    "Allows no following digit",
+    "Explanation matches expression"
+  ],
+  "modelAnswer": "Begins with literal 1 Character choice/group for 0 or 1 Kleene star/repetition Allows no following digit Explanation matches expression",
+  "lessonKeywords": [
+    "regular",
+    "expression"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-theory-computation-x03",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "Turing machine",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A Turing machine scans right over 1s until it finds a blank, writes 0 and halts. Starting with tape 111 followed by blanks and the head on the first 1, describe the final non-blank tape contents.",
+  "markPoints": [
+    "Moves across first 1",
+    "Moves across second 1",
+    "Moves across third 1",
+    "Finds blank",
+    "Writes 0",
+    "Final contents 1110"
+  ],
+  "modelAnswer": "Moves across first 1 Moves across second 1 Moves across third 1 Finds blank Writes 0 Final contents 1110",
+  "lessonKeywords": [
+    "turing",
+    "machine"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-theory-computation-x04",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "Classification",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "compare",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Compare a decision problem with an optimisation problem, giving one computing example of each.",
+  "markPoints": [
+    "Decision answer yes/no",
+    "Optimisation seeks best feasible solution",
+    "Decision example",
+    "Optimisation example",
+    "Distinction clear",
+    "Examples correctly classified"
+  ],
+  "modelAnswer": "Decision answer yes/no Optimisation seeks best feasible solution Decision example Optimisation example Distinction clear Examples correctly classified",
+  "lessonKeywords": [
+    "classification"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-theory-computation-x05",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "Intractability",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "explain",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Explain why an algorithm with exponential time complexity may become impractical even when it works quickly for small inputs.",
+  "markPoints": [
+    "Exponential growth identified",
+    "Small increase in n causes large work increase",
+    "Example doubling/exponential factor",
+    "Hardware speed-up does not remove growth class",
+    "Small inputs may still be feasible",
+    "Large inputs become infeasible",
+    "Links complexity to practicality"
+  ],
+  "modelAnswer": "Exponential growth identified Small increase in n causes large work increase Example doubling/exponential factor Hardware speed-up does not remove growth class Small inputs may still be feasible Large inputs become infeasible Links complexity to practicality",
+  "lessonKeywords": [
+    "intractability"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-theory-computation-x06",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "theory-computation",
+  "topicTitle": "Theory of Computation",
+  "subtopic": "Computability",
+  "specificationReferences": [
+    "AQA 4.4"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "Explain the significance of showing that a problem is non-computable rather than merely difficult to compute.",
+  "markPoints": [
+    "Non-computable means no algorithm solves all instances",
+    "Different from high time complexity",
+    "More hardware does not solve undecidability",
+    "Approximation/restriction may still be possible",
+    "Recognises limits of computation",
+    "Avoids equating with slow",
+    "Practical implication",
+    "Clear conclusion"
+  ],
+  "modelAnswer": "Non-computable means no algorithm solves all instances Different from high time complexity More hardware does not solve undecidability Approximation/restriction may still be possible Recognises limits of computation Avoids equating with slow Practical implication Clear conclusion",
+  "lessonKeywords": [
+    "computability"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "Two's complement",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "Represent -37 as an 8-bit two's-complement value. Show your method.",
+  "markPoints": [
+    "37 = 00100101",
+    "Invert -> 11011010",
+    "Add 1 -> 11011011",
+    "8-bit answer correct",
+    "Method clear"
+  ],
+  "modelAnswer": "37 = 00100101 Invert -> 11011010 Add 1 -> 11011011 8-bit answer correct Method clear",
+  "lessonKeywords": [
+    "two",
+    "s",
+    "complement"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "Fixed point",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "An 8-bit fixed-point format uses 4 bits after the binary point. Represent 5.625 and state the smallest positive step size.",
+  "markPoints": [
+    "5 = 0101 integer portion",
+    "0.625 = .1010",
+    "Representation 01011010",
+    "Four fractional bits",
+    "Step = 2^-4",
+    "Step = 0.0625"
+  ],
+  "modelAnswer": "5 = 0101 integer portion 0.625 = .1010 Representation 01011010 Four fractional bits Step = 2^-4 Step = 0.0625",
+  "lessonKeywords": [
+    "fixed",
+    "point"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "Floating point",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "explain",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Explain why floating-point representation can represent a much wider range than fixed point using the same number of bits, and identify the trade-off.",
+  "markPoints": [
+    "Exponent changes scale",
+    "Mantissa/significand stores significant digits",
+    "Very large/small magnitudes possible",
+    "Fixed point has fixed scale",
+    "Finite precision causes rounding",
+    "Range-precision trade-off"
+  ],
+  "modelAnswer": "Exponent changes scale Mantissa/significand stores significant digits Very large/small magnitudes possible Fixed point has fixed scale Finite precision causes rounding Range-precision trade-off",
+  "lessonKeywords": [
+    "floating",
+    "point"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "Normalisation",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A binary floating-point mantissa is written 0.001101 × 2^5. Rewrite it in normalised form using a mantissa beginning 0.1 and adjust the exponent.",
+  "markPoints": [
+    "Moves binary point two places right",
+    "Mantissa 0.1101",
+    "Exponent reduced by 2",
+    "New exponent 3",
+    "Equivalent value retained"
+  ],
+  "modelAnswer": "Moves binary point two places right Mantissa 0.1101 Exponent reduced by 2 New exponent 3 Equivalent value retained",
+  "lessonKeywords": [
+    "normalisation"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "Character encoding",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "compare",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Compare ASCII and Unicode for a global messaging application.",
+  "markPoints": [
+    "ASCII limited character repertoire",
+    "Unicode supports far more scripts/symbols",
+    "Unicode suitable globally",
+    "Encoding such as UTF-8 may use variable bytes",
+    "ASCII may use less space for simple repertoire",
+    "Justified suitability"
+  ],
+  "modelAnswer": "ASCII limited character repertoire Unicode supports far more scripts/symbols Unicode suitable globally Encoding such as UTF-8 may use variable bytes ASCII may use less space for simple repertoire Justified suitability",
+  "lessonKeywords": [
+    "character",
+    "encoding"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-data-representation-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-data-representation",
+  "topicTitle": "Advanced Data Representation",
+  "subtopic": "File calculation",
+  "specificationReferences": [
+    "AQA 4.5",
+    "OCR 1.4"
+  ],
+  "questionType": "calculate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "An uncompressed stereo audio clip is sampled at 44,100 Hz with 16-bit samples for 3 minutes. Calculate its approximate size in MiB, ignoring metadata.",
+  "markPoints": [
+    "180 seconds",
+    "Two channels",
+    "44100*16*2*180 bits",
+    "Correct bit total",
+    "Divide by 8 for bytes",
+    "Divide by 1024^2",
+    "Approximately 30.3 MiB"
+  ],
+  "modelAnswer": "180 seconds Two channels 44100*16*2*180 bits Correct bit total Divide by 8 for bytes Divide by 1024^2 Approximately 30.3 MiB",
+  "lessonKeywords": [
+    "file",
+    "calculation"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-5",
+    "ocr-1-4"
+  ]
+},
+{
+  "id": "al-advanced-systems-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "FDE registers",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "trace",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "At the start of a fetch cycle PC=240. Describe the roles and likely changes of PC, MAR, MDR and CIR as the instruction is fetched.",
+  "markPoints": [
+    "PC address copied to MAR",
+    "Memory addressed via MAR",
+    "Instruction transferred to MDR",
+    "MDR copied to CIR",
+    "PC incremented",
+    "CIR holds current instruction",
+    "Sequence linked correctly"
+  ],
+  "modelAnswer": "PC address copied to MAR Memory addressed via MAR Instruction transferred to MDR MDR copied to CIR PC incremented CIR holds current instruction Sequence linked correctly",
+  "lessonKeywords": [
+    "fde",
+    "registers"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-systems-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "Pipelining",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "explain",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Explain how instruction pipelining can increase processor throughput and why a branch may reduce the benefit.",
+  "markPoints": [
+    "Overlaps fetch/decode/execute stages",
+    "Multiple instructions in pipeline",
+    "Improves throughput not necessarily single-instruction latency",
+    "Branch changes next instruction",
+    "May flush/stall pipeline",
+    "Performance penalty explained"
+  ],
+  "modelAnswer": "Overlaps fetch/decode/execute stages Multiple instructions in pipeline Improves throughput not necessarily single-instruction latency Branch changes next instruction May flush/stall pipeline Performance penalty explained",
+  "lessonKeywords": [
+    "pipelining"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-systems-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "RISC/CISC",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "compare",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Compare RISC and CISC processor design, including instruction complexity, execution and compiler implications.",
+  "markPoints": [
+    "RISC simpler instruction set",
+    "Often fixed/simple instructions",
+    "CISC more complex instructions",
+    "RISC may need more instructions per task",
+    "Pipeline/decoding implications",
+    "Compiler implications",
+    "Balanced comparison"
+  ],
+  "modelAnswer": "RISC simpler instruction set Often fixed/simple instructions CISC more complex instructions RISC may need more instructions per task Pipeline/decoding implications Compiler implications Balanced comparison",
+  "lessonKeywords": [
+    "risc",
+    "cisc"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-systems-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "Parallel processing",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A program takes 100 seconds. 80% can be perfectly parallelised across 4 cores while 20% remains serial. Ignoring overhead, calculate the new time and speed-up.",
+  "markPoints": [
+    "Parallel part 80 s",
+    "80/4 = 20 s",
+    "Serial part 20 s",
+    "New time 40 s",
+    "Speed-up 100/40",
+    "Speed-up 2.5"
+  ],
+  "modelAnswer": "Parallel part 80 s 80/4 = 20 s Serial part 20 s New time 40 s Speed-up 100/40 Speed-up 2.5",
+  "lessonKeywords": [
+    "parallel",
+    "processing"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-systems-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "Assembly",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "trace",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Given LDA 20, ADD 21, STA 22 where memory[20]=7 and memory[21]=5, trace the accumulator and state memory[22] after execution.",
+  "markPoints": [
+    "LDA loads 7",
+    "ACC=7",
+    "ADD adds 5",
+    "ACC=12",
+    "STA stores ACC",
+    "memory[22]=12"
+  ],
+  "modelAnswer": "LDA loads 7 ACC=7 ADD adds 5 ACC=12 STA stores ACC memory[22]=12",
+  "lessonKeywords": [
+    "assembly"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-systems-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-systems",
+  "topicTitle": "Advanced Computer Systems",
+  "subtopic": "Virtual memory",
+  "specificationReferences": [
+    "AQA 4.6/4.7",
+    "OCR 1.1"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Evaluate the effect of relying heavily on virtual memory when a workstation runs a dataset larger than physical RAM.",
+  "markPoints": [
+    "Allows program/data beyond RAM capacity",
+    "Uses secondary storage",
+    "Secondary storage slower than RAM",
+    "Paging/swapping overhead",
+    "May cause thrashing",
+    "Performance depends on access pattern",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Allows program/data beyond RAM capacity Uses secondary storage Secondary storage slower than RAM Paging/swapping overhead May cause thrashing Performance depends on access pattern Justified conclusion",
+  "lessonKeywords": [
+    "virtual",
+    "memory"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-6",
+    "aqa-4-7",
+    "ocr-1-1"
+  ]
+},
+{
+  "id": "al-advanced-networks-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "Bit and baud rate",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 5,
+  "question": "A communication system sends 2400 symbols per second and each symbol represents 3 bits. Calculate the baud rate and bit rate.",
+  "markPoints": [
+    "Baud = symbols per second",
+    "Baud rate 2400",
+    "3 bits per symbol",
+    "Bit rate 2400*3",
+    "Bit rate 7200 bit/s"
+  ],
+  "modelAnswer": "Baud = symbols per second Baud rate 2400 3 bits per symbol Bit rate 2400*3 Bit rate 7200 bit/s",
+  "lessonKeywords": [
+    "bit",
+    "and",
+    "baud"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-networks-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "Serial/parallel",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "compare",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Compare serial and parallel transmission over a long cable connection.",
+  "markPoints": [
+    "Serial sends bits sequentially",
+    "Parallel sends multiple bits simultaneously",
+    "Parallel susceptible to skew over distance",
+    "Serial uses fewer wires/channels",
+    "Serial often more reliable at high speed/distance",
+    "Contextual conclusion"
+  ],
+  "modelAnswer": "Serial sends bits sequentially Parallel sends multiple bits simultaneously Parallel susceptible to skew over distance Serial uses fewer wires/channels Serial often more reliable at high speed/distance Contextual conclusion",
+  "lessonKeywords": [
+    "serial",
+    "parallel"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-networks-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "TCP/IP",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "scenario",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A browser retrieves a web page from a remote server. Explain roles of DNS, IP, TCP and HTTP/HTTPS in the process.",
+  "markPoints": [
+    "DNS resolves name to IP address",
+    "IP addressing/routing",
+    "TCP reliable ordered transport",
+    "Ports/connections acceptable",
+    "HTTP requests/resources",
+    "HTTPS adds TLS security",
+    "Layers/protocol roles distinguished"
+  ],
+  "modelAnswer": "DNS resolves name to IP address IP addressing/routing TCP reliable ordered transport Ports/connections acceptable HTTP requests/resources HTTPS adds TLS security Layers/protocol roles distinguished",
+  "lessonKeywords": [
+    "tcp",
+    "ip"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-networks-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "Subnetting",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "calculate",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "An IPv4 /27 subnet is used. Calculate the number of addresses in the subnet and the number normally available for host devices.",
+  "markPoints": [
+    "32-27=5 host bits",
+    "2^5=32 addresses",
+    "Network address reserved",
+    "Broadcast address reserved",
+    "30 usable hosts",
+    "Correct reasoning"
+  ],
+  "modelAnswer": "32-27=5 host bits 2^5=32 addresses Network address reserved Broadcast address reserved 30 usable hosts Correct reasoning",
+  "lessonKeywords": [
+    "subnetting"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-networks-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "Packet switching",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "explain",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Explain why packets from one message may take different routes and how the destination reconstructs the data.",
+  "markPoints": [
+    "Message split into packets",
+    "Routers choose routes independently",
+    "Routes may differ with conditions",
+    "Packets contain addressing/sequence information",
+    "Destination reorders/reassembles",
+    "Missing data can be handled by transport protocol"
+  ],
+  "modelAnswer": "Message split into packets Routers choose routes independently Routes may differ with conditions Packets contain addressing/sequence information Destination reorders/reassembles Missing data can be handled by transport protocol",
+  "lessonKeywords": [
+    "packet",
+    "switching"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-networks-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-networks",
+  "topicTitle": "Advanced Networks",
+  "subtopic": "Network design",
+  "specificationReferences": [
+    "AQA 4.9",
+    "OCR 1.3"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A company needs reliable low-latency communication between two offices and secure remote access for home workers. Evaluate relevant network choices.",
+  "markPoints": [
+    "Bandwidth/latency requirements",
+    "Leased/dedicated link or suitable WAN consideration",
+    "Internet/VPN trade-off",
+    "Encryption for remote access",
+    "Authentication/MFA",
+    "Redundancy/reliability",
+    "Cost consideration",
+    "Justified design"
+  ],
+  "modelAnswer": "Bandwidth/latency requirements Leased/dedicated link or suitable WAN consideration Internet/VPN trade-off Encryption for remote access Authentication/MFA Redundancy/reliability Cost consideration Justified design",
+  "lessonKeywords": [
+    "network",
+    "design"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-9",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "Normalisation",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "scenario",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A table stores OrderID, CustomerID, CustomerName, ProductID, ProductName, Quantity, with many products per order. Explain how the design could be normalised.",
+  "markPoints": [
+    "Separate Customer entity",
+    "Separate Product entity",
+    "Separate Order entity",
+    "OrderLine/junction entity",
+    "Keys identified",
+    "Reduces duplicated names/details",
+    "Relationships preserved"
+  ],
+  "modelAnswer": "Separate Customer entity Separate Product entity Separate Order entity OrderLine/junction entity Keys identified Reduces duplicated names/details Relationships preserved",
+  "lessonKeywords": [
+    "normalisation"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "SQL join",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "programming",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Tables Student(StudentID,Name,ClassID) and Class(ClassID,Teacher) are related. Write SQL to list each student's Name and Teacher.",
+  "markPoints": [
+    "SELECT Student.Name, Class.Teacher",
+    "FROM Student",
+    "JOIN Class",
+    "ON Student.ClassID = Class.ClassID",
+    "Correct key relationship",
+    "Syntactically coherent query"
+  ],
+  "modelAnswer": "SELECT Student.Name, Class.Teacher FROM Student JOIN Class ON Student.ClassID = Class.ClassID Correct key relationship Syntactically coherent query",
+  "lessonKeywords": [
+    "sql",
+    "join"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "Aggregate SQL",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "programming",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Write SQL to show each ClassID and its average Score from Results(ClassID,Score), but only for classes with an average of at least 60.",
+  "markPoints": [
+    "SELECT ClassID",
+    "AVG(Score)",
+    "FROM Results",
+    "GROUP BY ClassID",
+    "HAVING AVG(Score) >= 60",
+    "Distinguishes HAVING from WHERE",
+    "Complete query"
+  ],
+  "modelAnswer": "SELECT ClassID AVG(Score) FROM Results GROUP BY ClassID HAVING AVG(Score) >= 60 Distinguishes HAVING from WHERE Complete query",
+  "lessonKeywords": [
+    "aggregate",
+    "sql"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "Transactions",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "explain",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A bank transfer subtracts money from one account and adds it to another. Explain why this should be treated as a transaction.",
+  "markPoints": [
+    "Operations form one logical unit",
+    "Both changes should succeed or neither",
+    "Atomicity",
+    "Failure between updates risks inconsistency",
+    "Rollback valid",
+    "Consistency/integrity protected"
+  ],
+  "modelAnswer": "Operations form one logical unit Both changes should succeed or neither Atomicity Failure between updates risks inconsistency Rollback valid Consistency/integrity protected",
+  "lessonKeywords": [
+    "transactions"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "Indexing",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Evaluate adding an index to a database column that is searched frequently but updated very often.",
+  "markPoints": [
+    "Index can speed retrieval",
+    "Avoids/full scan reduction",
+    "Index consumes storage",
+    "Updates must maintain index",
+    "Write performance can fall",
+    "Benefit depends on query/update pattern",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Index can speed retrieval Avoids/full scan reduction Index consumes storage Updates must maintain index Write performance can fall Benefit depends on query/update pattern Justified conclusion",
+  "lessonKeywords": [
+    "indexing"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-advanced-databases-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "advanced-databases",
+  "topicTitle": "Advanced Databases",
+  "subtopic": "Concurrency",
+  "specificationReferences": [
+    "AQA 4.10",
+    "OCR 1.3"
+  ],
+  "questionType": "scenario",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "Two users attempt to reserve the final seat at the same time. Explain the concurrency problem and one database mechanism that can prevent double booking.",
+  "markPoints": [
+    "Race condition/concurrent access",
+    "Both may read seat as available",
+    "Both may attempt update",
+    "Transaction/locking/isolation",
+    "Only one commit succeeds or serialised access",
+    "Maintains consistency",
+    "Applied explanation"
+  ],
+  "modelAnswer": "Race condition/concurrent access Both may read seat as available Both may attempt update Transaction/locking/isolation Only one commit succeeds or serialised access Maintains consistency Applied explanation",
+  "lessonKeywords": [
+    "concurrency"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-10",
+    "ocr-1-3"
+  ]
+},
+{
+  "id": "al-big-data-x01",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "Three Vs",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A social-media platform receives millions of text posts, images and live events each minute. Explain how volume, velocity and variety apply.",
+  "markPoints": [
+    "Volume: very large quantity",
+    "Velocity: rapid/streaming arrival",
+    "Variety: text/images/events",
+    "Each applied to scenario",
+    "Processing challenge linked",
+    "Storage/analysis challenge linked"
+  ],
+  "modelAnswer": "Volume: very large quantity Velocity: rapid/streaming arrival Variety: text/images/events Each applied to scenario Processing challenge linked Storage/analysis challenge linked",
+  "lessonKeywords": [
+    "three",
+    "vs"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-big-data-x02",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "Distributed storage",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "explain",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "Explain why a very large dataset may be partitioned across several machines rather than stored on one server.",
+  "markPoints": [
+    "Capacity beyond one machine",
+    "Work can be distributed",
+    "Parallel access/processing",
+    "Potential resilience/replication",
+    "Network/coordination overhead",
+    "Scalability"
+  ],
+  "modelAnswer": "Capacity beyond one machine Work can be distributed Parallel access/processing Potential resilience/replication Network/coordination overhead Scalability",
+  "lessonKeywords": [
+    "distributed",
+    "storage"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-big-data-x03",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "MapReduce",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "trace",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A word-count MapReduce job processes 'cat dog cat' and 'dog bird'. Describe the map outputs and the final reduce results.",
+  "markPoints": [
+    "Map emits cat,1 etc.",
+    "First record produces cat twice/dog once",
+    "Second produces dog/bird",
+    "Shuffle groups identical keys",
+    "Reduce sums cat=2 dog=2",
+    "bird=1",
+    "Correct final mapping"
+  ],
+  "modelAnswer": "Map emits cat,1 etc. First record produces cat twice/dog once Second produces dog/bird Shuffle groups identical keys Reduce sums cat=2 dog=2 bird=1 Correct final mapping",
+  "lessonKeywords": [
+    "mapreduce"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-big-data-x04",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "Data quality",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A company has a huge dataset collected from many sources but many records are incomplete or duplicated. Evaluate the claim that its size alone guarantees useful insight.",
+  "markPoints": [
+    "Size alone not sufficient",
+    "Missing data harms analysis",
+    "Duplicates can bias counts",
+    "Source reliability matters",
+    "Cleaning/integration required",
+    "Relevant representative data matters",
+    "Rejects claim with justification"
+  ],
+  "modelAnswer": "Size alone not sufficient Missing data harms analysis Duplicates can bias counts Source reliability matters Cleaning/integration required Relevant representative data matters Rejects claim with justification",
+  "lessonKeywords": [
+    "data",
+    "quality"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-big-data-x05",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "Streaming",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A fraud-detection system must react to card transactions within milliseconds. Explain why velocity changes the system design.",
+  "markPoints": [
+    "Data arrives continuously/rapidly",
+    "Low response latency required",
+    "Batch processing may be too slow",
+    "Stream/online processing appropriate",
+    "Scalable processing needed",
+    "Timely decisions linked to fraud prevention"
+  ],
+  "modelAnswer": "Data arrives continuously/rapidly Low response latency required Batch processing may be too slow Stream/online processing appropriate Scalable processing needed Timely decisions linked to fraud prevention",
+  "lessonKeywords": [
+    "streaming"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-big-data-x06",
+  "boards": [
+    "AQA"
+  ],
+  "topicId": "big-data",
+  "topicTitle": "Big Data",
+  "subtopic": "Big Data ethics",
+  "specificationReferences": [
+    "AQA 4.11"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A retailer combines purchase history, location data and social-media profiles to predict customer behaviour. Evaluate technical and ethical issues.",
+  "markPoints": [
+    "Variety/integration challenge",
+    "Data quality/linkage issues",
+    "Privacy concern",
+    "Consent/transparency",
+    "Bias/profiling risk",
+    "Security risk",
+    "Potential business benefit",
+    "Balanced justified conclusion"
+  ],
+  "modelAnswer": "Variety/integration challenge Data quality/linkage issues Privacy concern Consent/transparency Bias/profiling risk Security risk Potential business benefit Balanced justified conclusion",
+  "lessonKeywords": [
+    "big",
+    "data",
+    "ethics"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-11"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x01",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Data protection",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "scenario",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A health app keeps precise location and medical data indefinitely because it 'might be useful later'. Evaluate the practice.",
+  "markPoints": [
+    "Sensitive personal data",
+    "Purpose limitation",
+    "Data minimisation",
+    "Retention concern",
+    "Security risk increases with retained data",
+    "Transparency/lawful basis consideration",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Sensitive personal data Purpose limitation Data minimisation Retention concern Security risk increases with retained data Transparency/lawful basis consideration Justified conclusion",
+  "lessonKeywords": [
+    "data",
+    "protection"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x02",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Copyright",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "scenario",
+  "difficulty": "standard",
+  "marks": 6,
+  "question": "A developer copies a substantial section of proprietary source code into a commercial product because the code was visible online. Explain the legal and professional issues.",
+  "markPoints": [
+    "Online visibility does not remove copyright",
+    "Permission/licence matters",
+    "Substantial copying may infringe rights",
+    "Commercial use does not legitimise copying",
+    "Professional attribution/licence compliance",
+    "Alternative original/licensed implementation"
+  ],
+  "modelAnswer": "Online visibility does not remove copyright Permission/licence matters Substantial copying may infringe rights Commercial use does not legitimise copying Professional attribution/licence compliance Alternative original/licensed implementation",
+  "lessonKeywords": [
+    "copyright"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x03",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Automation",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A council replaces some customer-service roles with an AI chatbot. Evaluate social and ethical consequences.",
+  "markPoints": [
+    "Efficiency/availability benefit",
+    "Potential job displacement/change",
+    "Accessibility issues",
+    "Incorrect advice/accountability",
+    "Bias or exclusion",
+    "Need human escalation",
+    "Transparency",
+    "Balanced conclusion"
+  ],
+  "modelAnswer": "Efficiency/availability benefit Potential job displacement/change Accessibility issues Incorrect advice/accountability Bias or exclusion Need human escalation Transparency Balanced conclusion",
+  "lessonKeywords": [
+    "automation"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x04",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Surveillance",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 8,
+  "question": "A school proposes software that records every keystroke on student laptops, including use at home. Evaluate the proposal.",
+  "markPoints": [
+    "Safeguarding/security rationale",
+    "Major privacy intrusion",
+    "Proportionality",
+    "Scope beyond school context",
+    "Sensitive data/security",
+    "Transparency",
+    "Less intrusive alternatives",
+    "Justified conclusion"
+  ],
+  "modelAnswer": "Safeguarding/security rationale Major privacy intrusion Proportionality Scope beyond school context Sensitive data/security Transparency Less intrusive alternatives Justified conclusion",
+  "lessonKeywords": [
+    "surveillance"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x05",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Algorithmic decision",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "scenario",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A university uses an automated model to shortlist applicants. Explain controls needed to reduce unfair or unaccountable decisions.",
+  "markPoints": [
+    "Representative/appropriate data",
+    "Bias testing",
+    "Explainability/audit",
+    "Human oversight/appeal",
+    "Data protection",
+    "Ongoing outcome monitoring",
+    "Accountability"
+  ],
+  "modelAnswer": "Representative/appropriate data Bias testing Explainability/audit Human oversight/appeal Data protection Ongoing outcome monitoring Accountability",
+  "lessonKeywords": [
+    "algorithmic",
+    "decision"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+},
+{
+  "id": "al-legal-ethical-a-level-x06",
+  "boards": [
+    "AQA",
+    "OCR"
+  ],
+  "topicId": "legal-ethical-a-level",
+  "topicTitle": "Legal, Ethical and Social Issues",
+  "subtopic": "Environmental impact",
+  "specificationReferences": [
+    "AQA 4.8",
+    "OCR 1.5"
+  ],
+  "questionType": "evaluate",
+  "difficulty": "advanced",
+  "marks": 7,
+  "question": "A company moves computation to a large cloud provider and claims this automatically makes its computing environmentally sustainable. Evaluate the claim.",
+  "markPoints": [
+    "Cloud may improve utilisation",
+    "Provider may use efficient cooling/hardware",
+    "Energy source matters",
+    "Network/data-centre energy remains",
+    "Workload growth/rebound effect",
+    "Embodied hardware impacts",
+    "Claim not automatic"
+  ],
+  "modelAnswer": "Cloud may improve utilisation Provider may use efficient cooling/hardware Energy source matters Network/data-centre energy remains Workload growth/rebound effect Embodied hardware impacts Claim not automatic",
+  "lessonKeywords": [
+    "environmental",
+    "impact"
+  ],
+  "curriculumAreaIds": [
+    "aqa-4-8",
+    "ocr-1-5"
+  ]
+}
 ] as ALevelPracticeQuestion[];
 
 export function getALevelQuestionsForBoard(

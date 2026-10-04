@@ -1,6 +1,7 @@
 import { getCurriculumDefinition } from "@/data/curriculum/curriculumMap";
 import { quizLibrary as gcseQuizLibrary } from "@/data/quizzes";
 import { aLevelQuizLibrary } from "@/data/quizzes/a-level";
+import { imediaQuizLibrary } from "@/data/quizzes/imedia";
 
 import type { Quiz } from "@/types/quiz";
 import type {
@@ -131,20 +132,12 @@ export function getCurriculumQuizzes(
     return [];
   }
 
-  /*
-   * Creative iMedia currently has interactive lessons but no dedicated
-   * built-in quiz library. Returning an empty collection is intentional:
-   * it prevents GCSE Computer Science quizzes being exposed simply because
-   * both courses use OCR + GCSE.
-   */
-  if (subject === "CREATIVE_IMEDIA") {
-    return [];
-  }
-
   const quizLibrary =
-    getQuizLibraryForQualification(
-      qualification,
-    );
+    subject === "CREATIVE_IMEDIA"
+      ? imediaQuizLibrary
+      : getQuizLibraryForQualification(
+          qualification,
+        );
 
   const results: CurriculumQuiz[] = [];
   const addedQuizIds = new Set<string>();
@@ -179,21 +172,15 @@ export function isTopicInCurriculum(
   qualification: Qualification,
   examBoard: ExamBoard,
 ): boolean;
-
 export function isTopicInCurriculum(
   topicId: string,
   qualification: Qualification,
   examBoard: ExamBoard,
 ): boolean;
-
 export function isTopicInCurriculum(
   topicId: string,
-  subjectOrQualification:
-    | Subject
-    | Qualification,
-  qualificationOrExamBoard:
-    | Qualification
-    | ExamBoard,
+  subjectOrQualification: Subject | Qualification,
+  qualificationOrExamBoard: Qualification | ExamBoard,
   maybeExamBoard?: ExamBoard,
 ): boolean {
   if (maybeExamBoard === undefined) {
@@ -209,6 +196,7 @@ export function isTopicInCurriculum(
     maybeExamBoard,
   ).includes(topicId);
 }
+
 export function getCurriculumQuizByTopic(
   topicId: string,
   subject: Subject,
@@ -236,10 +224,6 @@ export function getCurriculumQuizByTopic(
     maybeExamBoard,
   );
 
-  if (subject === "CREATIVE_IMEDIA") {
-    return null;
-  }
-
   if (
     !isTopicInCurriculum(
       topicId,
@@ -252,9 +236,11 @@ export function getCurriculumQuizByTopic(
   }
 
   const quizLibrary =
-    getQuizLibraryForQualification(
-      qualification,
-    );
+    subject === "CREATIVE_IMEDIA"
+      ? imediaQuizLibrary
+      : getQuizLibraryForQualification(
+          qualification,
+        );
 
   return quizLibrary[topicId] ?? null;
 }
@@ -283,18 +269,12 @@ export function getCurriculumTopicsWithoutQuizzes(
     maybeExamBoard,
   );
 
-  if (subject === "CREATIVE_IMEDIA") {
-    return getCurriculumTopicIds(
-      subject,
-      qualification,
-      examBoard,
-    );
-  }
-
   const quizLibrary =
-    getQuizLibraryForQualification(
-      qualification,
-    );
+    subject === "CREATIVE_IMEDIA"
+      ? imediaQuizLibrary
+      : getQuizLibraryForQualification(
+          qualification,
+        );
 
   return getCurriculumTopicIds(
     subject,

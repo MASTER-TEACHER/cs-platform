@@ -44,6 +44,8 @@ const studentLinks: SidebarLink[] = [
   { href: "/programming", label: "Programming" },
   { href: "/visualisers", label: "Visualisers" },
   { href: "/exam-trainer", label: "Exam Trainer" },
+  { href: "/model-papers", label: "Model Papers" },
+  { href: "/imedia-practice", label: "iMedia Practice" },
   { href: "/join-school", label: "Join School" },
   { href: "/profile", label: "Profile" },
   { href: "/data-rights", label: "Data Rights" },

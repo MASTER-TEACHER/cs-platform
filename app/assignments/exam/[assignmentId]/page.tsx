@@ -1671,7 +1671,7 @@ export default function StudentWrittenExamPage() {
               </h1>
 
               <p className="mt-3 text-white/70">
-                {assignment.className} Â· {assignment.teacherName}
+                {assignment.className} · {assignment.teacherName}
               </p>
             </div>
 
@@ -1927,7 +1927,7 @@ export default function StudentWrittenExamPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-bold text-slate-400">
-                    {currentQuestion.assessmentObjective} Â·{" "}
+                    {currentQuestion.assessmentObjective} ·{" "}
                     {currentQuestion.commandWord}
                   </p>
                 </div>
