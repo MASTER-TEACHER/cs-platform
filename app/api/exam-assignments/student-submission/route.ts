@@ -528,6 +528,15 @@ export async function POST(
             assignmentSnapshot.data() ||
             {};
 
+          const classId = text(assignment.classId, 240);
+          if (!classId) throw new Error("CLASS_NOT_ACTIVE");
+          const classSnapshot = await transaction.get(
+            adminDb.collection("classes").doc(classId),
+          );
+          if (!classSnapshot.exists || classSnapshot.data()?.status !== "active") {
+            throw new Error("CLASS_NOT_ACTIVE");
+          }
+
           const studentIds =
             Array.isArray(
               assignment.studentIds,
@@ -1049,6 +1058,11 @@ export async function POST(
         [
           "This exam is not assigned to your account.",
           403,
+        ],
+      CLASS_NOT_ACTIVE:
+        [
+          "This class is no longer active. Exam submissions are unavailable.",
+          409,
         ],
       ASSIGNMENT_INACTIVE:
         [

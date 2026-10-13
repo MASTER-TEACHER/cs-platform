@@ -72,7 +72,7 @@ function createTopicId(topic: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-  return topicId || "computer-science";
+  return topicId || "topic";
 }
 
 function getErrorDetails(error: unknown): OpenAIErrorLike {
@@ -139,6 +139,10 @@ export async function POST(request: Request) {
     }
 
     const { topic, qualification, examBoard, difficulty, questionCount } = body;
+    const isIMedia = qualification === "Creative iMedia";
+    if (isIMedia && examBoard !== "OCR") {
+      return NextResponse.json({ error: "Creative iMedia J834 must use OCR.", errorCode: "invalid_exam_board" }, { status: 400 });
+    }
 
     const topicId = createTopicId(topic);
 
@@ -150,7 +154,10 @@ export async function POST(request: Request) {
       model: "gpt-5.6",
 
       instructions: [
-        "You are an expert UK Computer Science teacher and assessment writer.",
+        isIMedia
+          ? "You are an expert UK OCR Cambridge National Creative iMedia J834 teacher and assessment writer. Focus only on Creative iMedia, not Computer Science."
+          : "You are an expert UK Computer Science teacher and assessment writer.",
+        ...(isIMedia ? ["Align questions with OCR J834: R093 media industry and pre-production; R094 visual identity and digital graphics; optional R095-R099 as relevant. Avoid inventing live NEA assignments, mark schemes or specification claims. Only test the topic supplied."] : []),
         "Create accurate and age-appropriate assessment questions.",
         "Use British English.",
         "Avoid ambiguous questions.",
@@ -162,7 +169,7 @@ export async function POST(request: Request) {
       ].join(" "),
 
       input: [
-        `Create a ${questionCount}-question Computer Science quiz.`,
+        `Create a ${questionCount}-question ${isIMedia ? "OCR Creative iMedia J834" : "Computer Science"} quiz.`,
         `Qualification: ${qualification}.`,
         `Exam board: ${examBoard}.`,
         `Topic: ${topic}.`,

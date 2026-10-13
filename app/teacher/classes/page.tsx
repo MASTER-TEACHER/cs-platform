@@ -18,7 +18,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   archiveTeacherClass,
   createTeacherClass,
-  deleteTeacherClass,
   getTeacherClasses,
   restoreTeacherClass,
   type TeacherClass,
@@ -463,20 +462,6 @@ export default function TeacherClassesPage() {
     }
   }
 
-  async function handleDeleteEmptyClass(classItem: TeacherClass) {
-    if (classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0) {
-      toast.error("This class contains students or assignment history. Archive it instead.");
-      return;
-    }
-    if (!window.confirm(`Permanently delete ${classItem.name} from Firestore? This cannot be undone.`)) return;
-    try {
-      await deleteTeacherClass(classItem.id);
-      toast.success("Class permanently deleted from Firestore.");
-      await loadClasses();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not delete the class.");
-    }
-  }
 
   if (
     authLoading ||
@@ -859,15 +844,13 @@ export default function TeacherClassesPage() {
                     >
                       {classItem.status === "active" ? "Archive" : "Restore"}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDeleteEmptyClass(classItem)}
-                      disabled={classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0}
-                      title={classItem.studentIds.length > 0 || (assignmentCountByClass.get(classItem.id) || 0) > 0 ? "Archive classes with students or assignment history" : "Permanently delete this empty class from Firestore"}
-                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    <Link
+                      href={`/teacher/classes/${encodeURIComponent(classItem.id)}`}
+                      title="Open class settings to archive and review permanent deletion"
+                      className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
                     >
-                      Delete
-                    </button>
+                      Delete options
+                    </Link>
                   </div>
 
                   <div className="mt-5 grid grid-cols-2 gap-3">

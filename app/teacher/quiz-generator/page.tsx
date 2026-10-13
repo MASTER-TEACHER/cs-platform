@@ -389,6 +389,7 @@ export default function QuizGeneratorPage() {
   }
 
   function handleGenerateDemo() {
+    if (settings.qualification === "Creative iMedia") { toast.error("Demo questions are Computer Science-only. Use live AI generation for iMedia."); return; }
     if (!validateTopic()) {
       return;
     }
@@ -423,6 +424,7 @@ export default function QuizGeneratorPage() {
     try {
       const quizId = await saveGeneratedQuiz({
         teacherId: user.uid,
+        subject: settings.qualification === "Creative iMedia" ? "imedia" : "computer_science",
         title: quiz.title,
         description: quiz.description,
         topicId: quiz.topicId,

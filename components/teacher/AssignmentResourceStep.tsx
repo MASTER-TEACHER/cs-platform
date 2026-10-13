@@ -31,7 +31,7 @@ type SavedQuizOption = {
   id: string;
   title: string;
   description: string;
-  qualification: "GCSE" | "A_LEVEL";
+  qualification: "GCSE" | "A_LEVEL" | "Creative iMedia";
   examBoard: string;
   difficulty: string;
   questionCount: number;
@@ -108,6 +108,7 @@ export default function AssignmentResourceStep({
       selectedResource?.resourceType || null,
     );
 
+  const [aiQualification, setAiQualification] = useState<"ALL" | SavedQuizOption["qualification"]>("ALL");
   const [savedQuizzes, setSavedQuizzes] =
     useState<SavedQuizOption[]>([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(true);
@@ -148,7 +149,7 @@ export default function AssignmentResourceStep({
               description:
                 data.description || "Complete the assigned quiz.",
               qualification:
-                data.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
+                data.qualification === "Creative iMedia" ? "Creative iMedia" : data.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE",
               examBoard:
                 typeof data.examBoard === "string" && data.examBoard.trim()
                   ? data.examBoard.trim()
@@ -254,7 +255,7 @@ export default function AssignmentResourceStep({
       resourceId: quiz.id,
       questionCount: quiz.questionCount,
       qualification: quiz.qualification,
-      examBoard: quiz.examBoard,
+      examBoard: quiz.qualification === "Creative iMedia" ? "OCR" : quiz.examBoard,
       estimatedTime: quiz.estimatedTime,
     });
   }
@@ -341,6 +342,22 @@ export default function AssignmentResourceStep({
             Choose a Saved Quiz
           </h3>
 
+          <label className="mt-5 block max-w-md">
+            <span className="text-xs font-black uppercase tracking-wide text-slate-600">Qualification</span>
+            <select
+              value={aiQualification}
+              onChange={(event) => {
+                setAiQualification(event.target.value as "ALL" | SavedQuizOption["qualification"]);
+                onSelect(createPlaceholderResource("ai-quiz", "Choose an AI Quiz", "Select a saved quiz from the list below."));
+              }}
+              className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800"
+            >
+              <option value="ALL">All qualifications</option>
+              <option value="GCSE">GCSE Computer Science</option>
+              <option value="A_LEVEL">A Level Computer Science</option>
+              <option value="Creative iMedia">Creative iMedia (OCR J834)</option>
+            </select>
+          </label>
           {loadingQuizzes ? (
             <div className="mt-6 space-y-3">
               <div className="h-28 animate-pulse rounded-xl bg-white" />
@@ -350,11 +367,11 @@ export default function AssignmentResourceStep({
             <div className="mt-6 rounded-xl bg-red-50 p-4 text-red-700">
               {quizLoadError}
             </div>
-          ) : savedQuizzes.length === 0 ? (
+          ) : savedQuizzes.filter((quiz) => aiQualification === "ALL" || quiz.qualification === aiQualification).length === 0 ? (
             <div className="mt-6 rounded-xl bg-white p-6 text-center">
               <div className="text-4xl">🤖</div>
               <h4 className="mt-3 text-lg font-bold text-slate-900">
-                No saved AI quizzes
+                No saved AI quizzes for this qualification
               </h4>
               <p className="mt-2 text-sm text-slate-600">
                 Generate and save a quiz before assigning it.
@@ -362,7 +379,7 @@ export default function AssignmentResourceStep({
             </div>
           ) : (
             <div className="mt-6 grid grid-cols-1 gap-4">
-              {savedQuizzes.map((quiz) => {
+              {savedQuizzes.filter((quiz) => aiQualification === "ALL" || quiz.qualification === aiQualification).map((quiz) => {
                 const selected =
                   selectedResource?.resourceType === "ai-quiz" &&
                   selectedResource.resourceId === quiz.id;
@@ -381,7 +398,7 @@ export default function AssignmentResourceStep({
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-black uppercase tracking-wide text-indigo-600">
-                          {quiz.examBoard} · {quiz.qualification === "A_LEVEL" ? "A-Level" : "GCSE"}
+                          {quiz.examBoard} · {quiz.qualification === "Creative iMedia" ? "Creative iMedia (J834)" : quiz.qualification === "A_LEVEL" ? "A Level Computer Science" : "GCSE Computer Science"}
                         </p>
                         <h4 className="mt-1 font-bold text-slate-900">{quiz.title}</h4>
                         <p className="mt-2 text-sm leading-6 text-slate-600">

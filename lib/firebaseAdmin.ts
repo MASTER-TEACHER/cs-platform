@@ -1,3 +1,4 @@
+
 import "server-only";
 
 import {
@@ -18,15 +19,73 @@ let cachedApp: App | null = null;
 let cachedAuth: Auth | null = null;
 let cachedDb: Firestore | null = null;
 
+const DEMO_PROJECT_ID = "demo-cs-master";
+
 function initialiseFirebaseAdmin(): App {
   if (cachedApp) {
     return cachedApp;
   }
 
-  const existingApps = getApps();
+  const useEmulators =
+    process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS === "true";
 
-  if (existingApps.length > 0) {
-    cachedApp = existingApps[0];
+  if (useEmulators) {
+    const projectId =
+      process.env.FIREBASE_ADMIN_PROJECT_ID?.trim();
+
+    const authHost =
+      process.env.FIREBASE_AUTH_EMULATOR_HOST?.trim();
+
+    const firestoreHost =
+      process.env.FIRESTORE_EMULATOR_HOST?.trim();
+
+    if (
+      projectId !== DEMO_PROJECT_ID ||
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID !== DEMO_PROJECT_ID ||
+      authHost !== "127.0.0.1:9099" ||
+      firestoreHost !== "127.0.0.1:8080"
+    ) {
+      throw new Error(
+        "Unsafe Firebase emulator configuration. " +
+          "Expected demo-cs-master with Auth on 9099 and Firestore on 8080.",
+      );
+    }
+
+    const existingApp = getApps()[0];
+
+    if (existingApp) {
+      if (existingApp.options.projectId !== DEMO_PROJECT_ID) {
+        throw new Error(
+          "Existing Firebase Admin app uses a different project.",
+        );
+      }
+
+      cachedApp = existingApp;
+      return cachedApp;
+    }
+
+    // Emulator mode uses a demo project without production credentials.
+    cachedApp = initializeApp({
+      projectId: DEMO_PROJECT_ID,
+    });
+
+    return cachedApp;
+  }
+
+  // Prevent emulator hosts from accidentally being used in production mode.
+  if (
+    process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+    process.env.FIRESTORE_EMULATOR_HOST
+  ) {
+    throw new Error(
+      "Firebase emulator host variables are set, but emulator mode is disabled.",
+    );
+  }
+
+  const existingApp = getApps()[0];
+
+  if (existingApp) {
+    cachedApp = existingApp;
     return cachedApp;
   }
 
@@ -39,23 +98,15 @@ function initialiseFirebaseAdmin(): App {
   const privateKeyBase64 =
     process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64?.trim();
 
-  if (
-    projectId &&
-    clientEmail &&
-    privateKeyBase64
-  ) {
+  if (projectId && clientEmail && privateKeyBase64) {
     const privateKey = Buffer.from(
       privateKeyBase64,
       "base64",
     ).toString("utf8");
 
     if (
-      !privateKey.includes(
-        "-----BEGIN PRIVATE KEY-----",
-      ) ||
-      !privateKey.includes(
-        "-----END PRIVATE KEY-----",
-      )
+      !privateKey.includes("-----BEGIN PRIVATE KEY-----") ||
+      !privateKey.includes("-----END PRIVATE KEY-----")
     ) {
       throw new Error(
         "FIREBASE_ADMIN_PRIVATE_KEY_BASE64 did not decode to a valid PEM private key.",
@@ -74,9 +125,7 @@ function initialiseFirebaseAdmin(): App {
     return cachedApp;
   }
 
-  if (
-    process.env.GOOGLE_APPLICATION_CREDENTIALS
-  ) {
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     cachedApp = initializeApp({
       credential: applicationDefault(),
       projectId:
@@ -91,25 +140,17 @@ function initialiseFirebaseAdmin(): App {
   throw new Error(
     [
       "Firebase Admin is not configured.",
-      "",
-      "For local development, set:",
-      "GOOGLE_APPLICATION_CREDENTIALS",
-      "",
-      "Or configure these server-only variables:",
+      "Set GOOGLE_APPLICATION_CREDENTIALS or configure:",
       "FIREBASE_ADMIN_PROJECT_ID",
       "FIREBASE_ADMIN_CLIENT_EMAIL",
       "FIREBASE_ADMIN_PRIVATE_KEY_BASE64",
-      "",
-      "Do not prefix Admin variables with NEXT_PUBLIC_.",
     ].join("\n"),
   );
 }
 
 function getAdminAuth(): Auth {
   if (!cachedAuth) {
-    cachedAuth = getAuth(
-      initialiseFirebaseAdmin(),
-    );
+    cachedAuth = getAuth(initialiseFirebaseAdmin());
   }
 
   return cachedAuth;
@@ -117,91 +158,34 @@ function getAdminAuth(): Auth {
 
 function getAdminDb(): Firestore {
   if (!cachedDb) {
-    cachedDb = getFirestore(
-      initialiseFirebaseAdmin(),
-    );
+    cachedDb = getFirestore(initialiseFirebaseAdmin());
   }
 
   return cachedDb;
 }
 
 /*
- * Lazy proxies are deliberate.
- *
- * API routes can import adminAuth/adminDb during `next build`
- * without immediately initialising Firebase Admin. Credentials
- * are required only when a route actually performs an Admin SDK
- * operation at request time.
+ * Lazy proxies allow API routes to import Firebase Admin
+ * during production builds without initialising credentials.
  */
-export const adminAuth =
-  new Proxy(
-    {} as Auth,
-    {
-      get(
-        _target,
-        property,
-      ) {
-        const auth =
-          getAdminAuth();
+export const adminAuth = new Proxy({} as Auth, {
+  get(_target, property) {
+    const auth = getAdminAuth();
+    const value = Reflect.get(auth, property, auth);
 
-        const value =
-          Reflect.get(
-            auth,
-            property,
-            auth,
-          );
+    return typeof value === "function"
+      ? value.bind(auth)
+      : value;
+  },
+});
 
-        if (
-          typeof value ===
-          "function"
-        ) {
-          return value.bind(
-            auth,
-          );
-        }
+export const adminDb = new Proxy({} as Firestore, {
+  get(_target, property) {
+    const db = getAdminDb();
+    const value = Reflect.get(db, property, db);
 
-        return value;
-      },
-    },
-  );
-
-export const adminDb =
-  new Proxy(
-    {} as Firestore,
-    {
-      get(
-        _target,
-        property,
-      ) {
-        const db =
-          getAdminDb();
-
-        const value =
-          Reflect.get(
-            db,
-            property,
-            db,
-          );
-
-        /*
-         * Firebase Admin methods depend on the real
-         * Firestore instance as `this`.
-         *
-         * Returning an unbound method through a Proxy can
-         * cause internal Admin SDK state errors such as:
-         *
-         * "Client is not yet ready to issue requests."
-         */
-        if (
-          typeof value ===
-          "function"
-        ) {
-          return value.bind(
-            db,
-          );
-        }
-
-        return value;
-      },
-    },
-  );
+    return typeof value === "function"
+      ? value.bind(db)
+      : value;
+  },
+});

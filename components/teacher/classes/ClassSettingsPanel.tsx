@@ -1,3 +1,4 @@
+import { auth } from "@/lib/firebase";
 
 
 import { useState } from "react";
@@ -5,7 +6,6 @@ import toast from "react-hot-toast";
 
 import {
   archiveTeacherClass,
-  deleteTeacherClass,
   ensureClassJoinCode,
   regenerateClassJoinCode,
   restoreTeacherClass,
@@ -413,38 +413,37 @@ export default function ClassSettingsPanel({
   }
 
   async function removePermanently() {
-    const confirmed =
-      window.confirm(
-        "Permanently delete this empty class? This cannot be undone. Classes with students or assignment history cannot be deleted.",
-      );
-
-    if (!confirmed) {
+    if (teacherClass.status !== "archived") {
+      toast.error("Archive this class before permanently deleting it.");
       return;
     }
-
     try {
       setDeleting(true);
-
-      await deleteTeacherClass(
-        teacherClass.id,
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Sign in again before deleting this class.");
+      const url = `/api/classes/${encodeURIComponent(teacherClass.id)}/delete`;
+      const previewResponse = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const preview = await previewResponse.json();
+      if (!previewResponse.ok) throw new Error(preview.error || "Unable to preview deletion.");
+      const typed = window.prompt(
+        `This permanently deletes ${preview.records} class-linked records and unlinks ${preview.students} students.\n` +
+        `Student accounts, independent quiz history and global XP are preserved.\n\n` +
+        `Type the exact class name to confirm: ${teacherClass.name}`,
       );
-
-      toast.success(
-        "Class deleted.",
-      );
-
+      if (typed === null) return;
+      if (typed.trim() !== teacherClass.name.trim()) throw new Error("Class name did not match. Nothing was deleted.");
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: typed.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to delete class.");
+      toast.success("Class permanently deleted.");
       onDeleted();
     } catch (error) {
-      console.error(
-        "Unable to delete class:",
-        error,
-      );
-
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "The class could not be deleted.",
-      );
+      console.error("Unable to delete class:", error);
+      toast.error(error instanceof Error ? error.message : "The class could not be deleted.");
     } finally {
       setDeleting(false);
     }
@@ -743,12 +742,11 @@ export default function ClassSettingsPanel({
         </p>
 
         <h2 className="mt-2 text-xl font-black text-red-950">
-          Permanently delete an empty class
+          Permanently delete this class
         </h2>
 
         <p className="mt-2 max-w-3xl text-sm leading-6 text-red-800">
-          Permanent deletion is intentionally restricted. A class containing students
-          or assignment history must be archived instead.
+          Archive the class first. Permanent deletion removes class assignments, scores and submissions, and unlinks students. Student accounts, independent learning and global XP remain intact.
         </p>
 
         <button
@@ -763,7 +761,7 @@ export default function ClassSettingsPanel({
         >
           {deleting
             ? "Deleting..."
-            : "Delete empty class"}
+            : "Permanently delete class"}
         </button>
       </section>
       )}

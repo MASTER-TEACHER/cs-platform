@@ -13,6 +13,7 @@ export type GeneratedQuizQuestion = {
 
 export type SaveGeneratedQuizInput = {
   teacherId: string;
+  subject?: "imedia" | "computer_science";
   title: string;
   description: string;
   topicId: string;
@@ -25,6 +26,7 @@ export type SaveGeneratedQuizInput = {
 
 export async function saveGeneratedQuiz({
   teacherId,
+  subject = "computer_science",
   title,
   description,
   topicId,
@@ -36,6 +38,7 @@ export async function saveGeneratedQuiz({
 }: SaveGeneratedQuizInput) {
   const quizReference = await addDoc(collection(db, "generatedQuizzes"), {
     teacherId,
+    subject,
     title,
     description,
     topicId,

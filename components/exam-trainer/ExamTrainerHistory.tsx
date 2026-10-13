@@ -20,6 +20,7 @@ function formatDate(value: Date | null): string {
 
 export default function ExamTrainerHistory() {
   const { user } = useAuth();
+
   const [history, setHistory] = useState<ExamTrainerHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,6 +31,7 @@ export default function ExamTrainerHistory() {
     if (!user) {
       void Promise.resolve().then(() => {
         if (!active) return;
+
         setHistory([]);
         setError("");
         setLoading(false);
@@ -60,7 +62,9 @@ export default function ExamTrainerHistory() {
         console.error("Exam trainer history error:", loadError);
 
         if (active) {
-          setError("Your saved exam history could not be loaded.");
+          setError(
+            "Your saved exam history could not be loaded.",
+          );
         }
       })
       .finally(() => {
@@ -90,10 +94,22 @@ export default function ExamTrainerHistory() {
         <p className="text-sm font-black uppercase tracking-widest text-blue-200">
           Saved assessment evidence
         </p>
-        <h1 className="mt-3 text-4xl font-black">Exam Trainer History</h1>
+
+        <h1 className="mt-3 text-4xl font-black">
+          Exam Trainer History
+        </h1>
+
         <p className="mt-3 text-blue-100">
-          Review completed papers, grades and recurring priority topics.
+          Review completed papers, grades, detailed examiner
+          feedback and recurring priority topics.
         </p>
+
+        <Link
+          href="/exam-trainer"
+          className="mt-6 inline-flex rounded-xl border border-white/30 px-5 py-3 font-black text-white"
+        >
+          ← Back to Exam Trainer
+        </Link>
       </Card>
 
       {error && (
@@ -106,7 +122,16 @@ export default function ExamTrainerHistory() {
         <Card>
           <div className="py-16 text-center">
             <div className="text-6xl">📝</div>
-            <h2 className="mt-5 text-2xl font-black">No completed exams yet</h2>
+
+            <h2 className="mt-5 text-2xl font-black">
+              No completed exams yet
+            </h2>
+
+            <p className="mt-2 text-slate-600">
+              Complete an Exam Trainer paper and your saved
+              results will appear here.
+            </p>
+
             <Link
               href="/exam-trainer"
               className="mt-6 inline-flex rounded-xl bg-blue-600 px-5 py-3 font-black text-white"
@@ -126,12 +151,14 @@ export default function ExamTrainerHistory() {
                       ? "Mixed Topics"
                       : attempt.selectedTopic}
                   </p>
+
                   <h2 className="mt-2 text-xl font-black">
                     {formatDate(attempt.submittedAt)}
                   </h2>
+
                   <p className="mt-1 text-sm capitalize text-slate-500">
-                    {attempt.selectedDifficulty} · {attempt.questionCount}{" "}
-                    questions
+                    {attempt.selectedDifficulty} ·{" "}
+                    {attempt.questionCount} questions
                   </p>
                 </div>
 
@@ -139,8 +166,10 @@ export default function ExamTrainerHistory() {
                   <p className="text-xs font-black uppercase text-slate-500">
                     Score
                   </p>
+
                   <p className="mt-1 text-2xl font-black">
-                    {attempt.totalAwardedMarks}/{attempt.totalAvailableMarks}
+                    {attempt.totalAwardedMarks}/
+                    {attempt.totalAvailableMarks}
                   </p>
                 </div>
 
@@ -148,6 +177,7 @@ export default function ExamTrainerHistory() {
                   <p className="text-xs font-black uppercase text-slate-500">
                     Percentage
                   </p>
+
                   <p className="mt-1 text-2xl font-black text-blue-700">
                     {attempt.percentage}%
                   </p>
@@ -157,6 +187,7 @@ export default function ExamTrainerHistory() {
                   <p className="text-xs font-black uppercase text-slate-500">
                     Grade
                   </p>
+
                   <p className="mt-1 text-3xl font-black text-indigo-700">
                     {attempt.grade}
                   </p>
@@ -166,10 +197,29 @@ export default function ExamTrainerHistory() {
               {attempt.priorityTopics.length > 0 && (
                 <div className="mt-5 rounded-2xl bg-amber-50 p-4">
                   <p className="text-sm font-black text-amber-950">
-                    Priority topics: {attempt.priorityTopics.join(", ")}
+                    Priority topics:{" "}
+                    {attempt.priorityTopics.join(", ")}
                   </p>
                 </div>
               )}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Link
+                  href={`/exam-trainer/history/${encodeURIComponent(
+                    attempt.id,
+                  )}`}
+                  className="inline-flex rounded-xl bg-blue-600 px-5 py-3 font-black text-white"
+                >
+                  View full report →
+                </Link>
+
+                <Link
+                  href="/exam-trainer"
+                  className="inline-flex rounded-xl border border-slate-300 px-5 py-3 font-black"
+                >
+                  Start another exam
+                </Link>
+              </div>
             </Card>
           ))}
         </div>

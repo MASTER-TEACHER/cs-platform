@@ -58,7 +58,7 @@ export default function LessonAssignmentSelector({
 }: Props) {
   const [qualification, setQualification] =
     useState<Qualification>(
-      selectedResource?.qualification ?? "GCSE",
+      (selectedResource?.qualification === "A_LEVEL" ? "A_LEVEL" : "GCSE"),
     );
 
  const [examBoard, setExamBoard] =

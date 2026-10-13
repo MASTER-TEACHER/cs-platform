@@ -1170,6 +1170,12 @@ export default function TeacherAssignmentsPage() {
                         )}
                       </span>
 
+                      {assignment.kind === "quiz" && /^creative[ -]?imedia/i.test(assignment.title) && (
+                        <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-black text-teal-800">
+                          Creative iMedia · OCR J834
+                        </span>
+                      )}
+
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
                         {
                           assignment.className

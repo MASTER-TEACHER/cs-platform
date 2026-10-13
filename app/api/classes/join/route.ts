@@ -181,13 +181,12 @@ export async function POST(
     }
 
     if (
-      classData.status ===
-        "archived"
+      classData.status !== "active" /* CSMASTER_BATCH_1B_LIFECYCLE */
     ) {
       return NextResponse.json(
         {
           error:
-            "This class is archived and is not accepting new students.",
+            "This class is not active and is not accepting new students.",
         },
         {
           status: 409,

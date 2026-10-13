@@ -27,7 +27,8 @@ export type AssignmentWizardResource = {
   topicTitle?: string;
 
   // General curriculum metadata
-  qualification?: "GCSE" | "A_LEVEL";
+  qualification?: "GCSE" | "A_LEVEL" | "Creative iMedia";
+  subject?: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA";
   examBoard?: string;
 
   // Quiz metadata

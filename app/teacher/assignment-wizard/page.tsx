@@ -294,11 +294,13 @@ export default function AssignmentWizardPage() {
               ? data.examBoard
               : undefined,
           qualification:
-            data.qualification === "A_LEVEL"
-              ? "A_LEVEL"
-              : data.qualification === "GCSE"
-                ? "GCSE"
-                : undefined,
+            data.qualification === "Creative iMedia"
+              ? "Creative iMedia"
+              : data.qualification === "A_LEVEL"
+                ? "A_LEVEL"
+                : data.qualification === "GCSE"
+                  ? "GCSE"
+                  : undefined,
           estimatedTime:
             typeof data.estimatedTime === "string"
               ? data.estimatedTime
@@ -755,6 +757,7 @@ export default function AssignmentWizardPage() {
               quizSource: isAIQuiz ? "ai-generated" : "built-in",
               deliveryMode: wizardData.deliveryMode,
               qualification: resource.qualification,
+              subject: resource.subject ?? (resource.qualification === "Creative iMedia" ? "CREATIVE_IMEDIA" : "COMPUTER_SCIENCE"),
               examBoard: resource.examBoard,
               studentIds: group.studentIds,
             }),

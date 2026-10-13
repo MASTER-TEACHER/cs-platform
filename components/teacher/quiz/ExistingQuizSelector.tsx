@@ -7,6 +7,7 @@ import type { AssignmentWizardResource } from "@/types/assignmentWizard";
 import type {
   ExamBoard,
   Qualification,
+  Subject,
 } from "@/types/user";
 
 type Props = {
@@ -26,6 +27,7 @@ export default function ExistingQuizSelector({
   onSelect,
 }: Props) {
   const [search, setSearch] = useState("");
+  const [subject, setSubject] = useState<Subject>("COMPUTER_SCIENCE");
 
   /*
    * The quiz selector must preserve the curriculum from which the
@@ -44,10 +46,11 @@ export default function ExistingQuizSelector({
   const curriculumQuizzes = useMemo(
     () =>
       getCurriculumQuizzes(
+        subject,
         qualification,
         examBoard,
       ),
-    [qualification, examBoard],
+    [subject, qualification, examBoard],
   );
 
   const filteredQuizzes = useMemo(() => {
@@ -83,6 +86,7 @@ export default function ExistingQuizSelector({
           unitTitle,
           qualification,
           examBoard,
+          subject,
         ]
           .join(" ")
           .toLowerCase();
@@ -97,7 +101,15 @@ export default function ExistingQuizSelector({
     search,
     qualification,
     examBoard,
+    subject,
   ]);
+
+  function handleSubjectChange(value: Subject) {
+    setSubject(value);
+    setQualification("GCSE");
+    setExamBoard(value === "CREATIVE_IMEDIA" ? "OCR" : "AQA");
+    setSearch("");
+  }
 
   function handleQualificationChange(
     value: Qualification,
@@ -142,7 +154,14 @@ export default function ExistingQuizSelector({
         selection is different.
       </p>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid gap-4 md:grid-cols-4">
+        <label className="block">
+          <span className="text-xs font-black uppercase tracking-wide text-slate-500">Subject</span>
+          <select value={subject} onChange={(event) => handleSubjectChange(event.target.value as Subject)} className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800">
+            <option value="COMPUTER_SCIENCE">Computer Science</option>
+            <option value="CREATIVE_IMEDIA">Creative iMedia (OCR J834)</option>
+          </select>
+        </label>
         <label className="block">
           <span className="text-xs font-black uppercase tracking-wide text-slate-500">
             Qualification
@@ -162,9 +181,9 @@ export default function ExistingQuizSelector({
               GCSE
             </option>
 
-            <option value="A_LEVEL">
-              A Level
-            </option>
+            {subject === "COMPUTER_SCIENCE" && (
+              <option value="A_LEVEL">A Level</option>
+            )}
           </select>
         </label>
 
@@ -183,17 +202,17 @@ export default function ExistingQuizSelector({
             }
             className="mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100"
           >
-            <option value="AQA">
-              AQA
-            </option>
+            {subject === "COMPUTER_SCIENCE" && (
+              <option value="AQA">AQA</option>
+            )}
 
             <option value="OCR">
               OCR
             </option>
 
-            <option value="EDEXCEL">
-              Edexcel
-            </option>
+            {subject === "COMPUTER_SCIENCE" && (
+              <option value="EDEXCEL">Edexcel</option>
+            )}
           </select>
         </label>
 
@@ -220,10 +239,9 @@ export default function ExistingQuizSelector({
         <span className="font-black text-violet-700">
           Current curriculum:
         </span>{" "}
-        {examBoard}{" "}
-        {qualification === "A_LEVEL"
-          ? "A Level"
-          : "GCSE"}
+        {subject === "CREATIVE_IMEDIA"
+          ? "Creative iMedia (OCR J834)"
+          : `${examBoard} ${qualification === "A_LEVEL" ? "A Level" : "GCSE"}`}
         {" · "}
         {curriculumQuizzes.length}{" "}
         {curriculumQuizzes.length === 1
@@ -264,6 +282,7 @@ export default function ExistingQuizSelector({
                   topicId &&
                 selectedResource.qualification ===
                   quizQualification &&
+                selectedResource.subject === subject &&
                 selectedResource.examBoard ===
                   quizExamBoard;
 
@@ -316,6 +335,8 @@ export default function ExistingQuizSelector({
                        */
                       qualification:
                         quizQualification,
+
+                      subject,
 
                       examBoard:
                         quizExamBoard,

@@ -13,16 +13,52 @@ function normalise(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function shouldUseAutomaticMarking(
+  question: ExamTrainerQuestion,
+): boolean {
+  /*
+   * Multiple-choice questions are always deterministic.
+   *
+   * Calculation and code-tracing questions may also be marked
+   * deterministically when the question bank explicitly provides an
+   * accepted answer.
+   *
+   * Short-response and extended-response questions deliberately go through
+   * mark-scheme-based marking so that legitimate partial credit is possible.
+   */
+  if (question.type === "multiple-choice") {
+    return true;
+  }
+
+  if (
+    (question.type === "calculation" ||
+      question.type === "code-tracing") &&
+    Boolean(
+      question.correctAnswer ||
+        (question.acceptedAnswers &&
+          question.acceptedAnswers.length > 0),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function automaticMark(
   question: ExamTrainerQuestion,
   response: string,
 ): ExamTrainerMarkedAnswer | null {
+  if (!shouldUseAutomaticMarking(question)) {
+    return null;
+  }
+
   const accepted = [
     question.correctAnswer,
     ...(question.acceptedAnswers ?? []),
   ].filter((value): value is string => Boolean(value));
 
-  if (question.type !== "multiple-choice" && accepted.length === 0) {
+  if (accepted.length === 0) {
     return null;
   }
 
@@ -37,7 +73,7 @@ function automaticMark(
     percentage: correct ? 100 : 0,
     feedback: correct
       ? "Correct. You have matched the expected answer."
-      : "This answer does not match the expected response.",
+      : "This answer does not match the expected response. Review the expected answer and marking points below.",
     matchedPoints: correct ? question.markScheme : [],
     missingPoints: correct ? [] : question.markScheme,
     improvedAnswer: question.modelAnswer,
@@ -79,16 +115,27 @@ async function markWrittenAnswer(
   };
 
   if (!apiResponse.ok || typeof result.awardedMarks !== "number") {
-    throw new Error(result.error || "The written answer could not be marked.");
+    throw new Error(
+      result.error || "The written answer could not be marked.",
+    );
   }
+
+  const maximumMarks = result.maximumMarks ?? question.marks;
+
+  const safeAwardedMarks = Math.max(
+    0,
+    Math.min(maximumMarks, result.awardedMarks),
+  );
 
   return {
     questionId: question.id,
-    awardedMarks: result.awardedMarks,
-    maximumMarks: result.maximumMarks ?? question.marks,
+    awardedMarks: safeAwardedMarks,
+    maximumMarks,
     percentage:
       result.percentage ??
-      Math.round((result.awardedMarks / question.marks) * 100),
+      (maximumMarks > 0
+        ? Math.round((safeAwardedMarks / maximumMarks) * 100)
+        : 0),
     feedback: result.feedback ?? "Your answer has been marked.",
     matchedPoints: result.matchedPoints ?? [],
     missingPoints: result.missingPoints ?? [],
@@ -109,7 +156,9 @@ export function buildExamQuestions({
   questionBank: ExamTrainerQuestion[];
 }): ExamTrainerQuestion[] {
   const filtered = questionBank.filter((question) => {
-    const topicMatches = topic === "all" || question.topic === topic;
+    const topicMatches =
+      topic === "all" || question.topic === topic;
+
     const difficultyMatches =
       difficulty === "all" || question.difficulty === difficulty;
 
@@ -117,7 +166,11 @@ export function buildExamQuestions({
   });
 
   const shuffled = [...filtered].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, Math.max(1, Math.min(count, shuffled.length)));
+
+  return shuffled.slice(
+    0,
+    Math.max(1, Math.min(count, shuffled.length)),
+  );
 }
 
 export async function markExamTrainerAttempt({
@@ -132,8 +185,9 @@ export async function markExamTrainerAttempt({
   const markedAnswers = await Promise.all(
     questions.map(async (question) => {
       const response =
-        answers.find((answer) => answer.questionId === question.id)?.response ??
-        "";
+        answers.find(
+          (answer) => answer.questionId === question.id,
+        )?.response ?? "";
 
       if (!response.trim()) {
         return {
@@ -157,14 +211,19 @@ export async function markExamTrainerAttempt({
 
       try {
         return await markWrittenAnswer(question, response);
-      } catch {
+      } catch (markingError) {
+        console.error(
+          `Exam Trainer marking failed for question ${question.id}:`,
+          markingError,
+        );
+
         return {
           questionId: question.id,
           awardedMarks: 0,
           maximumMarks: question.marks,
           percentage: 0,
           feedback:
-            "Automatic marking was unavailable. Review the model answer and mark scheme.",
+            "Automatic marking was unavailable for this response. Review the model answer and marking points below.",
           matchedPoints: [],
           missingPoints: question.markScheme,
           improvedAnswer: question.modelAnswer,
@@ -186,12 +245,17 @@ export async function markExamTrainerAttempt({
 
   const percentage =
     totalAvailableMarks > 0
-      ? Math.round((totalAwardedMarks / totalAvailableMarks) * 100)
+      ? Math.round(
+          (totalAwardedMarks / totalAvailableMarks) * 100,
+        )
       : 0;
 
   const topicMap = new Map<
     string,
-    { awardedMarks: number; availableMarks: number }
+    {
+      awardedMarks: number;
+      availableMarks: number;
+    }
   >();
 
   questions.forEach((question) => {
@@ -205,8 +269,10 @@ export async function markExamTrainerAttempt({
     };
 
     topicMap.set(question.topic, {
-      awardedMarks: existing.awardedMarks + (marked?.awardedMarks ?? 0),
-      availableMarks: existing.availableMarks + question.marks,
+      awardedMarks:
+        existing.awardedMarks + (marked?.awardedMarks ?? 0),
+      availableMarks:
+        existing.availableMarks + question.marks,
     });
   });
 
@@ -217,17 +283,25 @@ export async function markExamTrainerAttempt({
       availableMarks: values.availableMarks,
       percentage:
         values.availableMarks > 0
-          ? Math.round((values.awardedMarks / values.availableMarks) * 100)
+          ? Math.round(
+              (values.awardedMarks / values.availableMarks) *
+                100,
+            )
           : 0,
     }))
-    .sort((first, second) => second.percentage - first.percentage);
-
+    .sort(
+      (first, second) =>
+        second.percentage - first.percentage,
+    );
 
   return {
     totalAwardedMarks,
     totalAvailableMarks,
     percentage,
-    grade: indicativeGradeFromPercentage(percentage, qualification),
+    grade: indicativeGradeFromPercentage(
+      percentage,
+      qualification,
+    ),
     topicScores,
     strongestTopics: topicScores
       .filter((topic) => topic.percentage >= 70)

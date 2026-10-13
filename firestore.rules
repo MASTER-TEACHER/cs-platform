@@ -270,6 +270,25 @@ function validCoTeacherChange(oldData, newData) {
         data.onboardingComplete is bool;
     }
 
+    // CSMASTER_BATCH_1B_LIFECYCLE: deny class-linked client writes while permanent cleanup runs.
+    function classNotDeleting(classId) {
+      return classId is string &&
+        exists(/databases/$(database)/documents/classes/$(classId)) &&
+        get(/databases/$(database)/documents/classes/$(classId)).data.get("status", "active") != "deleting";
+    }
+
+    function assignmentClassNotDeleting(assignmentId) {
+      return assignmentId is string &&
+        exists(/databases/$(database)/documents/classAssignments/$(assignmentId)) &&
+        classNotDeleting(get(/databases/$(database)/documents/classAssignments/$(assignmentId)).data.classId);
+    }
+
+    function examAssignmentClassNotDeleting(assignmentId) {
+      return assignmentId is string &&
+        exists(/databases/$(database)/documents/examAssignments/$(assignmentId)) &&
+        classNotDeleting(get(/databases/$(database)/documents/examAssignments/$(assignmentId)).data.classId);
+    }
+
     function ownsClass(classId) {
       return isTeacher() &&
         exists(
@@ -730,7 +749,9 @@ allow update: if signedIn() &&
           )
         );
 
-     allow update: if isTeacher() &&
+     allow update: if resource.data.get("status", "active") != "deleting" &&
+  request.resource.data.get("status", "active") != "deleting" &&
+  isTeacher() &&
   (
     resource.data.teacherId == currentUserId() ||
     (
@@ -784,11 +805,9 @@ allow update: if signedIn() &&
     )
   );
 
-      allow delete: if isTeacher() &&
-        (
-          resource.data.teacherId == currentUserId() ||
-          isAdmin()
-        );
+      // Class documents may only be deleted by trusted server code.
+      // Firebase Admin SDK bypasses Firestore client security rules.
+      allow delete: if false;
     }
 
 
@@ -815,7 +834,8 @@ allow list: if signedIn() &&
     isAdmin()
   );
 
-      allow create: if isTeacher() &&
+      allow create: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         request.resource.data.classId is string &&
         managesClass(request.resource.data.classId) &&
@@ -828,7 +848,8 @@ allow list: if signedIn() &&
         ) &&
         request.resource.data.status == "active";
 
-      allow update: if isTeacher() &&
+      allow update: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -867,7 +888,8 @@ allow list: if signedIn() &&
           isAdmin()
         );
 
-      allow create: if isTeacher() &&
+      allow create: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         request.resource.data.classId is string &&
         managesClass(request.resource.data.classId) &&
@@ -886,7 +908,8 @@ allow list: if signedIn() &&
       /*
        * Teacher or admin management updates.
        */
-      allow update: if isTeacher() &&
+      allow update: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -902,7 +925,8 @@ allow list: if signedIn() &&
        * They cannot edit the resource, class, teacher, due date,
        * instructions or student list.
        */
-      allow update: if signedIn() &&
+      allow update: if classNotDeleting(request.resource.data.classId) &&
+        signedIn() &&
         currentUserId() in resource.data.studentIds &&
         request.resource.data
           .diff(resource.data)
@@ -981,7 +1005,8 @@ allow list: if signedIn() &&
       isAdmin()
     );
 
-  allow create: if signedIn() &&
+  allow create: if assignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        signedIn() &&
     request.resource.data.studentId ==
       currentUserId() &&
     request.resource.data.assignmentId is string &&
@@ -997,7 +1022,8 @@ allow list: if signedIn() &&
       "completed"
     ];
 
-  allow update: if signedIn() &&
+  allow update: if assignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        signedIn() &&
     resource.data.studentId ==
       currentUserId() &&
     request.resource.data.studentId ==
@@ -1032,7 +1058,8 @@ allow list: if signedIn() &&
  * Assignment identity, student identity, class/teacher ownership
  * and assignment configuration cannot be changed here.
  */
-allow update: if signedIn() &&
+allow update: if assignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        signedIn() &&
 
   // This must remain the student's own progress document.
   resource.data.studentId == currentUserId() &&
@@ -1160,8 +1187,8 @@ allow update: if signedIn() &&
    */
   allow list: if signedIn() &&
     (
-      resource.data.studentId ==
-        currentUserId() ||
+      resource.data.studentId == currentUserId() ||
+      (isTeacher() && resource.data.teacherId == currentUserId()) ||
       managesClass(resource.data.classId) ||
       isAdmin()
     );
@@ -1171,7 +1198,8 @@ allow update: if signedIn() &&
    * Assignment, class and teacher values must match the
    * original quiz assignment document.
    */
-  allow create: if signedIn() &&
+  allow create: if classNotDeleting(request.resource.data.classId) &&
+        signedIn() &&
     request.resource.data.studentId ==
       currentUserId() &&
     assignmentExists(
@@ -1201,7 +1229,8 @@ allow update: if signedIn() &&
    * Students may update only their own result while preserving
    * assignment ownership and identity fields.
    */
-  allow update: if signedIn() &&
+  allow update: if classNotDeleting(request.resource.data.classId) &&
+        signedIn() &&
     resource.data.studentId ==
       currentUserId() &&
     request.resource.data.studentId ==
@@ -1295,7 +1324,12 @@ allow update: if signedIn() &&
       allow get, list: if signedIn() &&
         (
           currentUserId() == userId ||
-          isTeacher()
+          isAdmin() ||
+          (
+            isTeacher() &&
+            sameSchoolUser(userId) &&
+            isSchoolStaff(currentSchoolId())
+          )
         );
 
       allow create: if signedIn() &&
@@ -1318,10 +1352,7 @@ allow update: if signedIn() &&
     }
 
 
-    // Supports collectionGroup(db, "quizResults").
-    match /{path=**}/quizResults/{resultId} {
-      allow get, list: if isTeacher();
-    }
+
 
 
 // ------------------------------------------------------------
@@ -1523,7 +1554,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
           isAdmin()
         );
 
-      allow create: if isTeacher() &&
+      allow create: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         request.resource.data.teacherId == currentUserId() &&
         managesClass(request.resource.data.classId) &&
         request.resource.data.studentIds is list &&
@@ -1536,7 +1568,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
         request.resource.data.questionSetSnapshot is map &&
         request.resource.data.status == "active";
 
-      allow update: if isTeacher() &&
+      allow update: if classNotDeleting(request.resource.data.classId) &&
+        isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -1545,7 +1578,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
         request.resource.data.classId == resource.data.classId &&
         request.resource.data.studentIds == resource.data.studentIds;
 
-      allow update: if signedIn() &&
+      allow update: if classNotDeleting(request.resource.data.classId) &&
+        signedIn() &&
         currentUserId() in resource.data.studentIds &&
         request.resource.data
           .diff(resource.data)
@@ -1600,6 +1634,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
       allow list: if signedIn() &&
         (
           resource.data.studentId == currentUserId() ||
+          (isTeacher() && resource.data.teacherId == currentUserId()) ||
           managesClass(resource.data.classId) ||
           isAdmin()
         );
@@ -1608,7 +1643,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
        * A student may create only their own initial submission for an exam
        * assignment that is actually assigned to them.
        */
-      allow create: if signedIn() &&
+      allow create: if examAssignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        signedIn() &&
         request.resource.data.studentId == currentUserId() &&
         submissionId.matches(
           "^.*_" + currentUserId() + "$"
@@ -1648,7 +1684,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
        *
        * Identity and teacher-marking fields remain protected.
        */
-      allow update: if signedIn() &&
+      allow update: if examAssignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        signedIn() &&
         resource.data.studentId == currentUserId() &&
         request.resource.data.studentId == resource.data.studentId &&
         request.resource.data.assignmentId == resource.data.assignmentId &&
@@ -1680,7 +1717,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
       /*
        * Teacher/admin marking updates.
        */
-      allow update: if isTeacher() &&
+      allow update: if examAssignmentClassNotDeleting(request.resource.data.assignmentId) &&
+        isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -2320,5 +2358,3 @@ match /users/{userId}/examTrainerResults/{resultId} {
     }
   }
 }
-
-

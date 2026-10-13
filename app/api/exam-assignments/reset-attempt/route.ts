@@ -120,16 +120,19 @@ export async function POST(request: Request) {
         throw new Error("FORBIDDEN");
       }
 
+      // Admin SDK bypasses Firestore rules: enforce lifecycle for EVERY actor.
+      const classSnapshot = await transaction.get(
+        adminDb.collection("classes").doc(classId),
+      );
+      if (!classSnapshot.exists) {
+        throw new Error("FORBIDDEN");
+      }
+      const classData = classSnapshot.data() || {};
+      if (classData.status !== "active") {
+        throw new Error("CLASS_NOT_ACTIVE");
+      }
+
       if (role !== "admin") {
-        const classSnapshot = await transaction.get(
-          adminDb.collection("classes").doc(classId),
-        );
-
-        if (!classSnapshot.exists) {
-          throw new Error("FORBIDDEN");
-        }
-
-        const classData = classSnapshot.data() || {};
         const coTeacherIds = Array.isArray(classData.coTeacherIds)
           ? classData.coTeacherIds.filter(
               (value: unknown): value is string =>
@@ -242,6 +245,13 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
+
+    if (code === "CLASS_NOT_ACTIVE") {
+      return NextResponse.json(
+        { error: "Exam attempts cannot be reset for an archived or deleting class." },
+        { status: 409 },
+      );
+    }
 
     if (code === "ASSIGNMENT_NOT_FOUND") {
       return NextResponse.json(

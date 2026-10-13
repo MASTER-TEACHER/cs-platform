@@ -43,7 +43,7 @@ export default function QuizGeneratorForm({
           type="text"
           value={settings.topic}
           onChange={(event) => updateSetting("topic", event.target.value)}
-          placeholder="Example: Binary addition"
+          placeholder={settings.qualification === "Creative iMedia" ? "Example: R093 media audiences and purpose" : "Example: Binary addition"}
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
           required
         />
@@ -57,12 +57,13 @@ export default function QuizGeneratorForm({
         <select
           value={settings.qualification}
           onChange={(event) =>
-            updateSetting("qualification", event.target.value)
+            onChange({ ...settings, qualification: event.target.value, examBoard: event.target.value === "Creative iMedia" ? "OCR" : settings.examBoard })
           }
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         >
           <option value="GCSE">GCSE</option>
           <option value="A Level">A Level</option>
+          <option value="Creative iMedia">Creative iMedia (OCR J834)</option>
         </select>
       </label>
 
@@ -74,9 +75,9 @@ export default function QuizGeneratorForm({
           onChange={(event) => updateSetting("examBoard", event.target.value)}
           className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
         >
-          <option value="AQA">AQA</option>
+          {settings.qualification !== "Creative iMedia" && <option value="AQA">AQA</option>}
           <option value="OCR">OCR</option>
-          <option value="Pearson Edexcel">Pearson Edexcel</option>
+          {settings.qualification !== "Creative iMedia" && <option value="Pearson Edexcel">Pearson Edexcel</option>}
         </select>
       </label>
 

@@ -489,6 +489,11 @@ export default function StudentAssignmentsPage() {
                         {formatResourceType(assignment.resourceType)}
                       </span>
 
+                      {assignment.kind === "quiz" && /^(imedia-|creative[ -]?imedia)/i.test(assignment.resourceId || assignment.title) && (
+                        <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-bold text-teal-800">
+                          Creative iMedia · OCR J834
+                        </span>
+                      )}
                       <StatusBadge assignment={assignment} overdue={overdue} />
                     </div>
 
@@ -514,7 +519,7 @@ export default function StudentAssignmentsPage() {
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                     <p className="font-bold text-slate-900">
-                      {assignment.className}
+                      Class: {assignment.className}
                     </p>
                     <p className="mt-1">{assignment.teacherName}</p>
                   </div>

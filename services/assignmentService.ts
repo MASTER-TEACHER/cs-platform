@@ -38,7 +38,8 @@ export type CreateAssignmentInput = {
    * route to resolve the exact assigned quiz instead of incorrectly
    * using the student's normal browsing curriculum.
    */
-  qualification?: "GCSE" | "A_LEVEL";
+  qualification?: "GCSE" | "A_LEVEL" | "Creative iMedia";
+  subject?: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA";
   examBoard?: string;
 
   studentIds?: string[];
@@ -88,6 +89,7 @@ export async function createAssignment({
   quizSource,
   deliveryMode,
   qualification,
+  subject,
   examBoard,
   studentIds,
 }: CreateAssignmentInput) {
@@ -217,6 +219,10 @@ export async function createAssignment({
 
             ...(qualification
               ? { qualification }
+              : {}),
+
+            ...(subject
+              ? { subject }
               : {}),
 
             ...(cleanedExamBoard

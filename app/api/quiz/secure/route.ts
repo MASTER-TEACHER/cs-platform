@@ -59,6 +59,7 @@ type AssignmentContext = {
   resourceId: string;
   quizSource: "built-in" | "ai-generated";
   qualification: Qualification | null;
+  subject: Subject | null;
   examBoard: ExamBoard | null;
   deliveryMode: SecureQuizDeliveryMode;
   status: "active" | "closed";
@@ -488,6 +489,13 @@ async function getAssignmentContext({
     );
   }
 
+  // Admin SDK bypasses Firestore rules. Check class lifecycle even when
+  // the assignment explicitly targets this student.
+  const owningClass = await adminDb.collection("classes").doc(classId).get();
+  if (!owningClass.exists || owningClass.data()?.status !== "active") {
+    throw new Error("CLASS_INACTIVE");
+  }
+
   /*
    * New targeted assignments carry their explicit studentIds.
    * Prefer that list so another student in the same class cannot
@@ -603,6 +611,12 @@ async function getAssignmentContext({
         : "built-in",
 
     qualification,
+
+    subject: assignment.subject === "CREATIVE_IMEDIA" || resourceId.startsWith("imedia-")
+      ? "CREATIVE_IMEDIA"
+      : assignment.subject === "COMPUTER_SCIENCE"
+        ? "COMPUTER_SCIENCE"
+        : null,
 
     examBoard:
       examBoardValue
@@ -734,8 +748,12 @@ async function loadQuiz({
      * collection used by the teacher selector. Assignments may store either
      * the quiz id or the canonical topic id as resourceId.
      */
+    const assignmentSubject: Subject = assignment.subject ||
+      (assignment.resourceId.startsWith("imedia-") ? "CREATIVE_IMEDIA" : "COMPUTER_SCIENCE");
+
     const curriculumQuizzes =
       getCurriculumQuizzes(
+        assignmentSubject,
         assignmentQualification,
         assignmentExamBoard,
       );
@@ -758,11 +776,13 @@ async function loadQuiz({
       assignedEntry?.quiz ||
       getCurriculumQuizByTopic(
         assignment.resourceId,
+        assignmentSubject,
         assignmentQualification,
         assignmentExamBoard,
       ) ||
       getCurriculumQuizByTopic(
         topic,
+        assignmentSubject,
         assignmentQualification,
         assignmentExamBoard,
       );
@@ -910,7 +930,22 @@ async function createAttempt({
         ATTEMPT_LIFETIME_MS,
     );
 
-  await reference.set({
+  await adminDb.runTransaction(async (transaction) => {
+    if (assignment) {
+      const classRef = adminDb.collection("classes").doc(assignment.classId);
+      const assignmentRef = adminDb.collection("assignments").doc(assignment.id);
+      const [classSnap, assignmentSnap] = await Promise.all([
+        transaction.get(classRef),
+        transaction.get(assignmentRef),
+      ]);
+      if (!classSnap.exists || classSnap.data()?.status !== "active") {
+        throw new Error("CLASS_INACTIVE");
+      }
+      if (!assignmentSnap.exists || assignmentSnap.data()?.status !== "active") {
+        throw new Error("ASSIGNMENT_NOT_AVAILABLE");
+      }
+    }
+    transaction.set(reference, {
     uid:
       identity.uid,
 
@@ -953,6 +988,7 @@ async function createAttempt({
 
     result:
       null,
+  });
   });
 
   return reference.id;
@@ -1098,6 +1134,13 @@ function errorResponse(
       {
         status: 409,
       },
+    );
+  }
+
+  if (code === "CLASS_INACTIVE") {
+    return NextResponse.json(
+      { error: "This class is no longer active. The assigned quiz cannot be started or submitted." },
+      { status: 409 },
     );
   }
 
@@ -1852,6 +1895,23 @@ export async function POST(
             throw new Error(
               "ATTEMPT_EXPIRED",
             );
+          }
+
+          // Validate the class and assignment within the same transaction
+          // as result/XP writes, preventing submissions after archival/deletion.
+          if (loaded.assignment) {
+            const classRef = adminDb.collection("classes").doc(loaded.assignment.classId);
+            const assignmentRef = adminDb.collection("assignments").doc(loaded.assignment.id);
+            const [classSnap, assignmentSnap] = await Promise.all([
+              transaction.get(classRef),
+              transaction.get(assignmentRef),
+            ]);
+            if (!classSnap.exists || classSnap.data()?.status !== "active") {
+              throw new Error("CLASS_INACTIVE");
+            }
+            if (!assignmentSnap.exists || assignmentSnap.data()?.status !== "active") {
+              throw new Error("ASSIGNMENT_NOT_AVAILABLE");
+            }
           }
 
           const [

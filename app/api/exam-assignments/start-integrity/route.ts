@@ -82,6 +82,13 @@ export async function POST(request: Request) {
 
       const assignment = assignmentSnapshot.data() || {};
 
+      const classId = typeof assignment.classId === "string" ? assignment.classId.trim() : "";
+      if (!classId) throw new Error("CLASS_NOT_ACTIVE");
+      const classSnapshot = await transaction.get(adminDb.collection("classes").doc(classId));
+      if (!classSnapshot.exists || classSnapshot.data()?.status !== "active") {
+        throw new Error("CLASS_NOT_ACTIVE");
+      }
+
       const studentIds = Array.isArray(assignment.studentIds)
         ? assignment.studentIds.filter(
             (value: unknown): value is string =>
@@ -164,6 +171,10 @@ export async function POST(request: Request) {
       NOT_ASSIGNED: [
         "This exam is not assigned to your account.",
         403,
+      ],
+      CLASS_NOT_ACTIVE: [
+        "This class is no longer active. Exam attempts cannot be started.",
+        409,
       ],
       ASSIGNMENT_INACTIVE: [
         "This exam assignment is no longer active.",

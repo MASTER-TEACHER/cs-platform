@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -1889,62 +1888,9 @@ export async function restoreTeacherClass(
  * Classes with students or assignment references should be archived
  * instead so school history is not accidentally severed.
  */
-export async function deleteTeacherClass(
-  classId: string,
-): Promise<void> {
-  const cleanedClassId =
-    classId.trim();
-
-  if (!cleanedClassId) {
-    throw new Error(
-      "A valid class is required.",
-    );
-  }
-
-  const reference =
-    doc(
-      db,
-      "classes",
-      cleanedClassId,
-    );
-
-  const snapshot =
-    await getDoc(
-      reference,
-    );
-
-  if (
-    !snapshot.exists()
-  ) {
-    return;
-  }
-
-  const teacherClass =
-    convertClassDocument(
-      snapshot.id,
-      snapshot.data() as
-        Partial<FirestoreTeacherClass>,
-    );
-
-  if (
-    teacherClass.studentIds
-      .length > 0
-  ) {
-    throw new Error(
-      "Remove students before permanently deleting this class. Archive it instead if you need to preserve history.",
-    );
-  }
-
-  if (
-    teacherClass.assignmentIds
-      .length > 0
-  ) {
-    throw new Error(
-      "This class has assignment history and cannot be permanently deleted. Archive it instead.",
-    );
-  }
-
-  await deleteDoc(
-    reference,
-  );
+export async function deleteTeacherClass(classId: string): Promise<void> {
+  void classId;
+  // Direct client-side Firestore deletion is prohibited. Only the audited,
+  // authenticated server deletion endpoint may perform permanent deletion.
+  throw new Error("Open the class settings page to archive and review permanent deletion.");
 }
