@@ -43,6 +43,7 @@ export type TeacherQuizAssignmentSummary = {
   status: QuizAssignmentStatus;
   deliveryMode: QuizDeliveryMode;
   studentCount: number;
+  studentIds: string[];
   completedCount: number;
   completionPercentage: number;
   averagePercentage: number;
@@ -344,6 +345,7 @@ async function buildQuizAssignmentSummary(
     status: normaliseStatus(assignment.status),
     deliveryMode: normaliseDeliveryMode(assignment.deliveryMode),
     studentCount: recipients.length,
+    studentIds: Array.isArray(assignment.studentIds) ? recipients : [],
     completedCount,
     completionPercentage: calculateCompletionPercentage(
       completedCount,
@@ -550,6 +552,7 @@ export async function getTeacherQuizAssignmentDetail(
       status: normaliseStatus(assignment.status),
       deliveryMode: normaliseDeliveryMode(assignment.deliveryMode),
       studentCount,
+      studentIds: Array.isArray(assignment.studentIds) ? recipients : [],
       completedCount,
       completionPercentage: calculateCompletionPercentage(
         completedCount,

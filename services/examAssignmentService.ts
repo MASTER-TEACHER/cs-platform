@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -509,14 +508,15 @@ export async function updateExamIntegrityPolicy({
   return cleaned;
 }
 
-export async function deleteExamAssignment(
-  assignmentId: string,
-): Promise<void> {
-  await deleteDoc(
-    doc(
-      db,
-      "examAssignments",
-      assignmentId,
-    ),
-  );
+export async function deleteExamAssignment(assignmentId: string): Promise<void> {
+  const { auth } = await import("@/lib/firebase");
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Sign in to delete an assignment.");
+  const response = await fetch(`/api/exam-assignments/${encodeURIComponent(assignmentId)}/delete`, {
+    method: "DELETE", headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(typeof body.error === "string" ? body.error : "Assignment deletion failed.");
+  }
 }
