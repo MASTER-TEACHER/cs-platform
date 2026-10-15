@@ -53,6 +53,10 @@ async function main(){
  await write('studentTargets',`${runId}-target-b`,{classId:classB,studentId:student.uid});
  await write('studentTargets',student.uid,{target:90,studentId:student.uid});
  await write('quizAttempts',`${runId}-independent`,{studentId:student.uid,score:100});
+ await write('quizAttempts',`${runId}-class-attempt`,{classId:classA,assignmentId:assignmentA,uid:student.uid,status:'completed'});
+ await write('quizAttempts',`${runId}-other-class-attempt`,{classId:classB,assignmentId:assignmentB,uid:student.uid,status:'completed'});
+ await write('quizAttempts',`${runId}-legacy-attempt`,{assignmentId:assignmentA,uid:student.uid,status:'completed'});
+ await write('quizAttempts',`${runId}-independent-other`,{uid:student.uid,score:98});
  server=spawn('npm.cmd',['run','dev','--','-p','3107'],{env,stdio:'inherit',shell:true});
  await waitForServer();
  let r=await request('DELETE',classA,null,{confirmation:'Deletion Test Class A'});assert.equal(r.status,401,JSON.stringify(r));pass('Authentication required');
@@ -68,6 +72,7 @@ async function main(){
  }
  assert.equal(await exists('assignments',assignmentA),false);assert.equal(await exists('assignments',assignmentB),true);pass('All owned collections and linked legacy records cleaned, other class preserved');
  assert.equal(await exists('studentTargets',student.uid),true);assert.equal(await exists('quizAttempts',`${runId}-independent`),true);pass('Shared student target and independent quiz preserved');
+ assert.equal(await exists('quizAttempts',`${runId}-class-attempt`),false);assert.equal(await exists('quizAttempts',`${runId}-legacy-attempt`),false);assert.equal(await exists('quizAttempts',`${runId}-other-class-attempt`),true);assert.equal(await exists('quizAttempts',`${runId}-independent-other`),true);pass('Class-linked quiz attempts removed; other-class and independent attempts preserved');
  const user=(await db.collection('users').doc(student.uid).get()).data();assert.deepEqual(user.classIds,[classB]);assert.equal(user.xp,777);assert.equal(user.streak,12);pass('Student account, other membership, XP and streak preserved');
  const audit=(await db.collection('classDeletionAudit').doc(classA).get()).data();assert.equal(audit?.state,'completed');assert.equal(audit?.emulatorOnly,true);pass('Persistent completed audit retained');
  // Simulate an interrupted deletion with an expired lease; the class is already in deleting state.

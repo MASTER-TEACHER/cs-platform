@@ -1,6 +1,7 @@
-
 "use client";
 
+import DeleteAssignmentButton from "@/components/teacher/DeleteAssignmentButton";
+import RemoveAssignmentStudent from "@/components/teacher/RemoveAssignmentStudent";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -135,6 +136,8 @@ export default function ProgrammingAssignmentResultsPage() {
 
   return (
     <div className="space-y-7">
+      <DeleteAssignmentButton assignmentId={assignment.id} kind="programming" returnTo="/teacher/programming-assignments" />
+      <RemoveAssignmentStudent assignmentId={assignment.id} kind="programming" studentIds={assignment.studentIds ?? []} />
       <section className="rounded-3xl bg-gradient-to-br from-cyan-800 via-blue-800 to-indigo-800 p-8 text-white shadow-xl">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>

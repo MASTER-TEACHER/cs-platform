@@ -11,9 +11,12 @@ type Context = { params: Promise<{ classId: string }> };
 type DocRef = FirebaseFirestore.DocumentReference;
 const clean = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ids = (value: unknown): string[] => Array.isArray(value) ? value.filter((x): x is string => typeof x === "string" && !!x) : [];
-const OWNED = ["assignments", "classAssignments", "examAssignments", "assignmentProgress", "assignmentResults", "examSubmissions", "examSubmissionAttemptHistory", "interventions"] as const;
-const BY_ASSIGNMENT = ["assignmentProgress", "assignmentResults", "examSubmissions", "examSubmissionAttemptHistory"] as const;
+const OWNED = ["assignments", "classAssignments", "examAssignments", "assignmentProgress", "assignmentResults", "examSubmissions", "examSubmissionAttemptHistory", "interventions", "quizAttempts"] as const;
+const BY_ASSIGNMENT = ["assignmentProgress", "assignmentResults", "examSubmissions", "examSubmissionAttemptHistory", "quizAttempts"] as const;
 const DEMO = "demo-cs-master";
+// Production activation requires an explicit server-only release switch.
+// Never use a NEXT_PUBLIC_ variable to authorise production deletion.
+const productionEnabled = () => process.env.CSMASTER_ENABLE_PRODUCTION_CLASS_DELETE === "YES_I_APPROVE_PERMANENT_CLASS_DELETION";
 
 // IMPORTANT: production deletion stays disabled until end-to-end emulator tests
 // prove complete isolation and every Admin SDK writer has lifecycle protection.
@@ -94,13 +97,16 @@ export async function GET(request: Request, context: Context) {
     const { classId } = await context.params;
     const { data } = await authorise(request, classId);
     const found = await discover(classId, data);
-    return NextResponse.json({ className: clean(data.name), status: clean(data.status), students: found.studentIds.size, records: found.docs.size, counts: found.counts, warning: "Class deletion is disabled in production. Global XP and independent practice are never deleted." });
+    return NextResponse.json({ className: clean(data.name), status: clean(data.status), students: found.studentIds.size, records: found.docs.size, counts: found.counts, warning: "Preview only. Deletion requires archived status and an explicit server-side release switch. Independent practice and global XP are preserved." });
   } catch (error) { return failure(error); }
 }
 
 export async function DELETE(request: Request, context: Context) {
   // This guard MUST be first, before parsing or any Firestore write.
-  if (!destructiveEmulatorOnly()) return NextResponse.json({ error: "Permanent class deletion is disabled until emulator data-integrity testing is completed." }, { status: 503 });
+  const emulatorMode = destructiveEmulatorOnly();
+  if (!emulatorMode && !productionEnabled()) return NextResponse.json({ error: "Permanent class deletion is disabled until release validation and explicit server-side activation." }, { status: 503 });
+  // Refuse mixed emulator and production configuration.
+  if (!emulatorMode && (process.env.FIRESTORE_EMULATOR_HOST || process.env.FIREBASE_AUTH_EMULATOR_HOST || process.env.NEXT_PUBLIC_FIREBASE_USE_EMULATORS === "true" || process.env.FIREBASE_ADMIN_PROJECT_ID === DEMO || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID === DEMO)) return NextResponse.json({ error: "Unsafe mixed Firebase configuration." }, { status: 503 });
   let classId = "";
   let auditId = "";
   try {
@@ -122,7 +128,7 @@ export async function DELETE(request: Request, context: Context) {
       const prior = journal.data() ?? {};
       const now = Date.now();
       if (prior.state === "running" && typeof prior.leaseUntil === "number" && prior.leaseUntil > now) throw new Error("DELETION_BUSY");
-      tx.set(audit, { classId, className: clean(latestData.name), schoolId: actor.schoolId, deletedBy: actor.uid, state: "running", leaseUntil: now + 300000, startedAt: prior.startedAt ?? FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), emulatorOnly: true }, { merge: true });
+      tx.set(audit, { classId, className: clean(latestData.name), schoolId: actor.schoolId, deletedBy: actor.uid, state: "running", leaseUntil: now + 300000, startedAt: prior.startedAt ?? FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), emulatorOnly: emulatorMode }, { merge: true });
       tx.update(ref, { status: "deleting", joinCodeEnabled: false, updatedAt: FieldValue.serverTimestamp() });
     });
     // Discover repeatedly so an interrupted run can be resumed and newly linked
@@ -148,10 +154,11 @@ export async function DELETE(request: Request, context: Context) {
     const verification = await discover(classId, data);
     const remainingMemberships = await adminDb.collection("users").where("classIds", "array-contains", classId).get();
     if (verification.docs.size || remainingMemberships.size) throw new Error("Deletion verification failed; class retained");
-    await audit.set({ state: "completed", leaseUntil: 0, finishedAt: FieldValue.serverTimestamp(), removedInFinalRun: removed, studentMembershipsChecked: found.studentIds.size, globalXpPreserved: true }, { merge: true });
-    // Class document is deleted LAST. Audit remains outside the class.
+    // Class document is deleted LAST among class-owned records. Audit is
+    // completed only after class deletion succeeds, so retries stay possible.
     await adminDb.recursiveDelete(ref);
-    return NextResponse.json({ ok: true, removed, studentMembershipsChecked: found.studentIds.size, emulatorOnly: true });
+    await audit.set({ state: "completed", leaseUntil: 0, finishedAt: FieldValue.serverTimestamp(), removedInFinalRun: removed, studentMembershipsChecked: found.studentIds.size, globalXpPreserved: true }, { merge: true });
+    return NextResponse.json({ ok: true, removed, studentMembershipsChecked: found.studentIds.size, emulatorOnly: emulatorMode });
   } catch (error) {
     if (auditId) console.error(`[Class deletion] interrupted: ${auditId}`, error);
     return failure(error);

@@ -1,6 +1,7 @@
-
 "use client";
 
+import DeleteAssignmentButton from "@/components/teacher/DeleteAssignmentButton";
+import RemoveAssignmentStudent from "@/components/teacher/RemoveAssignmentStudent";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -490,6 +491,8 @@ export default function ExamAssignmentMarkbookPage() {
 
   return (
     <div className="space-y-8">
+      <DeleteAssignmentButton assignmentId={assignment.id} kind="exam" returnTo="/teacher/exam-assignments" />
+      <RemoveAssignmentStudent assignmentId={assignment.id} kind="exam" studentIds={assignment.studentIds ?? []} />
       <Card className="border-0 bg-gradient-to-r from-slate-950 to-indigo-950 text-white">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>

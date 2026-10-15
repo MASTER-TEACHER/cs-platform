@@ -1,5 +1,7 @@
 "use client";
 
+import DeleteAssignmentButton from "@/components/teacher/DeleteAssignmentButton";
+import RemoveAssignmentStudent from "@/components/teacher/RemoveAssignmentStudent";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
@@ -275,6 +277,8 @@ export default function TeacherQuizMarkbookPage() {
 
   return (
     <div className="space-y-6">
+      <DeleteAssignmentButton assignmentId={assignment.id} kind="quiz" returnTo="/teacher/quiz-assignments" />
+      <RemoveAssignmentStudent assignmentId={assignment.id} kind="quiz" studentIds={assignment.studentIds ?? []} />
       <section className="rounded-3xl bg-gradient-to-r from-violet-700 via-purple-700 to-blue-700 p-6 text-white shadow-sm sm:p-8">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div>

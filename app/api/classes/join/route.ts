@@ -8,6 +8,7 @@ import {
   requireAuthenticatedUser,
 } from "@/lib/auth/requireUser";
 import { adminDb } from "@/lib/firebaseAdmin";
+import { checkTransactionalStudentSeat, serializeSchoolMembershipChange } from "@/lib/billing/transactionalSeats";
 
 import {
   billingEnforcementEnabled,
@@ -413,8 +414,8 @@ export async function POST(
           }
 
           if (
-            freshClassData.status ===
-              "archived"
+            freshClassData.status !==
+              "active"
           ) {
             throw new Error(
               "CLASS_ARCHIVED",
@@ -457,6 +458,14 @@ export async function POST(
             throw new Error(
               "DIFFERENT_SCHOOL",
             );
+          }
+
+          // Recheck seats within the same transaction that attaches the student.
+          // This transaction also writes the school document, serializing joins.
+          if (!freshUserSchoolId && billingEnforcementEnabled()) {
+            const subscription = await getSchoolSubscriptionSummary(classSchoolId);
+            if (!subscription.active) throw new Error("SUBSCRIPTION_INACTIVE");
+            await checkTransactionalStudentSeat(transaction, classSchoolId, subscription.seatLimit);
           }
 
           const existingStudentIds =
@@ -539,6 +548,8 @@ export async function POST(
             );
           }
 
+          serializeSchoolMembershipChange(transaction, schoolRef);
+
           transaction.set(
             memberRef,
             {
@@ -608,6 +619,8 @@ export async function POST(
             message: string;
           }
         > = {
+          SEAT_LIMIT_REACHED: { status: 409, message: "This school has reached its CS Master student-seat limit." },
+          SUBSCRIPTION_INACTIVE: { status: 402, message: "This school's CS Master subscription is not active." },
           CLASS_NOT_FOUND: {
             status: 404,
             message:
