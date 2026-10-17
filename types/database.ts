@@ -96,6 +96,9 @@ export interface UserProfile {
    * Student curriculum
    */
   subject?: Subject;
+  enrolledSubjects?: Subject[];
+  activeSubject?: Subject;
+  subjectPreferences?: Partial<Record<Subject, { qualification: Qualification | ""; examBoard: ExamBoard | ""; currentCourse: string }>>;
 
   onboardingComplete:
     boolean;

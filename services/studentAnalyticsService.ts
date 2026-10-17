@@ -1,4 +1,4 @@
-﻿import {
+import {
   collection,
   doc,
   getDoc,
@@ -319,6 +319,7 @@ export async function getStudentAnalytics(
       query(
         collection(db, "classes"),
         where("studentIds", "array-contains", cleanedStudentId),
+        ...(student.schoolId ? [where("schoolId", "==", student.schoolId)] : []),
       ),
     ),
 

@@ -250,6 +250,17 @@ function validCoTeacherChange(oldData, newData) {
     data.subject == "CREATIVE_IMEDIA";
 }
 
+    function validSubjectEnrolment(data) {
+      return data.get("enrolledSubjects", [data.get("subject", "COMPUTER_SCIENCE")]) is list &&
+        data.get("enrolledSubjects", [data.get("subject", "COMPUTER_SCIENCE")]).size() >= 1 &&
+        data.get("enrolledSubjects", [data.get("subject", "COMPUTER_SCIENCE")]).size() <= 2 &&
+        data.get("enrolledSubjects", [data.get("subject", "COMPUTER_SCIENCE")]).hasOnly(["COMPUTER_SCIENCE", "CREATIVE_IMEDIA"]) &&
+        data.get("subject", "COMPUTER_SCIENCE") in data.get("enrolledSubjects", [data.get("subject", "COMPUTER_SCIENCE")]) &&
+        data.get("activeSubject", data.get("subject", "COMPUTER_SCIENCE")) == data.get("subject", "COMPUTER_SCIENCE") &&
+        data.get("subjectPreferences", {}) is map &&
+        data.get("subjectPreferences", {}).keys().hasOnly(["COMPUTER_SCIENCE", "CREATIVE_IMEDIA"]);
+    }
+
     function validQualification(data) {
       return !("qualification" in data) ||
         data.qualification == null ||
@@ -575,6 +586,7 @@ allow update: if signedIn() &&
       request.resource.data.teacherAccessStatus == "pending"
     ) &&
     validSubject(request.resource.data) &&
+    validSubjectEnrolment(request.resource.data) &&
     validQualification(request.resource.data) &&
     validExamBoard(request.resource.data) &&
     validOnboardingStatus(request.resource.data) &&
@@ -610,19 +622,30 @@ allow update: if signedIn() &&
         "schoolId",
         "currentCourse",
         "subject",
+        "activeSubject",
+        "enrolledSubjects",
+        "subjectPreferences",
         "qualification",
         "examBoard",
         "onboardingComplete",
-        "xp",
-        "streak",
-        "badges",
-        "completedLessons",
-        "completedTopics",
-        "completedUnits",
-        "completedPapers",
         "classIds",
         "updatedAt"
       ]) &&
+
+    /* Students cannot grant themselves class membership through profile edits.
+     * The verified class-join API uses Admin SDK; teacher enrolment has
+     * a separate same-school rule below. A genuine school exit may clear
+     * classIds as part of the verified membership transition.
+     */
+    (
+      request.resource.data.get("classIds", []) ==
+        resource.data.get("classIds", []) ||
+      (
+        userSchoolId(resource.data) != "" &&
+        userSchoolId(request.resource.data) == "" &&
+        request.resource.data.get("classIds", []) == []
+      )
+    ) &&
     (
       /*
        * Normal update while staying in the same tenant/account state.
@@ -733,7 +756,16 @@ allow update: if signedIn() &&
        * still constrain results to owned/co-taught classes; document updates
        * remain protected by the stricter rules below.
        */
-      allow list: if isTeacher();
+      // Tenant-scoped class queries; preserve owner/co-teacher queries.
+      allow list: if signedIn() && (
+        isAdmin() ||
+        (isTeacher() && (
+          resource.data.teacherId == currentUserId() ||
+          currentUserId() in resource.data.get("coTeacherIds", []) ||
+          (currentUserHasSchool() && resource.data.get("schoolId", "") == currentSchoolId())
+        )) ||
+        currentUserId() in resource.data.get("studentIds", [])
+      );
 
      allow create: if isTeacher() &&
   request.resource.data.teacherId == currentUserId() &&
@@ -861,7 +893,7 @@ allow list: if signedIn() &&
         request.resource.data.get("studentIds", []) ==
           resource.data.get("studentIds", []);
 
-      allow delete: if isTeacher() &&
+      allow delete: if classNotDeleting(resource.data.classId) && isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -941,7 +973,7 @@ allow list: if signedIn() &&
         request.resource.data.completedCount <=
           resource.data.studentCount;
 
-      allow delete: if isTeacher() &&
+      allow delete: if classNotDeleting(resource.data.classId) && isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -1198,69 +1230,11 @@ allow update: if assignmentClassNotDeleting(request.resource.data.assignmentId) 
    * Assignment, class and teacher values must match the
    * original quiz assignment document.
    */
-  allow create: if classNotDeleting(request.resource.data.classId) &&
-        signedIn() &&
-    request.resource.data.studentId ==
-      currentUserId() &&
-    assignmentExists(
-      request.resource.data.assignmentId
-    ) &&
-    request.resource.data.classId ==
-      assignmentData(
-        request.resource.data.assignmentId
-      ).classId &&
-    request.resource.data.teacherId ==
-      assignmentData(
-        request.resource.data.assignmentId
-      ).teacherId &&
-    request.resource.data.resourceId ==
-      assignmentData(
-        request.resource.data.assignmentId
-      ).resourceId &&
-    request.resource.data.assignmentType ==
-      "quiz" &&
-    belongsToClass(
-      request.resource.data.classId
-    ) &&
-    request.resource.data.status ==
-      "completed";
+  // Trusted marking is performed by Firebase Admin in /api/quiz/secure.
+  // Students cannot create or overwrite assessed results from a browser.
+  allow create, update: if false;
 
-  /*
-   * Students may update only their own result while preserving
-   * assignment ownership and identity fields.
-   */
-  allow update: if classNotDeleting(request.resource.data.classId) &&
-        signedIn() &&
-    resource.data.studentId ==
-      currentUserId() &&
-    request.resource.data.studentId ==
-      resource.data.studentId &&
-    request.resource.data.assignmentId ==
-      resource.data.assignmentId &&
-    request.resource.data.classId ==
-      resource.data.classId &&
-    request.resource.data.teacherId ==
-      resource.data.teacherId &&
-    request.resource.data.resourceId ==
-      resource.data.resourceId &&
-    request.resource.data.assignmentType ==
-      resource.data.assignmentType &&
-    request.resource.data.status ==
-      "completed" &&
-    request.resource.data
-      .diff(resource.data)
-      .affectedKeys()
-      .hasOnly([
-        "score",
-        "totalQuestions",
-        "percentage",
-        "earnedXP",
-        "timeTakenSeconds",
-        "status",
-        "completedAt"
-      ]);
-
-  allow delete: if isTeacher() &&
+  allow delete: if classNotDeleting(resource.data.classId) && isTeacher() &&
     (
       managesClass(resource.data.classId) ||
       isAdmin()
@@ -1332,23 +1306,13 @@ allow update: if assignmentClassNotDeleting(request.resource.data.assignmentId) 
           )
         );
 
-      allow create: if signedIn() &&
-        currentUserId() == userId &&
-        request.resource.data.uid ==
-          currentUserId();
+      // The secure quiz API creates results with Firebase Admin.
+      // Browser writes to scores and XP are forbidden.
+      allow create, update: if false;
 
-      allow update: if signedIn() &&
-        currentUserId() == userId &&
-        request.resource.data.uid ==
-          resource.data.uid &&
-        request.resource.data.uid ==
-          currentUserId();
-
-      allow delete: if signedIn() &&
-        (
-          currentUserId() == userId ||
-          isAdmin()
-        );
+      // Trusted assessment history is immutable from the browser.
+      // Any legitimate deletion must use an authorised server workflow.
+      allow delete: if false;
     }
 
 
@@ -1365,7 +1329,8 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
   allow get, list: if signedIn() &&
     (
       currentUserId() == userId ||
-      isTeacher()
+      isAdmin() ||
+      (isTeacher() && sameSchoolUser(userId))
     );
 
   allow create: if signedIn() &&
@@ -1594,7 +1559,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
         request.resource.data.submittedCount <=
           resource.data.studentIds.size();
 
-      allow delete: if isTeacher() &&
+      allow delete: if classNotDeleting(resource.data.classId) && isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -1745,7 +1710,7 @@ match /users/{userId}/programmingPracticeResults/{resultId} {
             "updatedAt"
           ]);
 
-      allow delete: if isTeacher() &&
+      allow delete: if classNotDeleting(resource.data.classId) && isTeacher() &&
         (
           managesClass(resource.data.classId) ||
           isAdmin()
@@ -1816,8 +1781,8 @@ match /studentTutorConversations/{conversationId} {
       progressId.matches(
         "^" + currentUserId() + "_.*$"
       ) ||
-      isTeacher() ||
-      isAdmin()
+      isAdmin() ||
+      (resource != null && isTeacher() && sameSchoolUser(resource.data.studentId))
     );
 
   /*
@@ -1827,8 +1792,8 @@ match /studentTutorConversations/{conversationId} {
   allow list: if signedIn() &&
     (
       resource.data.studentId == currentUserId() ||
-      isTeacher() ||
-      isAdmin()
+      isAdmin() ||
+      (isTeacher() && sameSchoolUser(resource.data.studentId))
     );
 
   /*

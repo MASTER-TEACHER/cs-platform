@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 
 import LogoutButton from "@/components/layout/LogoutButton";
+import SubjectSwitcher from "@/components/student/SubjectSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 
 type SidebarLink = {
   href: string;
   label: string;
   aLevelOnly?: boolean;
+  subjectOnly?: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA";
 };
 
 type SidebarProps = {
@@ -21,11 +23,11 @@ type SidebarProps = {
 
 const studentLinks: SidebarLink[] = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/adaptive-learning", label: "Adaptive Learning" },
-  { href: "/knowledge-map", label: "Knowledge Map" },
+  { href: "/adaptive-learning", subjectOnly: "COMPUTER_SCIENCE", label: "Adaptive Learning" },
+  { href: "/knowledge-map", subjectOnly: "COMPUTER_SCIENCE", label: "Knowledge Map" },
   { href: "/analytics", label: "Analytics" },
   { href: "/tutor", label: "AI Tutor" },
-  { href: "/revision-plan", label: "Revision Plan" },
+  { href: "/revision-plan", subjectOnly: "COMPUTER_SCIENCE", label: "Revision Plan" },
   { href: "/assignments", label: "Assignments" },
   { href: "/notifications", label: "Notifications" },
   { href: "/exam", label: "Exam Mode" },
@@ -34,18 +36,20 @@ const studentLinks: SidebarLink[] = [
     href: "/a-level-practice",
     label: "A-Level Practice",
     aLevelOnly: true,
+    subjectOnly: "COMPUTER_SCIENCE",
   },
   {
     href: "/nea",
     label: "NEA Project",
     aLevelOnly: true,
+    subjectOnly: "COMPUTER_SCIENCE",
   },
   { href: "/quiz", label: "Quiz" },
-  { href: "/programming", label: "Programming" },
-  { href: "/visualisers", label: "Visualisers" },
-  { href: "/exam-trainer", label: "Exam Trainer" },
-  { href: "/model-papers", label: "Model Papers" },
-  { href: "/imedia-practice", label: "iMedia Practice" },
+  { href: "/programming", subjectOnly: "COMPUTER_SCIENCE", label: "Programming" },
+  { href: "/visualisers", subjectOnly: "COMPUTER_SCIENCE", label: "Visualisers" },
+  { href: "/exam-trainer", subjectOnly: "COMPUTER_SCIENCE", label: "Exam Trainer" },
+  { href: "/model-papers", subjectOnly: "COMPUTER_SCIENCE", label: "Model Papers" },
+  { href: "/imedia-practice", subjectOnly: "CREATIVE_IMEDIA", label: "iMedia Practice" },
   { href: "/join-school", label: "Join School" },
   { href: "/profile", label: "Profile" },
   { href: "/data-rights", label: "Data Rights" },
@@ -99,6 +103,10 @@ export default function Sidebar({
   const isStudent = profile?.role === "student";
   const isIndividualStudent = isStudent && !profile?.schoolId;
 
+  const activeSubject = profile?.subject === "CREATIVE_IMEDIA"
+    ? "CREATIVE_IMEDIA"
+    : "COMPUTER_SCIENCE";
+
   const qualification =
     (
       profile as {
@@ -113,9 +121,8 @@ export default function Sidebar({
         ? teacherLinks
         : studentLinks.filter(
             (link) =>
-              !link.aLevelOnly ||
-              qualification ===
-                "A_LEVEL",
+              (!link.subjectOnly || link.subjectOnly === activeSubject) &&
+              (!link.aLevelOnly || qualification === "A_LEVEL"),
           );
 
   const homeHref = isAdmin ? "/admin" : isTeacher ? "/teacher" : "/dashboard";
@@ -195,6 +202,8 @@ export default function Sidebar({
           </>
         )}
       </div>
+
+      {isStudent && <SubjectSwitcher />}
 
       <nav className="flex-1 space-y-2 overflow-y-auto p-5">
         {links.map((link) => {

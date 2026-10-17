@@ -33,7 +33,7 @@ export async function requireAuthenticatedUser(
   let token: DecodedIdToken;
 
   try {
-    token = await adminAuth.verifyIdToken(idToken);
+    token = await adminAuth.verifyIdToken(idToken, true);
   } catch {
     throw new Error("AUTH_INVALID");
   }
@@ -45,6 +45,9 @@ export async function requireAuthenticatedUser(
   }
 
   const profile = snapshot.data() ?? {};
+  if (["suspended", "deleted", "disabled"].includes(String(profile.status ?? "").toLowerCase())) {
+    throw new Error("ACCOUNT_DISABLED");
+  }
 
   return {
     uid: token.uid,
@@ -71,6 +74,9 @@ export function authenticatedUserError(error: unknown): {
         status: 401,
         message: "Your sign-in session is invalid or has expired. Please sign in again.",
       };
+
+    case "ACCOUNT_DISABLED":
+      return { status: 403, message: "This account is disabled. Contact your administrator." };
 
     case "PROFILE_NOT_FOUND":
       return {

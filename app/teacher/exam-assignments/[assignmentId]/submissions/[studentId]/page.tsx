@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import { auth } from "@/lib/firebase";
 
 import Card from "@/components/ui/Card";
 import Skeleton from "@/components/ui/Skeleton";
@@ -14,6 +15,7 @@ import {
   finaliseExamMarking,
   getExamSubmission,
   saveDraftMarking,
+  releaseExamResults,
 } from "@/services/examSubmissionService";
 import type {
   AIExamMarkingResult,
@@ -97,6 +99,8 @@ export default function MarkExamSubmissionPage() {
   const [saving, setSaving] = useState(false);
 
   const [aiMarking, setAiMarking] = useState(false);
+  const [studentCode, setStudentCode] = useState<string>("");
+  const [released, setReleased] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -109,6 +113,15 @@ export default function MarkExamSubmissionPage() {
         setAssignment(loadedAssignment);
 
         setSubmission(loadedSubmission);
+        setReleased((loadedSubmission as unknown as { resultsReleased?: boolean } | null)?.resultsReleased === true);
+        const token = await auth.currentUser?.getIdToken();
+        if (token) {
+          const codeResponse = await fetch(`/api/teacher/student-code?assignmentId=${encodeURIComponent(params.assignmentId)}&studentId=${encodeURIComponent(params.studentId)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+          if (codeResponse.ok) {
+            const codeData = (await codeResponse.json()) as { studentCode?: string };
+            setStudentCode(codeData.studentCode ?? "");
+          }
+        }
 
         setAnswers(loadedSubmission?.answers || []);
 
@@ -165,20 +178,17 @@ export default function MarkExamSubmissionPage() {
     setAiMarking(true);
 
     try {
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("Please sign in again before marking.");
       const response = await fetch("/api/ai/mark-exam-submission", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          assignmentTitle: assignment.title,
-          topic:
-            assignment.questionSetSnapshot.topic || assignment.questionSetTitle,
-          questions: assignment.questionSetSnapshot.questions,
-          answers: answers.map((answer) => ({
-            questionId: answer.questionId,
-            response: answer.response,
-          })),
+          assignmentId: params.assignmentId,
+          studentId: params.studentId,
         }),
       });
 
@@ -288,7 +298,7 @@ export default function MarkExamSubmissionPage() {
 
     if (
       !window.confirm(
-        "Finalise these marks and release the result to the student?",
+        "Finalise these marks? The result will remain unpublished until you release it.",
       )
     ) {
       return;
@@ -305,7 +315,7 @@ export default function MarkExamSubmissionPage() {
         totalAvailableMarks: assignment.totalMarks,
       });
 
-      toast.success("Marking finalised.");
+      toast.success("Marking finalised. The result has not been released.");
 
       router.push(`/teacher/exam-assignments/${assignment.id}`);
     } catch (error) {
@@ -726,6 +736,18 @@ export default function MarkExamSubmissionPage() {
             Finalise Marking
           </button>
 
+          {submission.status === "marked" && !released && (
+            <button type="button" disabled={saving} className="rounded-xl bg-emerald-700 px-5 py-3 font-bold text-white" onClick={() => {
+              if (!window.confirm("Release this student's final marks and feedback?")) return;
+              setSaving(true);
+              void releaseExamResults(assignment.id, params.studentId).then(() => {
+                setReleased(true);
+                toast.success("Results released to student.");
+              }).catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Release failed.")).finally(() => setSaving(false));
+            }}>Release Results</button>
+          )}
+          {released && <span className="rounded-xl bg-emerald-50 px-5 py-3 font-bold text-emerald-800">Results released</span>}
+          {studentCode && <span className="rounded-xl border px-5 py-3 text-sm font-semibold">Student code: {studentCode}</span>}
           <Link
             href={`/teacher/exam-assignments/${assignment.id}`}
             className="rounded-xl border px-5 py-3 font-bold"

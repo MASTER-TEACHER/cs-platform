@@ -28,7 +28,7 @@ export async function requirePlatformAdmin(
   let token: DecodedIdToken;
 
   try {
-    token = await adminAuth.verifyIdToken(idToken);
+    token = await adminAuth.verifyIdToken(idToken, true);
   } catch {
     throw new Error("AUTH_INVALID");
   }
@@ -44,7 +44,7 @@ export async function requirePlatformAdmin(
 
   const profile = profileSnapshot.data() ?? {};
 
-  if (profile.role !== "admin") {
+  if (profile.role !== "admin" || ["suspended", "disabled", "deleted"].includes(String(profile.status ?? "").toLowerCase())) {
     throw new Error("ADMIN_REQUIRED");
   }
 

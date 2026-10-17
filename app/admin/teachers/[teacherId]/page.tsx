@@ -73,6 +73,11 @@ export default function AdminTeacherDetailsPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [processing, setProcessing] = useState(false);
+  const [lifecycleReason, setLifecycleReason] = useState("");
+  const [lifecycleConfirmation, setLifecycleConfirmation] = useState("");
+  const [deletionReviewed, setDeletionReviewed] = useState(false);
+  const [retentionApproved, setRetentionApproved] = useState(false);
+  const [deletionDependencies, setDeletionDependencies] = useState<string[]>([]);
 
   const isAdmin = profile?.role === "admin";
 
@@ -315,6 +320,30 @@ export default function AdminTeacherDetailsPage() {
     }
   }
 
+  async function performLifecycle(action: "remove_school" | "delete_account" | "review_deletion") {
+    if (!user || !teacher) return;
+    if (!window.confirm(action === "remove_school" ? "Remove this teacher from their school?" : action === "delete_account" ? "PERMANENTLY DELETE the teacher login and profile? This cannot be undone. Confirm that retention and privacy obligations were reviewed." : "Review permanent deletion dependencies?")) return;
+    setProcessing(true);
+    try {
+      const token = await user.getIdToken(true);
+      const response = await fetch(`/api/admin/teachers/${teacher.id}/lifecycle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, reason: lifecycleReason, confirmation: lifecycleConfirmation, retentionApproved: action === "delete_account" ? retentionApproved : false }),
+      });
+      const result = (await response.json()) as { error?: string; message?: string; dependencies?: string[]; eligible?: boolean };
+      if (!response.ok) throw new Error(result.error || "Action could not be completed.");
+      toast.success(result.message || "Action completed.");
+      if (action === "review_deletion") { setDeletionReviewed(result.eligible === true); setDeletionDependencies(result.dependencies || []); }
+      if (action === "delete_account") { setDeletionReviewed(false); setRetentionApproved(false); }
+      if (action === "remove_school") setTeacher(current => current ? { ...current, schoolName: "School not assigned" } : current);
+      setLifecycleConfirmation("");
+      setLifecycleReason("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Account action failed.");
+    } finally { setProcessing(false); }
+  }
+
   return (
     <div className="space-y-8">
       <Card className="border-0 bg-gradient-to-r from-slate-900 via-indigo-900 to-violet-900 text-white">
@@ -490,6 +519,24 @@ export default function AdminTeacherDetailsPage() {
             {processing ? "Restoring..." : "Restore Teacher"}
           </button>
         )}
+      </Card>
+      <Card>
+        <h2 className="text-2xl font-bold text-slate-900">School removal and account deletion</h2>
+        <p className="mt-2 text-slate-600">Existing classes and assignments must be reassigned before removal. Deletion requires an explicit dependency review, verified retention approval and a second confirmation. Linked assessment records must be preserved or reassigned.</p>
+        <label className="mt-4 block text-sm font-semibold text-slate-700" htmlFor="lifecycle-reason">Reason (minimum 10 characters)</label>
+        <textarea id="lifecycle-reason" className="mt-1 w-full rounded-lg border p-3 text-slate-900" value={lifecycleReason} onChange={event => setLifecycleReason(event.target.value)} maxLength={500} rows={3} />
+        <label className="mt-3 block text-sm font-semibold text-slate-700" htmlFor="lifecycle-confirm">Type the teacher&#39;s account ID to confirm: <code>{teacher.id}</code></label>
+        <input id="lifecycle-confirm" className="mt-1 w-full rounded-lg border p-3 text-slate-900" value={lifecycleConfirmation} onChange={event => setLifecycleConfirmation(event.target.value)} />
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button type="button" disabled={processing || lifecycleReason.trim().length < 10 || lifecycleConfirmation !== teacher.id} onClick={() => void performLifecycle("remove_school")} className="rounded-xl bg-amber-600 px-5 py-3 font-bold text-white disabled:opacity-50">Remove from school</button>
+          <button type="button" disabled={processing || lifecycleReason.trim().length < 10 || lifecycleConfirmation !== teacher.id} onClick={() => void performLifecycle("review_deletion")} className="rounded-xl bg-red-700 px-5 py-3 font-bold text-white disabled:opacity-50">Check permanent deletion eligibility</button>
+        </div>
+        {deletionDependencies.length > 0 && <p className="mt-3 text-sm text-red-700">Deletion blocked by: {deletionDependencies.join(", ")}</p>}
+        {deletionReviewed && <div className="mt-4 space-y-3 rounded-lg border border-red-200 p-4">
+          <p className="font-semibold text-red-800">No known dependencies found. Deletion is irreversible.</p>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={retentionApproved} onChange={event => setRetentionApproved(event.target.checked)} />I have verified the school data-retention requirements, outstanding privacy requests, and legal holds, and approve deletion of this account.</label>
+          <button type="button" disabled={processing || !retentionApproved || lifecycleConfirmation !== teacher.id} onClick={() => void performLifecycle("delete_account")} className="rounded-xl bg-red-800 px-5 py-3 font-bold text-white disabled:opacity-50">Permanently delete teacher account</button>
+        </div>}
       </Card>
     </div>
   );

@@ -96,7 +96,7 @@ export async function POST(
 
     const decoded =
       await adminAuth.verifyIdToken(
-        adminIdToken,
+        adminIdToken, true,
       );
 
     const adminDoc =
@@ -117,7 +117,7 @@ export async function POST(
 
     if (
       adminDoc.data()?.role !==
-      "admin"
+      "admin" || ["suspended", "disabled", "deleted"].includes(String(adminDoc.data()?.status ?? "").toLowerCase())
     ) {
       return NextResponse.json(
         {
@@ -179,12 +179,23 @@ export async function POST(
       body.action ===
       "suspend";
 
+    try {
     await adminAuth.updateUser(
       teacherId,
       {
         disabled: suspended,
       },
     );
+
+    if (suspended) {
+      await adminAuth.revokeRefreshTokens(teacherId);
+    }
+    } catch (authError) {
+      if ((authError as { code?: string }).code === "auth/user-not-found") {
+        return NextResponse.json({ error: "Firebase Authentication account is missing. This is an orphaned teacher profile; suspension/restoration is unavailable." }, { status: 409 });
+      }
+      throw authError;
+    }
 
     await teacherRef.update({
       status:
@@ -195,6 +206,13 @@ export async function POST(
         new Date(),
       statusUpdatedBy:
         decoded.uid,
+    });
+
+    await adminDb.collection("adminUserAudit").add({
+      action: suspended ? "suspend_teacher" : "restore_teacher",
+      actorId: decoded.uid,
+      targetId: teacherId,
+      at: new Date(),
     });
 
     return NextResponse.json({

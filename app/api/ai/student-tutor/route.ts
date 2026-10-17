@@ -77,6 +77,7 @@ function isTutorContext(
     candidate.studentId === studentId &&
     typeof candidate.name === "string" &&
     candidate.name.trim().length > 0 &&
+    (candidate.subject === "COMPUTER_SCIENCE" || candidate.subject === "CREATIVE_IMEDIA") &&
     typeof candidate.qualification === "string" &&
     typeof candidate.examBoard === "string" &&
     typeof candidate.currentCourse === "string" &&
@@ -118,7 +119,7 @@ async function verifyFirebaseStudent(
   request: Request,
   studentId: string,
 ): Promise<
-  | { ok: true }
+  | { ok: true; subject: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA" }
   | { ok: false; status: number; error: string }
 > {
   const authorization =
@@ -178,7 +179,10 @@ async function verifyFirebaseStudent(
       };
     }
 
-    return { ok: true };
+    const subject = profile.data()?.subject === "CREATIVE_IMEDIA"
+      ? "CREATIVE_IMEDIA" as const
+      : "COMPUTER_SCIENCE" as const;
+    return { ok: true, subject };
   } catch (error) {
     console.error(
       "Firebase tutor authentication check failed:",
@@ -281,7 +285,7 @@ function demo(body: Body, warning?: string): TutorResponse {
   const topic =
     priority?.topic ||
     context.recommendedActions[0]?.topic ||
-    "Computer Science";
+    (context.subject === "CREATIVE_IMEDIA" ? "Creative iMedia" : "Computer Science");
 
   const message = body.message.toLowerCase();
 
@@ -341,6 +345,7 @@ function demo(body: Body, warning?: string): TutorResponse {
       "Create a 25-minute revision plan",
     ],
     recommendations: context.recommendedActions
+      .filter((action) => context.subject !== "CREATIVE_IMEDIA" || !["/programming", "/adaptive-learning", "/revision-plan"].some((path) => action.href.startsWith(path)))
       .slice(0, 3)
       .map((action) => ({
         title: action.title,
@@ -353,7 +358,8 @@ function demo(body: Body, warning?: string): TutorResponse {
 }
 
 function prompt(body: Body): string {
-  return `You are CS Master, a careful and supportive UK secondary Computer Science tutor.
+  return `You are CS Master, a careful and supportive UK secondary ${body.context.subject === "CREATIVE_IMEDIA" ? "OCR Cambridge National Creative iMedia J834" : "Computer Science"} tutor.
+Only discuss the student's selected subject. Do not recommend programming, Computer Science lessons or unrelated subject content when Creative iMedia is selected.
 
 IMPORTANT EVIDENCE MODEL
 - independentEvidenceCount is the evidence allowed to drive mastery/attainment.
@@ -372,7 +378,7 @@ Student message:
 ${body.message}
 
 TUTORING RULES
-1. Use clear UK English and accurate Computer Science terminology.
+1. Use clear UK English and accurate terminology for the active subject.
 2. Respect qualification and exam-board context, but do not invent specification requirements.
 3. Adapt scaffolding to mastery, confidence and recommended difficulty.
 4. For weak/new topics: explain briefly, model one example, then ask a checking question.
@@ -583,6 +589,11 @@ export async function POST(request: Request) {
         { error: verified.error },
         verified.status,
       );
+    }
+
+    // Client-supplied tutor context must agree with the authenticated profile.
+    if (body.context.subject !== verified.subject) {
+      return noStore({ error: "Your subject changed. Refresh the tutor and try again." }, 409);
     }
 
     if (process.env.AI_STUDENT_TUTOR_DEMO_MODE === "true") {

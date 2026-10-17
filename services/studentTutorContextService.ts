@@ -102,6 +102,27 @@ export async function getStudentTutorContext(
     );
   }
 
+  // Read the active subject first. Do not fetch CS adaptive evidence for iMedia.
+  const activeProfile = await getUserProfile(id);
+  if (!activeProfile) throw new Error("The student profile could not be loaded.");
+  if (activeProfile.subject === "CREATIVE_IMEDIA") {
+    return {
+      studentId: id,
+      subject: "CREATIVE_IMEDIA",
+      name: activeProfile.name || "Student",
+      qualification: "GCSE",
+      examBoard: "OCR",
+      currentCourse: "imedia-ocr-j834",
+      overallMastery: 0, examReadiness: 0, confidence: 0,
+      combinedAverage: 0, quizAverage: 0, examAverage: 0,
+      currentGrade: "Not assessed", predictedGrade: "Not assessed",
+      improvementTrend: 0, completedLessons: 0, completedAssessments: 0,
+      awaitingMarking: 0, independentEvidenceCount: 0,
+      supportedEvidenceCount: 0, dueForReviewCount: 0,
+      strongestTopics: [], priorityTopics: [], recommendedActions: [],
+    };
+  }
+
   const [
     profile,
     plan,
@@ -236,6 +257,7 @@ export async function getStudentTutorContext(
 
   return {
     studentId: id,
+    subject: "COMPUTER_SCIENCE",
 
     name:
       profile.name ||

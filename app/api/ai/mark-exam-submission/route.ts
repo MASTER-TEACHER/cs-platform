@@ -1,5 +1,16 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebaseAdmin";
+import { requireAuthenticatedUser, authenticatedUserError } from "@/lib/auth/requireUser";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const cleanId = (value: unknown) =>
+  typeof value === "string" && /^[a-zA-Z0-9_-]{1,240}$/.test(value)
+    ? value
+    : "";
+
 
 import type {
   AIExamMarkingResult,
@@ -655,12 +666,63 @@ function isRateLimitError(error: unknown): boolean {
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as RequestBody;
+    // Do not trust questions, mark schemes or answers supplied by the browser.
+    // Resolve the authoritative assessment and submission on the server.
+    const actor = await requireAuthenticatedUser(request);
+    if (!["teacher", "admin", "school_admin"].includes(actor.role.toLowerCase())) {
+      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    }
+    const input = (await request.json()) as Record<string, unknown>;
+    const assignmentId = cleanId(input?.assignmentId);
+    const studentId = cleanId(input?.studentId);
+    if (!assignmentId || !studentId || !actor.schoolId) {
+      return NextResponse.json({ error: "Invalid marking request." }, { status: 400 });
+    }
+    const assignmentSnap = await adminDb.collection("examAssignments").doc(assignmentId).get();
+    if (!assignmentSnap.exists) {
+      return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
+    }
+    const assignment = assignmentSnap.data() ?? {};
+    const classId = cleanId(assignment.classId);
+    if (!classId || assignment.teacherId !== actor.uid ||
+        !Array.isArray(assignment.studentIds) || !assignment.studentIds.includes(studentId)) {
+      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    }
+    const [classSnap, studentSnap, submissionSnap] = await Promise.all([
+      adminDb.collection("classes").doc(classId).get(),
+      adminDb.collection("users").doc(studentId).get(),
+      adminDb.collection("examSubmissions").doc(`${assignmentId}_${studentId}`).get(),
+    ]);
+    const classroom = classSnap.data() ?? {};
+    if (!classSnap.exists || classroom.teacherId !== actor.uid ||
+        classroom.schoolId !== actor.schoolId ||
+        !studentSnap.exists || studentSnap.data()?.schoolId !== actor.schoolId ||
+        !submissionSnap.exists) {
+      return NextResponse.json({ error: "Access denied." }, { status: 403 });
+    }
+    const submission = submissionSnap.data() ?? {};
+    if (submission.studentId !== studentId || submission.assignmentId !== assignmentId ||
+        submission.classId !== classId || !["submitted", "marking", "marked"].includes(String(submission.status))) {
+      return NextResponse.json({ error: "Submission is not ready for marking." }, { status: 409 });
+    }
+    const snapshot = assignment.questionSetSnapshot as Record<string, unknown> | undefined;
+    const questions = Array.isArray(snapshot?.questions) ? snapshot.questions : [];
+    const answers = Array.isArray(submission.answers) ? submission.answers : [];
+    const body: RequestBody = {
+      assignmentTitle: typeof assignment.title === "string" ? assignment.title : "Exam",
+      topic: typeof snapshot?.topic === "string" ? snapshot.topic : "",
+      questions: questions as RequestQuestion[],
+      answers: answers.map((answer: Record<string, unknown>) => ({
+        questionId: typeof answer.questionId === "string" ? answer.questionId : "",
+        response: typeof answer.response === "string" ? answer.response : "",
+      })),
+    };
 
     if (
       !body ||
       !Array.isArray(body.questions) ||
-      !Array.isArray(body.answers)
+      !Array.isArray(body.answers) ||
+      body.questions.length === 0
     ) {
       return NextResponse.json(
         {
@@ -736,6 +798,10 @@ export async function POST(request: Request) {
       return NextResponse.json(createDemoResult(body, reason));
     }
   } catch (error) {
+    if (error instanceof Error && ["AUTH_REQUIRED", "AUTH_INVALID", "PROFILE_NOT_FOUND"].includes(error.message)) {
+      const response = authenticatedUserError(error);
+      return NextResponse.json({ error: response.message }, { status: response.status });
+    }
     console.error("AI exam marking route error:", error);
 
     return NextResponse.json(

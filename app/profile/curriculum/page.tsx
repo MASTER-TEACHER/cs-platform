@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   updateUserCourseSelection,
 } from "@/services/userService";
+import { enrolStudentSubject } from "@/services/subjectSwitchService";
 
 import type {
   ExamBoard,
@@ -122,6 +123,8 @@ export default function CurriculumSettingsPage() {
 
   const [submitting, setSubmitting] =
     useState(false);
+
+  const [enrolling, setEnrolling] = useState(false);
 
   const [saved, setSaved] =
     useState(false);
@@ -438,6 +441,28 @@ export default function CurriculumSettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
+      {profile?.role === "student" && (
+        <section className="rounded-2xl border border-blue-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-bold text-slate-900">My subjects</h2>
+          <p className="mt-2 text-sm text-slate-600">Study either or both subjects. Only the current subject appears in your learning menu.</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            {(["COMPUTER_SCIENCE", "CREATIVE_IMEDIA"] as const).map((option) => {
+              const enrolled = (profile.enrolledSubjects || [profile.subject || "COMPUTER_SCIENCE"]).includes(option);
+              return <button key={option} type="button" disabled={enrolled || enrolling || !user}
+                className="rounded-xl border border-blue-300 px-4 py-3 text-sm font-semibold text-blue-800 disabled:cursor-default disabled:bg-slate-100 disabled:text-slate-500"
+                onClick={async () => {
+                  if (!user) return;
+                  setEnrolling(true); setError("");
+                  try { await enrolStudentSubject(user.uid, option); await refreshProfile(); window.location.assign("/dashboard"); }
+                  catch (caught) { setError(caught instanceof Error ? caught.message : "Unable to add subject."); setEnrolling(false); }
+                }}>
+                {option === "COMPUTER_SCIENCE" ? "Computer Science" : "Creative iMedia"} — {enrolled ? "Enrolled" : "Add subject"}
+              </button>;
+            })}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Adding a subject opens it with OCR GCSE / Level 1–2 defaults. Use curriculum settings to change supported Computer Science options.</p>
+        </section>
+      )}
       <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm md:p-10">
         <div className="flex flex-col justify-between gap-6 md:flex-row md:items-start">
           <div>

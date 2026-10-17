@@ -15,7 +15,7 @@ import { getStudentTutorContext } from "@/services/studentTutorContextService";
 import type { TutorStudentContext } from "@/types/studentTutor";
 
 export default function TutorPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [context, setContext] =
     useState<TutorStudentContext | null>(null);
@@ -57,7 +57,7 @@ export default function TutorPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.uid]);
+  }, [user?.uid, profile?.subject]);
 
   if (loading) {
     return (
@@ -100,19 +100,19 @@ export default function TutorPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link
+            {context.subject === "COMPUTER_SCIENCE" && <Link
               href="/adaptive-learning"
               className="rounded-xl border border-white/20 px-5 py-3 font-bold"
             >
               Adaptive Learning
-            </Link>
+            </Link>}
 
-            <Link
+            {context.subject === "COMPUTER_SCIENCE" && <Link
               href="/revision-plan"
               className="rounded-xl border border-white/20 px-5 py-3 font-bold"
             >
               Revision Plan
-            </Link>
+            </Link>}
 
             <Link
               href="/dashboard"

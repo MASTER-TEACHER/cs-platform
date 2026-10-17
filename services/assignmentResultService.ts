@@ -1,11 +1,3 @@
-import {
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-
-import { db } from "@/lib/firebase";
-
 export type QuizIntegrityIncidentType =
   | "fullscreen_exit"
   | "fullscreen_restored"
@@ -48,67 +40,8 @@ export type SaveAssignmentResultInput = {
   integrityTerminationReason?: string;
 };
 
-export async function saveAssignmentResult({
-  assignmentId,
-  studentId,
-  classId,
-  teacherId,
-  assignmentType,
-  resourceId,
-  score = 0,
-  totalQuestions = 0,
-  percentage = 0,
-  earnedXP = 0,
-  timeTakenSeconds = 0,
-  deliveryMode = "practice",
-  integritySessionStartedAt = null,
-  integrityIncidents = [],
-  integrityTerminated = false,
-  integrityTerminationReason = "",
-}: SaveAssignmentResultInput) {
-  const resultId = `${assignmentId}_${studentId}`;
-
-  const resultRef = doc(
-    db,
-    "assignmentResults",
-    resultId,
-  );
-
-  await setDoc(
-    resultRef,
-    {
-      assignmentId,
-      studentId,
-      classId,
-      teacherId,
-      assignmentType,
-      resourceId,
-
-      score,
-      totalQuestions,
-      percentage,
-      earnedXP,
-      timeTakenSeconds,
-
-      status: "completed",
-
-      deliveryMode,
-
-      ...(deliveryMode === "assessment"
-        ? {
-            integritySessionStartedAt,
-            integrityIncidents,
-            integrityTerminated,
-            integrityTerminationReason,
-          }
-        : {}),
-
-      completedAt: serverTimestamp(),
-    },
-    {
-      merge: true,
-    },
-  );
-
-  return resultId;
+/** @deprecated Direct browser writes to assessed results are forbidden. */
+export async function saveAssignmentResult(_input: SaveAssignmentResultInput): Promise<string> {
+  void _input;
+  throw new Error("Legacy assignment result writes are disabled. Use /api/quiz/secure.");
 }

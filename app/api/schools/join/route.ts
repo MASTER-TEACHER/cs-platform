@@ -5,6 +5,7 @@ import {
 import {
   adminDb,
 } from "@/lib/firebaseAdmin";
+import { checkTransactionalStudentSeat, serializeSchoolMembershipChange } from "@/lib/billing/transactionalSeats";
 
 import {
   billingAuthError,
@@ -292,6 +293,8 @@ export async function POST(
             schoolRef,
           );
 
+        const freshUser = await transaction.get(userRef);
+
         if (
           !freshInvite.exists ||
           freshInvite.data()
@@ -313,6 +316,24 @@ export async function POST(
             "SCHOOL_NOT_ACTIVE",
           );
         }
+
+        if (!freshUser.exists) throw new Error("PROFILE_NOT_FOUND");
+        const currentSchoolId = typeof freshUser.data()?.schoolId === "string"
+          ? freshUser.data()!.schoolId.trim() : "";
+        if (currentSchoolId && currentSchoolId !== schoolId) throw new Error("DIFFERENT_SCHOOL");
+        if (freshInvite.data()?.schoolId !== schoolId ||
+            (freshInvite.data()?.role === "teacher" ? "teacher" : "student") !== role) {
+          throw new Error("INVITE_CHANGED");
+        }
+        const currentExpiry = freshInvite.data()?.expiresAt;
+        if (currentExpiry && typeof currentExpiry.toDate === "function" &&
+            currentExpiry.toDate().getTime() < Date.now()) throw new Error("INVITE_EXPIRED");
+        if (role === "student" && !currentSchoolId && billingEnforcementEnabled()) {
+          const subscription = await getSchoolSubscriptionSummary(schoolId);
+          if (!subscription.active) throw new Error("SUBSCRIPTION_INACTIVE");
+          await checkTransactionalStudentSeat(transaction, schoolId, subscription.seatLimit);
+        }
+        serializeSchoolMembershipChange(transaction, schoolRef);
 
         transaction.set(
           memberRef,
@@ -399,6 +420,18 @@ export async function POST(
           status: 409,
         },
       );
+    }
+
+    if (error instanceof Error) {
+      const statuses: Record<string, [number, string]> = {
+        SEAT_LIMIT_REACHED: [409, "This school has reached its CS Master student-seat limit."],
+        SUBSCRIPTION_INACTIVE: [402, "This school's CS Master subscription is not active."],
+        DIFFERENT_SCHOOL: [409, "Your account already belongs to another school."],
+        INVITE_CHANGED: [409, "The school invitation changed. Please request another code."],
+        INVITE_EXPIRED: [409, "This school join code has expired."],
+      };
+      const known = statuses[error.message];
+      if (known) return NextResponse.json({ error: known[1] }, { status: known[0] });
     }
 
     const failure =

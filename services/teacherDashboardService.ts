@@ -66,8 +66,20 @@ async function getDashboardDoc(
     return await getDoc(reference);
 
   } catch (error) {
+    const errorCode =
+      error !== null &&
+      typeof error === "object" &&
+      "code" in error &&
+      typeof error.code === "string"
+        ? error.code
+        : "";
 
-    console.error(`[Teacher dashboard] Firestore document read failed: ${label}`, error);
+    if (errorCode !== "permission-denied") {
+      console.error(
+        `[Teacher dashboard] Firestore document read failed: ${label}`,
+        error,
+      );
+    }
 
     throw error;
 

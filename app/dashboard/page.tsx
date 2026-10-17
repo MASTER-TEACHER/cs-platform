@@ -308,14 +308,12 @@ export default function DashboardPage() {
         badges={badges.length}
       />
 
-      <StudentAnalyticsSnapshot />
-
-      <AdaptiveLearningCard
-        plan={adaptivePlan}
-        loading={
-          adaptiveLoading
-        }
-      />
+      {journey.subject === "COMPUTER_SCIENCE" && (
+        <>
+          <StudentAnalyticsSnapshot />
+          <AdaptiveLearningCard plan={adaptivePlan} loading={adaptiveLoading} />
+        </>
+      )}
 
       <DashboardLearning
         mission={
@@ -335,6 +333,8 @@ export default function DashboardPage() {
         }
       />
 
+      {journey.subject === "COMPUTER_SCIENCE" && (
+        <>
       <DashboardQuiz
         recentQuiz={
           recentQuiz
@@ -366,6 +366,8 @@ export default function DashboardPage() {
           recentQuiz
         }
       />
+        </>
+      )}
     </div>
   );
 }

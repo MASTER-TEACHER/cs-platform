@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/contexts/AuthContext";
 import SchoolSubscriptionGate from "@/components/billing/SchoolSubscriptionGate";
@@ -13,6 +13,10 @@ export default function StudentAccessGate({
   children: ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const csOnlyPaths = ["/programming", "/visualisers", "/a-level-practice", "/nea", "/exam-trainer", "/model-papers", "/adaptive-learning", "/knowledge-map", "/revision-plan"];
+  const imediaOnlyPaths = ["/imedia-practice"];
+
 
   const {
     user,
@@ -21,6 +25,12 @@ export default function StudentAccessGate({
     profileReady,
     profileError,
   } = useAuth();
+
+  const currentSubject = profile?.subject === "CREATIVE_IMEDIA" ? "CREATIVE_IMEDIA" : "COMPUTER_SCIENCE";
+  const subjectBlocked = profile?.role === "student" && (
+    (currentSubject === "CREATIVE_IMEDIA" && csOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`))) ||
+    (currentSubject === "COMPUTER_SCIENCE" && imediaOnlyPaths.some((path) => pathname === path || pathname.startsWith(`${path}/`)))
+  );
 
   useEffect(() => {
     if (loading) {
@@ -35,6 +45,8 @@ export default function StudentAccessGate({
     if (!profileReady || !profile) {
       return;
     }
+
+    if (subjectBlocked) { router.replace("/dashboard"); return; }
 
     if (profile.role === "admin") {
       router.replace("/admin");
@@ -66,6 +78,7 @@ export default function StudentAccessGate({
     profileReady,
     profile,
     router,
+    subjectBlocked,
   ]);
 
   if (
@@ -86,6 +99,8 @@ export default function StudentAccessGate({
       </main>
     );
   }
+
+  if (subjectBlocked) return <main className="min-h-[60vh] p-8 text-slate-700">Returning to your selected subject...</main>;
 
   if (profileError) {
     return (

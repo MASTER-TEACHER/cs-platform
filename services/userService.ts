@@ -50,6 +50,10 @@ type FirestoreUserProfile = Omit<
   subject?:
     string | null;
 
+  activeSubject?: string | null;
+  enrolledSubjects?: string[];
+  subjectPreferences?: Record<string, { qualification?: string; examBoard?: string; currentCourse?: string }>;
+
   qualification?:
     string | null;
 
@@ -522,6 +526,14 @@ teacherVerificationRejectedAt:
       ),
 
     subject,
+    activeSubject: normaliseSubject(data.activeSubject || subject),
+    enrolledSubjects: Array.isArray(data.enrolledSubjects)
+      ? Array.from(new Set([...data.enrolledSubjects.filter((item): item is Subject => item === "COMPUTER_SCIENCE" || item === "CREATIVE_IMEDIA"), subject]))
+      : [subject],
+    subjectPreferences: {
+      ...(data.subjectPreferences?.COMPUTER_SCIENCE ? { COMPUTER_SCIENCE: { qualification: normaliseQualification(data.subjectPreferences.COMPUTER_SCIENCE.qualification), examBoard: normaliseExamBoard(data.subjectPreferences.COMPUTER_SCIENCE.examBoard), currentCourse: normaliseString(data.subjectPreferences.COMPUTER_SCIENCE.currentCourse) } } : {}),
+      ...(data.subjectPreferences?.CREATIVE_IMEDIA ? { CREATIVE_IMEDIA: { qualification: normaliseQualification(data.subjectPreferences.CREATIVE_IMEDIA.qualification), examBoard: normaliseExamBoard(data.subjectPreferences.CREATIVE_IMEDIA.examBoard), currentCourse: normaliseString(data.subjectPreferences.CREATIVE_IMEDIA.currentCourse) } } : {}),
+    },
 
     qualification,
 
@@ -858,8 +870,16 @@ export async function updateUserCourseSelection(
     string,
     unknown
   > = {
-    subject:
-      cleanedSubject,
+    subject: cleanedSubject,
+    activeSubject: cleanedSubject,
+    enrolledSubjects: Array.from(new Set([...(existingProfile?.enrolledSubjects || [existingProfile?.subject || "COMPUTER_SCIENCE"]), cleanedSubject])),
+    subjectPreferences: {
+      ...(existingProfile?.subjectPreferences || {}),
+      ...(existingProfile?.subject && existingProfile.subject !== cleanedSubject && !existingProfile.subjectPreferences?.[existingProfile.subject]
+        ? { [existingProfile.subject]: { qualification: existingProfile.qualification, examBoard: existingProfile.examBoard, currentCourse: existingProfile.currentCourse } }
+        : {}),
+      [cleanedSubject]: { qualification: cleanedQualification as Qualification, examBoard: cleanedExamBoard as ExamBoard, currentCourse: cleanedCurrentCourse },
+    },
 
     qualification:
       cleanedQualification,

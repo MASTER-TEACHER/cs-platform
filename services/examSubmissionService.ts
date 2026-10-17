@@ -1,3 +1,4 @@
+import { validateExamMarking } from "@/lib/marking/validateExamMarking";
 import {
   arrayUnion,
   collection,
@@ -687,188 +688,38 @@ export async function getAssignmentSubmissions(
     );
 }
 
-export async function saveDraftMarking({
-  assignmentId,
-  studentId,
-  answers,
-  overallFeedback,
-}: {
+async function postTeacherMarking(input: {
   assignmentId: string;
   studentId: string;
-  answers: StudentExamAnswer[];
-  overallFeedback: string;
+  answers?: StudentExamAnswer[];
+  overallFeedback?: string;
+  action: "draft" | "finalise" | "release";
+  reason?: string;
 }): Promise<void> {
-  const totalAwardedMarks =
-    answers.reduce(
-      (sum, answer) =>
-        sum +
-        (answer.awardedMarks || 0),
-      0,
-    );
-
-  await updateDoc(
-    doc(
-      db,
-      "examSubmissions",
-      createSubmissionId(
-        assignmentId,
-        studentId,
-      ),
-    ),
-    {
-      answers,
-      overallFeedback:
-        overallFeedback.trim(),
-      totalAwardedMarks,
-      status: "marking",
-      updatedAt:
-        serverTimestamp(),
-    },
-  );
+  const { auth } = await import("@/lib/firebase");
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error("Please sign in again.");
+  const response = await fetch("/api/teacher/exam-marking", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  const data: { error?: string } = await response.json();
+  if (!response.ok) throw new Error(data.error || "Marking request failed.");
 }
 
-export async function finaliseExamMarking({
-  assignmentId,
-  studentId,
-  answers,
-  overallFeedback,
-  totalAvailableMarks,
-}: {
-  assignmentId: string;
-  studentId: string;
-  answers: StudentExamAnswer[];
-  overallFeedback: string;
-  totalAvailableMarks: number;
+export async function saveDraftMarking(input: {
+  assignmentId: string; studentId: string; answers: StudentExamAnswer[]; overallFeedback: string;
 }): Promise<void> {
-  const assignmentReference = doc(
-    db,
-    "examAssignments",
-    assignmentId,
-  );
+  await postTeacherMarking({ ...input, action: "draft" });
+}
 
-  const submissionReference = doc(
-    db,
-    "examSubmissions",
-    createSubmissionId(
-      assignmentId,
-      studentId,
-    ),
-  );
+export async function finaliseExamMarking(input: {
+  assignmentId: string; studentId: string; answers: StudentExamAnswer[]; overallFeedback: string; totalAvailableMarks: number;
+}): Promise<void> {
+  await postTeacherMarking({ ...input, action: "finalise" });
+}
 
-  const totalAwardedMarks =
-    answers.reduce(
-      (sum, answer) =>
-        sum +
-        (answer.awardedMarks ?? 0),
-      0,
-    );
-
-  const safeAwardedMarks =
-    Math.min(
-      totalAvailableMarks,
-      Math.max(
-        0,
-        totalAwardedMarks,
-      ),
-    );
-
-  const percentage =
-    totalAvailableMarks > 0
-      ? Math.round(
-          (safeAwardedMarks /
-            totalAvailableMarks) *
-            100,
-        )
-      : 0;
-
-  await runTransaction(
-    db,
-    async (transaction) => {
-      const [
-        submissionSnapshot,
-        assignmentSnapshot,
-      ] = await Promise.all([
-        transaction.get(
-          submissionReference,
-        ),
-        transaction.get(
-          assignmentReference,
-        ),
-      ]);
-
-      if (
-        !submissionSnapshot.exists()
-      ) {
-        throw new Error(
-          "Submission not found.",
-        );
-      }
-
-      if (
-        !assignmentSnapshot.exists()
-      ) {
-        throw new Error(
-          "Assignment not found.",
-        );
-      }
-
-      const submissionData =
-        submissionSnapshot.data();
-
-      const assignmentData =
-        assignmentSnapshot.data();
-
-      const alreadyMarked =
-        submissionData.status ===
-        "marked";
-
-      transaction.update(
-        submissionReference,
-        {
-          answers,
-          overallFeedback:
-            overallFeedback.trim(),
-          totalAwardedMarks:
-            safeAwardedMarks,
-          totalAvailableMarks,
-          percentage,
-          status: "marked",
-          markedAt:
-            serverTimestamp(),
-          updatedAt:
-            serverTimestamp(),
-        },
-      );
-
-      if (!alreadyMarked) {
-        const currentMarkedCount =
-          typeof assignmentData.markedCount ===
-          "number"
-            ? assignmentData.markedCount
-            : 0;
-
-        const studentCount =
-          Array.isArray(
-            assignmentData.studentIds,
-          )
-            ? assignmentData
-                .studentIds.length
-            : 0;
-
-        transaction.update(
-          assignmentReference,
-          {
-            markedCount:
-              Math.min(
-                currentMarkedCount +
-                  1,
-                studentCount,
-              ),
-            updatedAt:
-              serverTimestamp(),
-          },
-        );
-      }
-    },
-  );
+export async function releaseExamResults(assignmentId: string, studentId: string): Promise<void> {
+  await postTeacherMarking({ assignmentId, studentId, action: "release" });
 }

@@ -41,6 +41,7 @@ export type TutorRecommendationType =
   | "review";
 
 export type TutorStudentContext = {
+  subject: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA";
   studentId: string;
   name: string;
   qualification: string;
