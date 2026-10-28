@@ -58,6 +58,7 @@ const studentLinks: SidebarLink[] = [
 
 const teacherLinks: SidebarLink[] = [
   { href: "/teacher", label: "Dashboard" },
+  { href: "/teacher/marking-centre", label: "AI Examination Marking" },
   { href: "/teacher/analytics", label: "Analytics" },
   { href: "/teacher/knowledge-map", label: "Class Knowledge Map" },
   { href: "/teacher/interventions", label: "Interventions" },
@@ -71,6 +72,7 @@ const teacherLinks: SidebarLink[] = [
   { href: "/teacher/billing", label: "Billing" },
   { href: "/teacher/assignments", label: "Assignments" },
   { href: "/teacher/exam-assignments", label: "Exam Assignments" },
+  { href: "/teacher/exam-builder", label: "Exam Builder" },
   { href: "/teacher/assignment-wizard", label: "Assignment Wizard" },
   { href: "/teacher/quiz-generator", label: "AI Quiz Generator" },
   { href: "/teacher/quiz-library", label: "Quiz Library" },

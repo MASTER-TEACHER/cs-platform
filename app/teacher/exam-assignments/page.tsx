@@ -73,6 +73,7 @@ export default function TeacherExamAssignmentsPage() {
             </p>
           </div>
 
+          <Link href="/teacher/exam-builder" className="rounded-xl bg-emerald-500 px-5 py-3 text-center font-bold text-white">Build an exam</Link>
           <Link
             href="/teacher/question-bank"
             className="rounded-xl bg-white px-5 py-3 text-center font-bold text-indigo-800"

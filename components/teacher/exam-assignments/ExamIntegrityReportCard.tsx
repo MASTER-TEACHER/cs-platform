@@ -145,7 +145,9 @@ export default function ExamIntegrityReportCard({
             No integrity incidents were recorded for this submission.
           </p>
         ) : (
-          <div className="space-y-3">
+          <details className="group" open={incidents.length <= 5}>
+            <summary className="cursor-pointer rounded-lg bg-slate-100 px-4 py-3 font-bold text-slate-900">Show integrity events ({incidents.length})</summary>
+            <div className="mt-3 max-h-96 space-y-3 overflow-y-auto">
             {incidents.map(
               (incident) => (
                 <div
@@ -177,7 +179,8 @@ export default function ExamIntegrityReportCard({
                 </div>
               ),
             )}
-          </div>
+            </div>
+          </details>
         )}
 
         <p className="mt-5 text-xs leading-5 text-slate-500">

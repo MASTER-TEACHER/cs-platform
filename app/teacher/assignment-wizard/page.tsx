@@ -83,6 +83,7 @@ export default function AssignmentWizardPage() {
     useState(false);
   const [submitting, setSubmitting] =
     useState(false);
+  const [createdExamAssignmentIds, setCreatedExamAssignmentIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -436,12 +437,11 @@ export default function AssignmentWizardPage() {
             totalMarks: questionSet.totalMarks,
           };
 
+          setCreatedExamAssignmentIds([]);
           setWizardData((current) => ({
             ...current,
             resource,
-            instructions:
-              current.instructions ||
-              "Complete the written assessment under the conditions set by your teacher.",
+            instructions: "Complete the written assessment under the conditions set by your teacher.",
           }));
           setStep("classes");
           toast.success("Exam paper loaded into the assignment wizard.");
@@ -721,7 +721,15 @@ export default function AssignmentWizardPage() {
           );
         }
 
-        await Promise.all(
+        // Verify the exact saved paper before assigning; never silently substitute
+        // another question set with the same title.
+        if (questionSet.teacherId !== user.uid || questionSet.id !== resource.resourceId ||
+            questionSet.status !== "published" ||
+            questionSet.content.questions.length !== resource.questionCount ||
+            questionSet.content.questions.reduce((sum, q) => sum + q.marks, 0) !== resource.totalMarks) {
+          throw new Error("The saved paper no longer matches the selected questions. Return to Exam Builder and save it again.");
+        }
+        const createdIds = await Promise.all(
           recipientGroups.map((group) =>
             createExamAssignment({
               teacherId: user.uid,
@@ -738,6 +746,7 @@ export default function AssignmentWizardPage() {
             }),
           ),
         );
+        setCreatedExamAssignmentIds(createdIds);
       } else if (
         resource.resourceType === "quiz" ||
         resource.resourceType === "ai-quiz"
@@ -1019,6 +1028,20 @@ export default function AssignmentWizardPage() {
               setStep("review")
             }
           />
+        </div>
+      )}
+
+      {createdExamAssignmentIds.length > 0 && (
+        <div className="rounded-xl border border-green-300 bg-green-50 p-4 text-slate-900" role="status">
+          <p className="font-bold">Exam assignment created successfully</p>
+          <p className="mt-1 text-sm">Open the exact new assignment below to verify its questions. Older assignments with the same title are separate records.</p>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {createdExamAssignmentIds.map((id, index) => (
+              <Link key={id} className="font-semibold text-blue-800 underline" href={`/teacher/exam-assignments/${encodeURIComponent(id)}`}>
+                Open newly created assignment {index + 1}
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

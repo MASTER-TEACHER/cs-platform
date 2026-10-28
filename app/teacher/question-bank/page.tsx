@@ -66,6 +66,7 @@ export default function QuestionBankPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
+            <Link href="/teacher/exam-builder" className="rounded-xl bg-emerald-500 px-5 py-3 text-center font-bold text-white">Build a paper</Link>
             <Link href="/teacher/content" className="rounded-xl border border-white/25 bg-white/10 px-5 py-3 text-center font-bold text-white">
               Content Hub
             </Link>

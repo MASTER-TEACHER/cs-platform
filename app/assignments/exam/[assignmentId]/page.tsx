@@ -1324,7 +1324,9 @@ export default function StudentWrittenExamPage() {
       !assignment ||
       submittingRef.current ||
       terminatingRef.current ||
-      stage !== "active"
+      stage !== "active" ||
+      questions.length === 0 ||
+      currentIndex !== questions.length - 1
     ) {
       return;
     }
@@ -2047,6 +2049,8 @@ export default function StudentWrittenExamPage() {
                 Save
               </button>
 
+              {questions.length > 0 &&
+                currentIndex === questions.length - 1 && (
               <button
                 type="button"
                 onClick={() =>
@@ -2063,6 +2067,7 @@ export default function StudentWrittenExamPage() {
                   ? "Submitting..."
                   : "Submit exam"}
               </button>
+                )}
             </div>
           </div>
         </section>
