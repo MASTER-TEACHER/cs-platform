@@ -187,3 +187,75 @@ export async function deleteExamQuestionSet(
 ): Promise<void> {
   await deleteDoc(doc(db, COLLECTION_NAME, questionSetId));
 }
+
+
+export type ExamPaperReview = Record<
+  string,
+  {
+    status: "pending" | "reviewed" | "needs-changes";
+    reviewedAt: string | null;
+  }
+>;
+
+export async function updateTeacherExamQuestionSet(
+  teacherId: string,
+  questionSetId: string,
+  content: GeneratedExamQuestionSet,
+  review: ExamPaperReview,
+): Promise<void> {
+  if (!teacherId.trim() || !questionSetId.trim()) {
+    throw new Error("Teacher and paper are required.");
+  }
+
+  const reference = doc(db, COLLECTION_NAME, questionSetId);
+  const snapshot = await getDoc(reference);
+
+  if (!snapshot.exists()) {
+    throw new Error("This saved paper no longer exists.");
+  }
+
+  const data = snapshot.data();
+
+  if (data.teacherId !== teacherId) {
+    throw new Error("You cannot edit another teacher's paper.");
+  }
+
+  if (data.status !== "draft") {
+    throw new Error(
+      "Only draft papers can be edited. Duplicate a published paper first.",
+    );
+  }
+
+  await updateDoc(reference, {
+    title: content.title,
+    topic: content.topic,
+    qualification: content.qualification,
+    examBoard: content.examBoard,
+    difficulty: content.difficulty,
+    questionCount: content.questionCount,
+    totalMarks: content.totalMarks,
+    content,
+    review,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getTeacherPaperReview(
+  teacherId: string,
+  questionSetId: string,
+): Promise<ExamPaperReview> {
+  const reference = doc(db, COLLECTION_NAME, questionSetId);
+  const snapshot = await getDoc(reference);
+
+  if (!snapshot.exists()) {
+    throw new Error("Paper not found.");
+  }
+
+  const data = snapshot.data();
+
+  if (data.teacherId !== teacherId) {
+    throw new Error("You cannot access another teacher's review.");
+  }
+
+  return (data.review ?? {}) as ExamPaperReview;
+}

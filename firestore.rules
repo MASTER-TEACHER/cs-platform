@@ -2318,6 +2318,43 @@ match /users/{userId}/examTrainerResults/{resultId} {
     // Deny collections not explicitly listed
     // ------------------------------------------------------------
 
+    match /questionLibrary/{questionId} {
+
+  allow get, list: if isTeacher() &&
+    resource.data.teacherId == currentUserId();
+
+  allow create: if isTeacher() &&
+    request.resource.data.teacherId == currentUserId() &&
+    request.resource.data.id == questionId &&
+    request.resource.data.reviewStatus in [
+      "draft",
+      "needs_review",
+      "approved"
+    ] &&
+    request.resource.data.question is string &&
+    request.resource.data.marks is int &&
+    request.resource.data.marks > 0 &&
+    request.resource.data.markScheme is list;
+
+  allow update: if isTeacher() &&
+    resource.data.teacherId == currentUserId() &&
+    request.resource.data.teacherId ==
+      resource.data.teacherId &&
+    request.resource.data.id == questionId &&
+    request.resource.data.reviewStatus in [
+      "draft",
+      "needs_review",
+      "approved"
+    ];
+
+  allow delete: if isTeacher() &&
+    resource.data.teacherId == currentUserId();
+}
+    // Student Question Bank attempts are server-managed.
+    // The Admin SDK routes enforce authenticated student ownership.
+    match /users/{userId}/questionBankAttempts/{attemptId} {
+      allow read, write: if false;
+    }
     match /{document=**} {
       allow read, write: if false;
     }

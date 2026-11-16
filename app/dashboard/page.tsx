@@ -299,6 +299,25 @@ export default function DashboardPage() {
         </section>
       )}
 
+      <section className="rounded-3xl border border-blue-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">
+              Student Question Bank
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Practise Computer Science and Creative iMedia questions,
+              review your answers and print practice papers.
+            </p>
+          </div>
+          <Link
+            href="/student-question-bank"
+            className="inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-700 px-5 py-3 font-bold text-white hover:bg-blue-800"
+          >
+            Open Question Bank
+          </Link>
+        </div>
+      </section>
       <DashboardStats
         xp={xp}
         completedLessons={
