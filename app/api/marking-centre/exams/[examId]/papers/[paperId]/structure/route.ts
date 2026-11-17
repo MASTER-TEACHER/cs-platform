@@ -36,7 +36,7 @@ function fail(error: unknown) {
   if (error instanceof Error && error.message === "CENTRE_SCHEME_PDF_FAILED") return NextResponse.json({ error: "Mark scheme extraction failed. Check the uploaded PDF." }, { status: 422, headers });
   if (error instanceof Error && error.message === "CENTRE_DUPLICATE_PDF_TEXT") return NextResponse.json({ error: "Question paper and mark scheme contain identical extracted text. Check the uploaded PDFs." }, { status: 422, headers });
   if (error instanceof Error && error.message === "CENTRE_STORAGE_UNAVAILABLE") return NextResponse.json({ error: "Storage credentials unavailable." }, { status: 503, headers });
-  if (error instanceof Error && error.message === "CENTRE_MISSING_DOCUMENTS") return NextResponse.json({ error: "Upload both the question paper and mark scheme first." }, { status: 400, headers });
+  if (error instanceof Error && error.message === "CENTRE_MISSING_DOCUMENTS") return NextResponse.json({ error: "Upload a question paper PDF first." }, { status: 400, headers });
   if (error instanceof Error && error.message === "CENTRE_APPROVED") return NextResponse.json({ error: "Approved structures cannot be edited or re-extracted in Phase 3." }, { status: 409, headers });
   if (error instanceof Error && error.message === "CENTRE_INVALID") return NextResponse.json({ error: "Invalid question structure. Check question IDs, marks and criteria." }, { status: 400, headers });
   const result = centreError(error);
@@ -58,7 +58,7 @@ export async function POST(request: Request, context: Context) {
     const previous = await structureRef.get();
     if (previous.data()?.status === "approved") throw new Error("CENTRE_APPROVED");
     const docs = await Promise.all(["questionPaper", "markScheme"].map(kind => ref.collection("paperDocuments").doc(`${paperId}_${kind}`).get()));
-    if (docs.some(doc => !doc.exists || typeof doc.data()?.path !== "string")) throw new Error("CENTRE_MISSING_DOCUMENTS");
+    if (!docs[0].exists || typeof docs[0].data()?.path !== "string") throw new Error("CENTRE_MISSING_DOCUMENTS");
     const bucketName = process.env.FIREBASE_ADMIN_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucketName) throw new Error("CENTRE_STORAGE_UNAVAILABLE");
     const bucket = storage().bucket(bucketName);
@@ -66,6 +66,10 @@ export async function POST(request: Request, context: Context) {
     const kinds = ["question paper", "mark scheme"];
 
     for (let i = 0; i < docs.length; i++) {
+      if (!docs[i].exists) {
+        results.push({ text: "", pages: 0, truncated: false });
+        continue;
+      }
       const path = docs[i].data()?.path as string;
       const [bytes] = await bucket.file(path).download();
 
@@ -83,11 +87,11 @@ export async function POST(request: Request, context: Context) {
       }
     }
 
-    if (results[0].text.trim() === results[1].text.trim()) {
+    if (results[1].text.trim() && results[0].text.trim() === results[1].text.trim()) {
       throw new Error("CENTRE_DUPLICATE_PDF_TEXT");
     }
     // Preserve teacher-entered draft questions on re-extraction, never silently overwrite edits.
-    await structureRef.set({ paperId, status: "draft", questionText: results[0].text, markSchemeText: results[1].text, questionPages: results[0].pages, markSchemePages: results[1].pages, questionTextTruncated: results[0].truncated, markSchemeTextTruncated: results[1].truncated, questions: previous.data()?.questions ?? [], extractedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    await structureRef.set({ paperId, status: "draft", questionText: results[0].text, markSchemeText: results[1].text, schemeSource: results[1].text.trim() ? "uploaded" : "no_uploaded_scheme", questionPages: results[0].pages, markSchemePages: results[1].pages, questionTextTruncated: results[0].truncated, markSchemeTextTruncated: results[1].truncated, questions: previous.data()?.questions ?? [], extractedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     return NextResponse.json({ message: "PDF text extracted. Verify the text and enter question-level marking criteria before approval.", textLengths: results.map(result => result.text.length) }, { headers });
   } catch (error) { console.error("[Marking Centre] Extraction:", error instanceof Error ? error.message : error); return fail(error); }
 }
@@ -99,7 +103,7 @@ export async function PUT(request: Request, context: Context) {
     if (existing.data()?.status === "approved") throw new Error("CENTRE_APPROVED");
     const body: unknown = await request.json();
     if (!body || typeof body !== "object") throw new Error("CENTRE_INVALID");
-    const input = body as { questions?: unknown; approve?: unknown };
+    const input = body as { questions?: unknown; approve?: unknown; criteriaOrigin?: unknown };
     if (!Array.isArray(input.questions) || input.questions.length < 1 || input.questions.length > MAX_QUESTIONS || typeof input.approve !== "boolean") throw new Error("CENTRE_INVALID");
     const questions: Question[] = [];
     const seen = new Set<string>();
@@ -116,7 +120,24 @@ export async function PUT(request: Request, context: Context) {
     const totalMarks = questions.reduce((sum, q) => sum + q.maxMarks, 0);
     if (totalMarks > 1000) throw new Error("CENTRE_INVALID");
     const approved = input.approve === true;
-    await structureRef.set({ paperId, questions, totalMarks, status: approved ? "approved" : "draft", updatedAt: FieldValue.serverTimestamp(), ...(approved ? { approvedAt: FieldValue.serverTimestamp(), approvedBy: actor.uid } : {}) }, { merge: true });
+    const uploadedScheme = Boolean(
+      typeof existing.data()?.markSchemeText === "string" &&
+      existing.data()?.markSchemeText.trim()
+    );
+    const requestedOrigin = input.criteriaOrigin;
+    if (
+      requestedOrigin !== undefined &&
+      !["manual", "ai-assisted"].includes(String(requestedOrigin))
+    ) throw new Error("CENTRE_INVALID");
+
+    const criteriaProvenance = uploadedScheme
+      ? requestedOrigin === "ai-assisted"
+        ? "teacher_verified_ai_assisted_uploaded_scheme"
+        : "teacher_verified_uploaded_scheme"
+      : requestedOrigin === "ai-assisted"
+        ? "teacher_verified_ai_generated_draft"
+        : "teacher_authored_without_uploaded_scheme";
+    await structureRef.set({ paperId, questions, totalMarks, schemeSource: existing.data()?.schemeSource ?? "teacher_entered", criteriaProvenance, status: approved ? "approved" : "draft", updatedAt: FieldValue.serverTimestamp(), ...(approved ? { approvedAt: FieldValue.serverTimestamp(), approvedBy: actor.uid } : {}) }, { merge: true });
     return NextResponse.json({ status: approved ? "approved" : "draft", totalMarks }, { headers });
   } catch (error) { return fail(error); }
 }
@@ -133,7 +154,8 @@ export async function PATCH(request: Request, context: Context) {
     if (data?.status === "approved") throw new Error("CENTRE_APPROVED");
     const questionText = typeof data?.questionText === "string" ? data.questionText : "";
     const markSchemeText = typeof data?.markSchemeText === "string" ? data.markSchemeText : "";
-    if (!questionText.trim() || !markSchemeText.trim()) return NextResponse.json({ error: "Extract both uploaded PDFs first. Scanned PDFs without selectable text require manual review." }, { status: 400, headers });
+    if (!questionText.trim()) return NextResponse.json({ error: "Extract the question paper first. Scanned PDFs without selectable text require manual transcription." }, { status: 400, headers });
+    if (data?.questionTextTruncated || data?.markSchemeTextTruncated) return NextResponse.json({ error: "The extracted PDF text is truncated. Review the complete document manually before AI generation." }, { status: 422, headers });
     const { suggestPaperStructure } = await import("@/lib/marking/autoStructure");
     const suggestion = await suggestPaperStructure({ questionText, markSchemeText, truncated: Boolean(data?.questionTextTruncated || data?.markSchemeTextTruncated) });
     return NextResponse.json({ suggestion }, { headers });
