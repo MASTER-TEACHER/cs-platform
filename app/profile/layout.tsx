@@ -1,3 +1,4 @@
+import AccessibilityPanel from "@/components/accessibility/AccessibilityPanel";
 import type { ReactNode } from "react";
 
 import AccountMembershipCard from "@/components/profile/AccountMembershipCard";
@@ -15,6 +16,7 @@ export default function ProfileLayout({
       <AccountMembershipCard />
 
       {children}
+      <AccessibilityPanel embedded />
     </div>
   );
 }

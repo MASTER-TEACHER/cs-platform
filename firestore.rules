@@ -456,6 +456,68 @@ function managesClass(classId) {
     // ------------------------------------------------------------
 
   match /users/{userId} {
+    // CS MASTER SEND: private per-user accessibility preferences.
+    match /preferences/{preferenceId} {
+      allow get: if signedIn() &&
+        currentUserId() == userId &&
+        preferenceId == "accessibility";
+
+      allow list: if false;
+
+      allow create, update: if signedIn() &&
+        currentUserId() == userId &&
+        preferenceId == "accessibility" &&
+        request.resource.data.keys().hasAll([
+          "font",
+          "background",
+          "size",
+          "spacing",
+          "letterSpacing",
+          "highContrast",
+          "reducedMotion",
+          "simplified",
+          "readingRuler",
+          "focusMode"
+        ]) &&
+        request.resource.data.keys().hasOnly([
+          "font",
+          "background",
+          "size",
+          "spacing",
+          "letterSpacing",
+          "highContrast",
+          "reducedMotion",
+          "simplified",
+          "readingRuler",
+          "focusMode"
+        ]) &&
+        request.resource.data.font in [
+          "arial", "verdana", "tahoma", "georgia", "trebuchet"
+        ] &&
+        request.resource.data.background in [
+          "default", "cream", "blue", "green",
+          "peach", "lavender", "dark", "black"
+        ] &&
+        request.resource.data.size in [
+          100, 110, 120, 130, 150, 175, 200
+        ] &&
+        request.resource.data.spacing in [
+          "normal", "comfortable", "wide"
+        ] &&
+        request.resource.data.letterSpacing in [
+          "normal", "comfortable", "wide"
+        ] &&
+        request.resource.data.highContrast is bool &&
+        request.resource.data.reducedMotion is bool &&
+        request.resource.data.simplified is bool &&
+        request.resource.data.readingRuler is bool &&
+        request.resource.data.focusMode is bool;
+
+      allow delete: if signedIn() &&
+        currentUserId() == userId &&
+        preferenceId == "accessibility";
+    }
+
 
   allow get: if signedIn() &&
     (

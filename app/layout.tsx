@@ -1,3 +1,4 @@
+import AccessibilityPanel from "@/components/accessibility/AccessibilityPanel";
 
 import type { Metadata } from "next";
 import "./globals.css";
@@ -56,6 +57,7 @@ export default function RootLayout({
       <body>
         <AuthProvider>
           <IdleSessionGuard />
+          <AccessibilityPanel />
           <ProgressProvider>
             <RequireCourse>
               <AppShell>{children}</AppShell>
