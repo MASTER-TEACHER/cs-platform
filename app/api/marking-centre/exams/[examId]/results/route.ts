@@ -77,6 +77,9 @@ export async function GET(request: Request, context: Context) {
   const scriptsByKey = new Map(scripts.docs.map(doc => [doc.id, doc.data()]));
   const rows = candidates.docs.map(doc => {
    const code = doc.id; let total = 0; const scores: Record<string, number | null> = {}; let complete = true;
+   // Provisional = AI-proposed (not yet approved) marks for the current mark scheme. Shown so the
+   // teacher can see results immediately; never used for final totals, grades or exports of approved results.
+   let provisionalTotal = 0; let provisionalComplete = true; const provisionalScores: Record<string, number | null> = {};
    for (const paper of papers) {
     const key = `${paper.id}_${code}`;
     const r = byKey.get(key); const script = scriptsByKey.get(key);
@@ -86,9 +89,15 @@ export async function GET(request: Request, context: Context) {
     const currentHash = structure?.questions ? createHash("sha256").update(JSON.stringify(structure.questions)).digest("hex") : "";
     if (!valid || r?.structureHash !== currentHash) { complete = false; scores[paper.id] = null; }
     else { const paperTotal = r.marks.reduce((sum: number, m: { awardedMarks: number }) => sum + m.awardedMarks, 0); scores[paper.id] = paperTotal; total += paperTotal; }
+    const proposedUsable = ["proposed", "reviewing", "approved"].includes(r?.status) && r?.structureHash === currentHash &&
+      Array.isArray(r?.marks) && r.marks.length === structure?.questions?.length;
+    if (proposedUsable) { const t = r.marks.reduce((sum: number, m: { awardedMarks: number }) => sum + (Number(m.awardedMarks) || 0), 0); provisionalScores[paper.id] = t; provisionalTotal += t; }
+    else { provisionalComplete = false; provisionalScores[paper.id] = null; }
    }
    const grade = complete && gradeReady ? (boundaries.find(b => total >= b.minimum)?.grade ?? "U") : null;
-   return { candidateCode: code, paperScores: scores, total: complete ? total : null, maximum, grade, status: complete ? "approved" : "incomplete" };
+   const provisionalGrade = !complete && provisionalComplete && gradeReady ? (boundaries.find(b => provisionalTotal >= b.minimum)?.grade ?? "U") : null;
+   return { candidateCode: code, paperScores: scores, total: complete ? total : null, maximum, grade, status: complete ? "approved" : provisionalComplete ? "provisional" : "incomplete",
+     provisionalScores, provisionalTotal: !complete && provisionalComplete ? provisionalTotal : null, provisionalGrade };
   });
   if (new URL(request.url).searchParams.get("format") === "csv") {
    const lines = [["Candidate code", ...papers.map(p => p.title || p.id), "Total", "Maximum", "Grade", "Status"].map(csvCell).join(",")];

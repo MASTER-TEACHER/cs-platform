@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, requireCentreTeacher } from "@/lib/marking/centre";
-import { extractMarkingPdf } from "@/lib/marking/extractPdf";
+import { extractCandidatePdf } from "@/lib/marking/visionPdf";
+import { transcriptCache } from "@/lib/marking/transcriptCache";
 
 export type MarkQuestion = { id: string; maxMarks: number; criteria: string; notes: string };
 export type ReviewMark = { questionId: string; answerText: string; awardedMarks: number; feedback: string; improvementGuidance?: string; evidence: string; confidence: "high" | "medium" | "low"; needsReview: boolean; teacherJustification?: string };
@@ -19,7 +20,7 @@ function storageClient() {
 export async function loadReviewContext(request: Request, examId: string, paperId: string, candidateCode: string) {
   const actor = await requireAuthenticatedUser(request);
   requireCentreTeacher(actor);
-  if (!/^[\w-]{1,128}$/.test(examId) || !/^paper-\d{1,2}$/.test(paperId) || !/^EX-[A-F0-9]{16}$/.test(candidateCode)) throw new Error("CENTRE_INVALID");
+  if (!/^[\w-]{1,128}$/.test(examId) || !/^paper-\d{1,2}$/.test(paperId) || !/^[A-Z0-9][A-Z0-9_-]{0,127}$/.test(candidateCode)) throw new Error("CENTRE_INVALID");
   const examRef = centreCollection.doc(examId);
   const exam = await examRef.get();
   if (!exam.exists || exam.data()?.ownerId !== actor.uid || !Array.isArray(exam.data()?.papers) || !exam.data()?.papers.some((p: {id:string}) => p.id === paperId)) throw new Error("CENTRE_NOT_FOUND");
@@ -41,7 +42,7 @@ export async function loadReviewContext(request: Request, examId: string, paperI
     reviewRef: examRef.collection("markingReviews").doc(`${paperId}_${candidateCode}`) };
 }
 export async function extractReviewText(ctx: ReviewContext) {
-  const extracted = await extractMarkingPdf(ctx.bytes);
+  const extracted = await extractCandidatePdf(ctx.bytes, transcriptCache(ctx.examRef, ctx.paperId, ctx.candidateCode, ctx.bytes, ctx.scriptHash));
   if (!extracted.text.trim()) throw new Error("CENTRE_SCAN");
   if (extracted.truncated) throw new Error("CENTRE_TRUNCATED");
   return extracted.text;

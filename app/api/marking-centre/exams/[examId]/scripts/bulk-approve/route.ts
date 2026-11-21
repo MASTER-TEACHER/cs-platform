@@ -19,7 +19,9 @@ export async function POST(request: Request, context: Context) {
     const examRef = centreCollection.doc(examId);
     const exam = await examRef.get();
     if (!exam.exists || exam.data()?.ownerId !== actor.uid) return NextResponse.json({ error: "Examination not found." }, { status: 404, headers });
-    const body = await request.json() as { selections?: Selection[]; confirmed?: boolean; moderationNote?: string };
+    const body = await request.json() as { selections?: Selection[]; confirmed?: boolean; moderationNote?: string; includeFlagged?: boolean; flagsReviewed?: boolean };
+    // Flagged scripts may be bulk-approved only when the teacher explicitly confirms they reviewed the flags.
+    const withFlags = body.includeFlagged === true && body.flagsReviewed === true;
     if (body.confirmed !== true || !Array.isArray(body.selections) || body.selections.length < 1 || body.selections.length > 20 ||
       typeof body.moderationNote !== "string" || body.moderationNote.trim().length < 12 || body.moderationNote.length > 1000 ||
       body.selections.some(s => !valid(s?.paperId) || !valid(s?.candidateCode) || !Number.isInteger(s.expectedRevision) || s.expectedRevision < 1)) {
@@ -39,8 +41,12 @@ export async function POST(request: Request, context: Context) {
             data.scriptHash !== ctx.scriptHash || data.structureHash !== ctx.structureHash) throw new Error("Stale or unavailable review");
           validateMarks(data.marks, ctx.questions);
           const marks = data.marks as ReviewMark[];
-          if (qualityFlags(marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : []).length) throw new Error("Unresolved quality flags");
-          if (marks.some(m => m.confidence !== "high" || m.needsReview || isExplicitNonAnswer(m.answerText) ||
+          const flags = qualityFlags(marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : []);
+          if (flags.length && !withFlags) throw new Error("Unresolved quality flags");
+          // Never bulk-approve credit for a blank answer, or unsupported claims of working, even with flags acknowledged.
+          if (marks.some(m => (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
+            unsupportedWorkingClaim(m.answerText, [m.feedback, m.evidence, m.improvementGuidance ?? ""].join(" ")))) throw new Error("Manual review required");
+          if (!withFlags && marks.some(m => m.confidence !== "high" || m.needsReview || (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
             unsupportedWorkingClaim(m.answerText, [m.feedback, m.evidence, m.improvementGuidance ?? ""].join(" ")) ||
             (m.teacherJustification ?? "").trim() || !m.feedback.trim() || !m.evidence.trim() ||
             (m.awardedMarks < (ctx.questions.find(q => q.id === m.questionId)?.maxMarks ?? 0) && !m.improvementGuidance?.trim()))) throw new Error("Manual review required");
@@ -48,8 +54,9 @@ export async function POST(request: Request, context: Context) {
           if (!Array.isArray(originals) || originals.length !== marks.length || marks.some(m => originals.find(o => o.questionId === m.questionId)?.awardedMarks !== m.awardedMarks)) throw new Error("Teacher override requires individual approval");
           const total = marks.reduce((sum, m) => sum + m.awardedMarks, 0);
           tx.update(ctx.reviewRef, { status: "approved", total, revision: data.revision + 1, approvedAt: FieldValue.serverTimestamp(), approvedBy: actor.uid,
-            approvalMethod: "teacher_confirmed_bulk", moderationNote: body.moderationNote!.trim(), updatedAt: FieldValue.serverTimestamp(), qualityFlags: [] });
-          tx.set(ctx.reviewRef.collection("audit").doc(), { action: "bulk_approve", actorId: actor.uid, at: FieldValue.serverTimestamp(), revision: data.revision + 1,
+            approvalMethod: flags.length ? "teacher_confirmed_bulk_with_flags" : "teacher_confirmed_bulk", moderationNote: body.moderationNote!.trim(), updatedAt: FieldValue.serverTimestamp(), qualityFlags: [],
+            ...(flags.length ? { acknowledgedFlags: flags } : {}) });
+          tx.set(ctx.reviewRef.collection("audit").doc(), { action: flags.length ? "bulk_approve_with_flags" : "bulk_approve", acknowledgedFlags: flags, actorId: actor.uid, at: FieldValue.serverTimestamp(), revision: data.revision + 1,
             previousMarks: marks, marks, moderationNote: body.moderationNote!.trim(), sourceRevision: data.revision });
         });
         outcomes.push({ paperId: selection.paperId, candidateCode: selection.candidateCode, approved: true });

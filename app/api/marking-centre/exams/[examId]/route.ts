@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
+import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, cleanText, requireCentreTeacher } from "@/lib/marking/centre";
 
@@ -38,30 +39,53 @@ export async function PATCH(request: Request, context: Context) {
   }
 }
 
+// Deletes an examination and EVERYTHING in it: papers, mark schemes, candidate codes, scripts,
+// transcriptions, marking reviews and results. Because this is permanent, the request must
+// carry the exact examination title (typed by the teacher) as confirmation. A small deletion
+// record (no candidate data) is kept for accountability.
+function storageClient(): Storage {
+  const projectId = process.env.FIREBASE_ADMIN_PROJECT_ID?.trim();
+  const email = process.env.FIREBASE_ADMIN_CLIENT_EMAIL?.trim();
+  const encoded = process.env.FIREBASE_ADMIN_PRIVATE_KEY_BASE64?.trim();
+  if (projectId && email && encoded) return new Storage({ projectId, credentials: { client_email: email, private_key: Buffer.from(encoded, "base64").toString("utf8") } });
+  return new Storage({ projectId: projectId || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT });
+}
+
 export async function DELETE(request: Request, context: Context) {
   try {
-    const { ref, actor } = await owned(request, context);
-    const result = await ref.firestore.runTransaction(async tx => {
-      const exam = await tx.get(ref);
-      if (!exam.exists) throw new Error("CENTRE_NOT_FOUND");
-      if ((exam.data()?.candidateCount ?? 0) > 0) return false;
-      // Never delete an exam with uploaded files, candidates, marking records, or other subcollections.
-      // A legacy examination may have candidate records without a correct count.
-      return true;
-    });
-    if (!result) return NextResponse.json({ error: "Cannot delete an examination with candidates. Preserve its assessment records." }, { status: 409, headers });
-    const collections = await ref.listCollections();
-    for (const collection of collections) {
-      const snapshot = await collection.limit(1).get();
-      if (!snapshot.empty) return NextResponse.json({ error: "This examination contains saved documents or records and cannot be deleted safely." }, { status: 409, headers });
+    const { ref, snap, actor } = await owned(request, context);
+    const data = snap.data() ?? {};
+    const title = typeof data.title === "string" ? data.title : "";
+    let confirmTitle = "";
+    try {
+      const body: unknown = await request.json();
+      if (body && typeof body === "object" && typeof (body as { confirmTitle?: unknown }).confirmTitle === "string") {
+        confirmTitle = (body as { confirmTitle: string }).confirmTitle.trim();
+      }
+    } catch { /* no body */ }
+    if (!title || confirmTitle !== title.trim()) {
+      return NextResponse.json({ error: "To delete, type the examination title exactly as shown." }, { status: 400, headers });
     }
-    // Re-check ownership and count immediately before deleting.
-    await ref.firestore.runTransaction(async tx => {
-      const latest = await tx.get(ref);
-      if (!latest.exists || latest.data()?.ownerId !== actor.uid) throw new Error("CENTRE_NOT_FOUND");
-      if ((latest.data()?.candidateCount ?? 0) !== 0) throw new Error("CENTRE_LIMIT");
-      tx.delete(ref);
+
+    // 1. Files in Cloud Storage (question papers, mark schemes, candidate scripts).
+    const bucketName = process.env.FIREBASE_ADMIN_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    if (bucketName) {
+      try {
+        await storageClient().bucket(bucketName).deleteFiles({ prefix: `marking-centre/${actor.uid}/${ref.id}/`, force: true });
+      } catch (error) {
+        console.error("[Marking Centre] storage cleanup failed for deleted exam", ref.id, error instanceof Error ? error.message : error);
+        return NextResponse.json({ error: "Could not delete the examination's files. Nothing was deleted; please retry." }, { status: 502, headers });
+      }
+    }
+
+    // 2. Accountability record without candidate data.
+    await ref.firestore.collection("markingCentreDeletions").add({
+      examId: ref.id, title, subject: data.subject ?? null, ownerId: actor.uid,
+      candidateCount: data.candidateCount ?? 0, deletedAt: FieldValue.serverTimestamp(),
     });
+
+    // 3. The examination document and all subcollections (candidates, structures, reviews, transcripts...).
+    await ref.firestore.recursiveDelete(ref);
     return NextResponse.json({ ok: true }, { headers });
   } catch (error) {
     const result = centreError(error);

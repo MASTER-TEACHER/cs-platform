@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { extractMarkingPdf } from "@/lib/marking/extractPdf";
+import { extractCandidatePdf, VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
+import { transcriptCache } from "@/lib/marking/transcriptCache";
 import { alignAnswers } from "@/lib/marking/alignAnswers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 const headers = { "Cache-Control": "private, no-store" };
 type Context = { params: Promise<{ examId: string }> };
 function storageClient(): Storage {
@@ -19,6 +21,7 @@ function storageClient(): Storage {
 }
 function fail(error: unknown) {
   const messages: Record<string, [number, string]> = {
+    ...VISION_ERROR_MESSAGES,
     CENTRE_NOT_APPROVED: [409, "Approve the paper structure before identifying answers."],
     CENTRE_SCRIPT_NOT_FOUND: [404, "Candidate script not found."],
     CENTRE_STORAGE_UNAVAILABLE: [503, "Storage credentials unavailable."],
@@ -44,7 +47,7 @@ export async function POST(request: Request, context: Context) {
     if (!body || typeof body !== "object") throw new Error("CENTRE_INVALID");
     const input = body as { paperId?: unknown; candidateCode?: unknown };
     const paperId = input.paperId; const candidateCode = input.candidateCode;
-    if (typeof paperId !== "string" || !/^paper-\d{1,2}$/.test(paperId) || typeof candidateCode !== "string" || !/^EX-[A-F0-9]{16}$/.test(candidateCode)) throw new Error("CENTRE_INVALID");
+    if (typeof paperId !== "string" || !/^paper-\d{1,2}$/.test(paperId) || typeof candidateCode !== "string" || !/^[A-Z0-9][A-Z0-9_-]{0,127}$/.test(candidateCode)) throw new Error("CENTRE_INVALID");
     const examRef = centreCollection.doc(examId);
     const exam = await examRef.get(); const examData = exam.data();
     if (!exam.exists || examData?.ownerId !== actor.uid || !Array.isArray(examData.papers) || !examData.papers.some((p: { id: string }) => p.id === paperId)) throw new Error("CENTRE_NOT_FOUND");
@@ -61,7 +64,7 @@ export async function POST(request: Request, context: Context) {
     const bucket = process.env.FIREBASE_ADMIN_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucket) throw new Error("CENTRE_STORAGE_UNAVAILABLE");
     const [bytes] = await storageClient().bucket(bucket).file(path).download();
-    const extracted = await extractMarkingPdf(bytes);
+    const extracted = await extractCandidatePdf(bytes, transcriptCache(examRef, paperId, candidateCode, bytes));
     if (!extracted.text.trim()) throw new Error("CENTRE_SCAN");
     if (extracted.truncated) throw new Error("CENTRE_TRUNCATED");
     const questions = structureData.questions as { id: string; maxMarks: number }[];

@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { extractMarkingPdf } from "@/lib/marking/extractPdf";
+import { extractCandidatePdf, VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
+import { transcriptCache } from "@/lib/marking/transcriptCache";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Handwritten scripts are transcribed page by page; allow time for long papers.
+export const maxDuration = 300;
 const headers = { "Cache-Control": "private, no-store" };
 type Context = { params: Promise<{ examId: string }> };
 
@@ -33,7 +36,8 @@ function failure(error: unknown) {
     if (error.message === "CENTRE_NOT_APPROVED") return NextResponse.json({ error: "Approve the paper's marking structure before extracting candidate answers." }, { status: 409, headers });
     if (error.message === "CENTRE_SCRIPT_NOT_FOUND") return NextResponse.json({ error: "Candidate script not found for this paper." }, { status: 404, headers });
     if (error.message === "CENTRE_STORAGE_UNAVAILABLE") return NextResponse.json({ error: "Storage credentials are unavailable." }, { status: 503, headers });
-    if (error.message === "CENTRE_INVALID_PDF") return NextResponse.json({ error: "Candidate script is not a supported PDF." }, { status: 422, headers });
+    const vision = VISION_ERROR_MESSAGES[error.message];
+    if (vision) return NextResponse.json({ error: vision[1] }, { status: vision[0], headers });
   }
   const result = centreError(error);
   return NextResponse.json({ error: result.error }, { status: result.status, headers });
@@ -48,7 +52,7 @@ export async function GET(request: Request, context: Context) {
     const url = new URL(request.url);
     const paperId = url.searchParams.get("paperId") ?? "";
     const candidateCode = (url.searchParams.get("candidateCode") ?? "").toUpperCase();
-    if (!/^[\w-]{1,128}$/.test(examId) || !/^paper-\d{1,2}$/.test(paperId) || !/^EX-[A-F0-9]{16}$/.test(candidateCode)) {
+    if (!/^[\w-]{1,128}$/.test(examId) || !/^paper-\d{1,2}$/.test(paperId) || !/^[A-Z0-9][A-Z0-9_-]{0,127}$/.test(candidateCode)) {
       throw new Error("CENTRE_INVALID");
     }
     const examRef = centreCollection.doc(examId);
@@ -75,7 +79,7 @@ export async function GET(request: Request, context: Context) {
     const bucketName = process.env.FIREBASE_ADMIN_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucketName) throw new Error("CENTRE_STORAGE_UNAVAILABLE");
     const [bytes] = await storageClient().bucket(bucketName).file(expectedPath).download();
-    const extracted = await extractMarkingPdf(bytes);
+    const extracted = await extractCandidatePdf(bytes, transcriptCache(examRef, paperId, candidateCode, bytes));
     const text = extracted.text.trim();
     const hasSelectableText = text.length > 0;
     return NextResponse.json({
@@ -85,7 +89,7 @@ export async function GET(request: Request, context: Context) {
       approvedQuestions: structureData.questions.map((q: { id: string; maxMarks: number }) => ({ id: q.id, maxMarks: q.maxMarks })),
       extraction: {
         status: !hasSelectableText ? "requires_vision_or_manual_transcription" : extracted.truncated ? "truncated_review_required" : "text_available_review_required",
-        pages: extracted.pages,
+        pages: extracted.pages, visionUsed: extracted.visionUsed,
         truncated: extracted.truncated,
         text,
       },

@@ -37,6 +37,10 @@ export async function GET(request: Request, context: Context) {
           marks.every((m: { confidence?: string; needsReview?: boolean; teacherJustification?: string }) => m.confidence === "high" && !m.needsReview && !m.teacherJustification) &&
           Array.isArray(review?.originalProposalMarks) && review.originalProposalMarks.length === marks.length &&
           marks.every((m: { questionId: string; awardedMarks: number }) => review.originalProposalMarks.some((o: { questionId: string; awardedMarks: number }) => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks)),
+        // Eligible for bulk approval once the teacher confirms they have reviewed the flagged questions.
+        bulkEligibleWithFlags: ["proposed", "reviewing"].includes(review?.status) && marks.length > 0 &&
+          Array.isArray(review?.originalProposalMarks) && review.originalProposalMarks.length === marks.length &&
+          marks.every((m: { questionId: string; awardedMarks: number }) => review.originalProposalMarks.some((o: { questionId: string; awardedMarks: number }) => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks)),
         flags, flagged: flags.length > 0,
         // A hash is checked again by the review endpoint before approval.
         sourceVerificationRequired: true,

@@ -2,6 +2,15 @@
 const nextConfig = {
   poweredByHeader: false,
 
+  // Keep native PDF rendering outside Turbopack bundles.
+  serverExternalPackages: ["@napi-rs/canvas", "pdfjs-dist"],
+
+  // The PDF worker is loaded by path at runtime, so make sure Vercel ships it with the
+  // marking routes (handwriting and mark scheme reading).
+  outputFileTracingIncludes: {
+    "/api/marking-centre/**": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
+
   async headers() {
     const securityHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

@@ -1,64 +1,64 @@
 {
-    "name":  "cs-platform",
-    "version":  "0.1.0",
-    "private":  true,
-    "scripts":  {
-                    "dev":  "next dev",
-                    "build":  "next build",
-                    "start":  "next start",
-                    "lint":  "eslint . --ignore-pattern \"backups/**\" --ignore-pattern \"deletion-client-directive-backup-*/**\"",
-                    "format":  "prettier --write .",
-                    "format:check":  "prettier --check .",
-                    "typecheck":  "tsc --noEmit",
-                    "hardening:audit":  "node scripts/hardening-audit.mjs",
-                    "verify":  "npm run lint \u0026\u0026 npm run typecheck \u0026\u0026 npm run encoding:audit \u0026\u0026 npm run a-level:curriculum-audit \u0026\u0026 npm run a-level:question-audit \u0026\u0026 npm run nea:production-audit \u0026\u0026 npm run student:production-audit \u0026\u0026 npm run student:curriculum-consistency-audit \u0026\u0026 npm run imedia:architecture-audit \u0026\u0026 npm run hardening:audit \u0026\u0026 npm run build",
-                    "encoding:audit":  "node scripts/encoding-audit.mjs",
-                    "a-level:question-audit":  "node scripts/a-level-question-audit.mjs",
-                    "a-level:curriculum-audit":  "node scripts/a-level-curriculum-audit.mjs",
-                    "nea:production-audit":  "node scripts/nea-production-audit.mjs",
-                    "student:production-audit":  "node scripts/student-production-audit.mjs",
-                    "student:curriculum-consistency-audit":  "node scripts/student-curriculum-consistency-audit.mjs",
-                    "imedia:architecture-audit":  "node scripts/creative-imedia-architecture-audit.mjs"
-                },
-    "dependencies":  {
-                         "@google-cloud/storage":  "8.4.0",
-                         "docx":  "^9.7.1",
-                         "exceljs":  "^4.4.0",
-                         "file-saver":  "^2.0.5",
-                         "firebase":  "^12.15.0",
-                         "firebase-admin":  "^14.3.0",
-                         "lucide-react":  "^1.25.0",
-                         "next":  "^16.2.9",
-                         "openai":  "^6.48.0",
-                         "pdf-lib":  "^1.17.1",
-                         "pdf-parse":  "1.1.1",
-                         "pdfjs-dist":  "4.10.38",
-                         "react":  "^19.2.7",
-                         "react-dom":  "^19.2.7",
-                         "react-hot-toast":  "^2.6.0",
-                         "resend":  "^6.24.0",
-                         "stripe":  "^22.6.0"
-                     },
-    "devDependencies":  {
-                            "@firebase/rules-unit-testing":  "^5.0.2",
-                            "@tailwindcss/postcss":  "^4",
-                            "@types/file-saver":  "^2.0.7",
-                            "@types/node":  "^20",
-                            "@types/pdf-parse":  "^1.1.5",
-                            "@types/react":  "^19",
-                            "@types/react-dom":  "^19",
-                            "eslint":  "^9",
-                            "eslint-config-next":  "16.2.9",
-                            "prettier":  "^3.9.6",
-                            "tailwindcss":  "^4",
-                            "typescript":  "^5"
-                        },
-    "overrides":  {
-                      "jwks-rsa":  {
-                                       "jose":  "4.15.9"
-                                   },
-                      "@google-cloud/storage":  {
-
-                                                }
-                  }
+    "name": "cs-platform",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "eslint . --ignore-pattern \"backups/**\" --ignore-pattern \"deletion-client-directive-backup-*/**\"",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "typecheck": "tsc --noEmit",
+        "vision:check": "node scripts/check-vision-render.mjs",
+        "hardening:audit": "node scripts/hardening-audit.mjs",
+        "verify": "npm run lint && npm run typecheck && npm run encoding:audit && npm run a-level:curriculum-audit && npm run a-level:question-audit && npm run nea:production-audit && npm run student:production-audit && npm run student:curriculum-consistency-audit && npm run imedia:architecture-audit && npm run hardening:audit && npm run build",
+        "encoding:audit": "node scripts/encoding-audit.mjs",
+        "a-level:question-audit": "node scripts/a-level-question-audit.mjs",
+        "a-level:curriculum-audit": "node scripts/a-level-curriculum-audit.mjs",
+        "nea:production-audit": "node scripts/nea-production-audit.mjs",
+        "student:production-audit": "node scripts/student-production-audit.mjs",
+        "student:curriculum-consistency-audit": "node scripts/student-curriculum-consistency-audit.mjs",
+        "imedia:architecture-audit": "node scripts/creative-imedia-architecture-audit.mjs"
+    },
+    "dependencies": {
+        "@google-cloud/storage": "8.4.0",
+        "@napi-rs/canvas": "^0.1.65",
+        "docx": "^9.7.1",
+        "exceljs": "^4.4.0",
+        "file-saver": "^2.0.5",
+        "firebase": "^12.15.0",
+        "firebase-admin": "^14.3.0",
+        "lucide-react": "^1.25.0",
+        "next": "^16.2.9",
+        "openai": "^6.48.0",
+        "pdf-lib": "^1.17.1",
+        "pdf-parse": "1.1.1",
+        "pdfjs-dist": "4.10.38",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7",
+        "react-hot-toast": "^2.6.0",
+        "resend": "^6.24.0",
+        "stripe": "^22.6.0"
+    },
+    "devDependencies": {
+        "@firebase/rules-unit-testing": "^5.0.2",
+        "@tailwindcss/postcss": "^4",
+        "@types/file-saver": "^2.0.7",
+        "@types/node": "^20",
+        "@types/pdf-parse": "^1.1.5",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "eslint": "^9",
+        "eslint-config-next": "16.2.9",
+        "prettier": "^3.9.6",
+        "tailwindcss": "^4",
+        "typescript": "^5"
+    },
+    "overrides": {
+        "jwks-rsa": {
+            "jose": "4.15.9"
+        },
+        "@google-cloud/storage": {}
+    }
 }

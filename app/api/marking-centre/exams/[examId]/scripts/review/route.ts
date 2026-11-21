@@ -2,16 +2,20 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { loadReviewContext, extractReviewText, validateMarks } from "@/lib/marking/reviewContext";
 import { proposeMarks } from "@/lib/marking/proposeMarks";
+import { VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
 import { qualityFlags, isExplicitNonAnswer, unsupportedWorkingClaim } from "@/lib/marking/reviewFlags";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 const headers = { "Cache-Control": "private, no-store" };
 type Context = { params: Promise<{ examId: string }> };
 function fail(error: unknown) {
   const messages: Record<string, [number, string]> = {
+    ...VISION_ERROR_MESSAGES,
     CENTRE_NOT_FOUND: [404, "Examination not found."], CENTRE_INVALID: [400, "Invalid marking details."], CENTRE_NOT_APPROVED: [409, "Approved question criteria required."],
     CENTRE_SCRIPT_NOT_FOUND: [404, "Candidate script not found."], CENTRE_SCAN: [422, "Scanned script needs manual transcription or vision review."],
-    CENTRE_TRUNCATED: [422, "Script text truncated. Review original PDF."], CENTRE_STORAGE_UNAVAILABLE: [503, "Storage unavailable."],
+    CENTRE_TRUNCATED: [422, "Script text truncated. Review original PDF."],
+CENTRE_STORAGE_UNAVAILABLE: [503, "Storage unavailable."],
     MARK_NO_KEY: [503, "AI marking not configured."], MARK_PROVIDER: [502, "AI marking service unavailable."], MARK_FORMAT: [422, "AI marking response failed validation."],
     CENTRE_STALE: [409, "Script or approved structure changed. Generate a new proposal."], CENTRE_FINAL: [409, "Approved marks are locked."], CENTRE_GUIDANCE: [422, "Add specific improvement guidance for each question with lost marks, or explain why guidance cannot be provided."], CENTRE_JUSTIFICATION: [422, "Add a teacher justification for changed marks or credit without an answer before approval."], CENTRE_EVIDENCE: [422, "Feedback claims working not evident in the extracted answer. Correct the feedback and verify the original script before approval."],
     CENTRE_FORBIDDEN: [403, "Teacher access required."], AUTH_REQUIRED: [401, "Sign in again."], AUTH_INVALID: [401, "Sign in again."],
@@ -53,6 +57,10 @@ export async function POST(request: Request, params: Context) {
     if (body.action === "propose") {
       const text = await extractReviewText(ctx);
       const result = await proposeMarks(text, ctx.questions);
+      // Handwritten (vision) scripts are now the normal case: they are no longer blanket-flagged.
+      // Individual questions are flagged only for objective reasons (see proposeMarks), and the
+      // screen still states that answers are AI transcriptions. Use the accuracy report to confirm
+      // agreement with your own marking before relying on bulk approval.
       // Check source again before persisting; teacher approval always performs a further check.
       await ctx.examRef.firestore.runTransaction(async tx => {
       const now = await tx.get(ctx.reviewRef);

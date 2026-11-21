@@ -7,6 +7,8 @@ import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marki
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Mark schemes are read page by page with vision; allow time for long documents.
+export const maxDuration = 300;
 const headers = { "Cache-Control": "no-store" };
 type Context = { params: Promise<{ examId: string; paperId: string }> };
 type Question = { id: string; maxMarks: number; criteria: string; notes: string };
@@ -74,9 +76,23 @@ export async function POST(request: Request, context: Context) {
       const [bytes] = await bucket.file(path).download();
 
       try {
-        const extracted = await extractMarkingPdf(bytes);
+        // Mark schemes (and scanned question papers) are read as page images so tables,
+        // tick grids and the Guidance column survive. Falls back to text if vision fails.
+        // Set MARKING_SCHEME_VISION=off to use text extraction only.
+        const visionAllowed = process.env.MARKING_SCHEME_VISION?.trim().toLowerCase() !== "off";
+        let extracted: { text: string; pages: number; truncated: boolean } | null = null;
+        const textVersion = await extractMarkingPdf(bytes).catch(() => null);
+        if (visionAllowed && (i === 1 || !textVersion?.text.trim())) {
+          try {
+            const { transcribeReferencePdf } = await import("@/lib/marking/visionPdf");
+            extracted = await transcribeReferencePdf(bytes, i === 1 ? "markScheme" : "questionPaper");
+          } catch (visionError) {
+            console.error("[Marking Centre] vision reading failed; using PDF text:", kinds[i], visionError instanceof Error ? visionError.message : visionError);
+          }
+        }
+        extracted = extracted ?? textVersion;
 
-        if (!extracted.text.trim()) {
+        if (!extracted || !extracted.text.trim()) {
           throw new Error("NO_SELECTABLE_TEXT");
         }
 
@@ -113,7 +129,7 @@ export async function PUT(request: Request, context: Context) {
       const id = typeof q.id === "string" ? q.id.trim() : "";
       const criteria = typeof q.criteria === "string" ? q.criteria.trim() : "";
       const notes = typeof q.notes === "string" ? q.notes.trim() : "";
-      if (!/^[a-zA-Z0-9][a-zA-Z0-9()._-]{0,39}$/.test(id) || seen.has(id.toLowerCase()) || !Number.isInteger(q.maxMarks) || (q.maxMarks as number) < 1 || (q.maxMarks as number) > 100 || criteria.length > 6000 || notes.length > 2000 || (input.approve && !criteria)) throw new Error("CENTRE_INVALID");
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9()._-]{0,39}$/.test(id) || seen.has(id.toLowerCase()) || !Number.isInteger(q.maxMarks) || (q.maxMarks as number) < 1 || (q.maxMarks as number) > 100 || criteria.length > 6000 || notes.length > 4000 || (input.approve && !criteria)) throw new Error("CENTRE_INVALID");
       seen.add(id.toLowerCase());
       questions.push({ id, maxMarks: q.maxMarks as number, criteria, notes });
     }

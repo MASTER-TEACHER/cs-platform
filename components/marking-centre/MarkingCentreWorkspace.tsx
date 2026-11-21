@@ -34,6 +34,9 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
   const [qualificationLevel, setQualificationLevel] = useState("GCSE");
   const [paperTitles, setPaperTitles] = useState(["Paper 1"]);
   const [count, setCount] = useState(100);
+  const [codeDigits, setCodeDigits] = useState<4 | 6>(6);
+  const [externalCodes, setExternalCodes] = useState("");
+
   const [uploading, setUploading] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -125,13 +128,15 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
     finally { setBusy(false); }
   }
   async function deleteExam(exam: Exam) {
-    if (!window.confirm(`Delete examination "${exam.title}"? Only empty examinations can be deleted. This cannot be undone.`)) return;
+    const typed = window.prompt(`Permanently delete "${exam.title}"?\n\nThis removes the exam papers, mark scheme, candidate codes, uploaded scripts, AI marking and approved results. It cannot be undone.\n\nType the examination title to confirm:`);
+    if (typed === null) return;
+    if (typed.trim() !== exam.title.trim()) { setMessage("Title did not match. Nothing was deleted."); return; }
     setBusy(true);
     try {
-      await call(`/api/marking-centre/exams/${exam.id}`, "DELETE");
+      await call(`/api/marking-centre/exams/${exam.id}`, "DELETE", { confirmTitle: typed.trim() });
       if (selected?.id === exam.id) { setSelected(null); setCandidates([]); setDocuments({}); }
       await refresh();
-      setMessage("Empty examination deleted.");
+      setMessage(`Examination "${exam.title}" and all its records were deleted.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Deletion failed."); }
     finally { setBusy(false); }
   }
@@ -143,7 +148,7 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
       let generated = 0;
       for (let remaining = count; remaining > 0; remaining -= Math.min(remaining, 100)) {
         const batch = Math.min(remaining, 100);
-        const result = await call(`/api/marking-centre/exams/${exam.id}/candidates`, "POST", { count: batch });
+        const result = await call(`/api/marking-centre/exams/${exam.id}/candidates`, "POST", { count: batch, digits: codeDigits });
         generated += result.codes.length;
         setMessage(`Generated ${generated} of ${count} codes...`);
       }
@@ -186,6 +191,57 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
     } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); }
     finally { setBusy(false); setUploading(null); }
   }
+  async function registerExternalCodes() {
+    if (!selected || !externalCodes.trim()) return;
+
+    const codes = externalCodes
+      .split(/[\s,;]+/)
+      .map(code => code.trim().toUpperCase())
+      .filter(Boolean);
+
+    const unique = [...new Set(codes)];
+    if (!unique.length) {
+      setMessage("Enter at least one candidate code.");
+      return;
+    }
+
+    if (!window.confirm(
+      `Register ${unique.length} candidate code(s)? Codes already registered will be skipped.`
+    )) return;
+
+    setBusy(true);
+    setMessage("Registering external candidate codes...");
+
+    try {
+      let added = 0, skipped = 0;
+      for (let index = 0; index < unique.length; index += 100) {
+        const result = await call(
+          `/api/marking-centre/exams/${selected.id}/candidates`,
+          "POST",
+          { codes: unique.slice(index, index + 100) }
+        );
+        added += Array.isArray(result.codes) ? result.codes.length : 0;
+        skipped += Array.isArray(result.skipped) ? result.skipped.length : 0;
+      }
+
+      const data = await call(
+        `/api/marking-centre/exams/${selected.id}/candidates`
+      );
+
+      setCandidates(data.candidates);
+      const updated = await refresh();
+      setSelected(updated.find(item => item.id === selected.id) ?? selected);
+      setExternalCodes("");
+      setMessage(`${added} candidate code(s) registered${skipped ? `, ${skipped} already registered and skipped` : ""}. Staged scripts are matched automatically.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Registration failed."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function exportCodes() {
     if (!selected) return;
     const rows = [["Examination", "Subject", "Year group", "Qualification level", "Candidate code", "Student name (optional)"], ...candidates.map(candidate => [selected.title, selected.subject, selected.yearGroup, selected.qualificationLevel ?? "", candidate.code, ""])];
@@ -237,8 +293,41 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
           </section>}
         </div>}
         {section === "candidates" && (selected ? <section className="space-y-5 rounded-xl border bg-white p-5"><h2 className="text-lg font-semibold">Candidate registration and uploads</h2>
-      <div className="border-t pt-4"><h3 className="font-semibold">Anonymous candidate codes</h3><p className="mt-1 text-sm text-slate-600">One code per candidate, shared across all papers in this examination.</p><div className="my-4 flex flex-wrap items-end gap-3"><label className="text-sm">New codes (1–1,000 total)<input type="number" min={1} max={1000} value={count} onChange={event => setCount(Number(event.target.value))} className="mt-1 block w-32 rounded-lg border p-2"/></label><button disabled={busy || count < 1 || count > 1000 || count + (selected.candidateCount ?? 0) > 1000} onClick={() => void generate()} className="rounded-lg bg-indigo-700 px-4 py-2 text-white disabled:opacity-50">{busy ? "Working..." : "Generate codes"}</button><button disabled={candidates.length === 0} onClick={exportCodes} className="rounded-lg border px-4 py-2 disabled:opacity-50">Export code register (CSV)</button></div><p className="mb-3 text-sm">{candidates.length} candidates listed</p><div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto md:grid-cols-4">{candidates.map(candidate => <code key={candidate.code} className="rounded bg-slate-100 p-2 text-xs">{candidate.code}</code>)}</div></div>
-          <CandidateScriptManager key={`${selected.id}-scripts`} examId={selected.id} papers={selected.papers ?? []} candidateCodes={candidates.map(c => c.code)} mode="scripts" qualificationLevel={selected.qualificationLevel}/></section> : <p className="rounded-xl border bg-white p-6">Select an examination to manage candidates.</p>)}
+      <div className="border-t pt-4"><h3 className="font-semibold">Anonymous candidate codes</h3><p className="mt-1 text-sm text-slate-600">One code per candidate, shared across all papers in this examination.</p><div className="my-4 flex flex-wrap items-end gap-3"><label className="text-sm">New codes (1–1,000 total)<input type="number" min={1} max={1000} value={count} onChange={event => setCount(Number(event.target.value))} className="mt-1 block w-32 rounded-lg border p-2"/></label><label className="text-sm">Code length
+      <select
+        value={codeDigits}
+        onChange={event =>
+          setCodeDigits(Number(event.target.value) as 4 | 6)
+        }
+        className="mt-1 block rounded-lg border p-2"
+      >
+        <option value={4}>4 digits</option>
+        <option value={6}>6 digits</option>
+      </select>
+    </label><button disabled={busy || count < 1 || count > 1000 || count + (selected.candidateCount ?? 0) > 1000} onClick={() => void generate()} className="rounded-lg bg-indigo-700 px-4 py-2 text-white disabled:opacity-50">{busy ? "Working..." : "Generate codes"}</button><button disabled={candidates.length === 0} onClick={exportCodes} className="rounded-lg border px-4 py-2 disabled:opacity-50">Export code register (CSV)</button></div><p className="mb-3 text-sm">{candidates.length} candidates listed</p><div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto md:grid-cols-4">{candidates.map(candidate => <code key={candidate.code} className="rounded bg-slate-100 p-2 text-xs">{candidate.code}</code>)}</div></div>
+          <div className="rounded-lg border p-4">
+      <h3 className="font-semibold">Register existing school codes</h3>
+      <p className="mt-1 text-sm text-slate-600">
+        Paste candidate codes separated by commas, spaces or new lines.
+        Existing codes will not be overwritten.
+      </p>
+      <textarea
+        value={externalCodes}
+        onChange={event => setExternalCodes(event.target.value)}
+        rows={3}
+        className="mt-3 w-full rounded-lg border p-2"
+        placeholder="4821, 5723, 6094"
+      />
+      <button
+        type="button"
+        disabled={busy || !externalCodes.trim()}
+        onClick={() => void registerExternalCodes()}
+        className="mt-2 rounded-lg bg-indigo-700 px-4 py-2 text-white disabled:opacity-50"
+      >
+        Register existing codes
+      </button>
+    </div>
+    <CandidateScriptManager key={`${selected.id}-scripts`} examId={selected.id} papers={selected.papers ?? []} candidateCodes={candidates.map(c => c.code)} mode="scripts" qualificationLevel={selected.qualificationLevel}/></section> : <p className="rounded-xl border bg-white p-6">Select an examination to manage candidates.</p>)}
         {section === "structures" && (selected ? <section className="rounded-xl border bg-white p-5"><PaperStructureManager key={selected.id} examId={selected.id} papers={selected.papers ?? []}/></section> : <p className="rounded-xl border bg-white p-6">Select an examination to review mark schemes.</p>)}
         {section === "marking" && (selected ? <section className="rounded-xl border bg-white p-5"><CandidateScriptManager key={`${selected.id}-marking`} examId={selected.id} papers={selected.papers ?? []} candidateCodes={candidates.map(c => c.code)} mode="marking" qualificationLevel={selected.qualificationLevel}/></section> : <p className="rounded-xl border bg-white p-6">Select an examination to begin marking.</p>)}
         {section === "results" && (selected ? <section className="rounded-xl border bg-white p-5"><CandidateScriptManager key={`${selected.id}-results`} examId={selected.id} papers={selected.papers ?? []} candidateCodes={candidates.map(c => c.code)} mode="results" qualificationLevel={selected.qualificationLevel}/></section> : <p className="rounded-xl border bg-white p-6">Select an examination to view results.</p>)}
