@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+// /landing shows the same page as the home page; tell search engines to index "/".
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const supportUrl = "https://donate.stripe.com/8x24gAgim71A55E0Vg4Vy00";
 

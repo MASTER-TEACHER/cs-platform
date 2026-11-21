@@ -356,6 +356,20 @@ export default function RequireCourse({
     return <>{children}</>;
   }
 
+  /*
+   * Public pages (home, about, pricing, login...) render their real
+   * content straight away, so it is in the server HTML that search
+   * engines and link previews read. Signed-in users are still sent to
+   * their portal as soon as their account has loaded.
+   */
+  if (
+    isPublicRoute &&
+    !redirectTarget &&
+    !profileError
+  ) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <LoadingScreen

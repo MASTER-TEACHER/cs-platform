@@ -2,6 +2,7 @@ import AccessibilityPanel from "@/components/accessibility/AccessibilityPanel";
 
 import type { Metadata } from "next";
 import "./globals.css";
+import { siteDescription, siteUrl } from "@/lib/site";
 import { AuthProvider } from "@/contexts/AuthContext";
 import IdleSessionGuard from "@/components/auth/IdleSessionGuard";
 import AppShell from "@/components/layout/AppShell";
@@ -11,24 +12,22 @@ import RequireCourse from "@/components/auth/RequireCourse";
 import CookieBanner from "@/components/legal/CookieBanner";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://cs-platform-5cgp.vercel.app",
-  ),
+  metadataBase: new URL(siteUrl),
   title: {
-    default: "CS Master",
+    default: "CS Master | GCSE & A-level Computer Science",
     template: "%s | CS Master",
   },
-  description:
-    "CS Master is an interactive GCSE Computer Science learning platform with lessons, simulators, XP, badges and progress tracking.",
+  description: siteDescription,
   applicationName: "CS Master",
   keywords: [
     "Computer Science",
     "GCSE Computer Science",
-    "Binary",
-    "Hexadecimal",
-    "Coding",
+    "A-level Computer Science",
+    "Computer Science revision",
+    "Programming practice",
+    "Exam practice",
+    "AI marking",
     "Education",
-    "Revision",
   ],
   authors: [{ name: "Master Teacher (Mr. Richards)" }],
   creator: "Master Teacher (Mr. Richards)",
@@ -38,12 +37,29 @@ export const metadata: Metadata = {
     apple: "/favicon.png",
   },
   openGraph: {
-    title: "CS Master",
-    description:
-      "Interactive GCSE Computer Science lessons, simulators, XP, badges and progress tracking.",
+    title: "CS Master | GCSE & A-level Computer Science",
+    description: siteDescription,
     siteName: "CS Master",
+    locale: "en_GB",
     type: "website",
+    images: [
+      {
+        url: "/logo.png",
+        width: 1747,
+        height: 900,
+        alt: "CS Master",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "CS Master | GCSE & A-level Computer Science",
+    description: siteDescription,
     images: ["/logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 

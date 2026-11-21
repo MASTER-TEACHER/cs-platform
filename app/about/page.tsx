@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "About",
+  description:
+    "Why CS Master was built and what it offers GCSE and A-level Computer Science students and teachers.",
+  alternates: { canonical: "/about" },
+};
 
 const supportUrl = "https://donate.stripe.com/8x24gAgim71A55E0Vg4Vy00";
 

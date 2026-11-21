@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description:
+    "CS Master plans for students and schools: a free individual plan, Student Premium monthly or annual, and options for teachers.",
+  alternates: { canonical: "/pricing" },
+};
 
 const studentPlans = [
   { name: "Free Individual", price: "£0", period: "forever", description: "Core Computer Science learning and basic practice with no subscription required.", features: ["Curriculum learning", "Core quizzes and practice", "Exam-board-aware pathways", "Progress tracking"], action: "Create free account", href: "/register" },
