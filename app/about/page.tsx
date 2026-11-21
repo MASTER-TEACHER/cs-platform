@@ -15,7 +15,7 @@ export default function AboutPage() {
     <main className="min-h-screen bg-slate-50 text-slate-900">
       <section className="bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-900 px-6 py-16 text-white">
         <div className="mx-auto max-w-6xl">
-          <Link href="/landing" className="text-sm font-bold text-blue-200 hover:text-white">← Back to CS Master</Link>
+          <Link href="/" className="text-sm font-bold text-blue-200 hover:text-white">← Back to CS Master</Link>
           <p className="mt-10 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">About CS Master</p>
           <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl">Built to help students learn Computer Science — and teachers teach it.</h1>
           <p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">CS Master is a Computer Science learning, practice, assessment and teacher-intelligence platform designed for secondary education.</p>

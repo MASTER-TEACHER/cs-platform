@@ -24,7 +24,7 @@ export default function PricingPage() {
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="bg-gradient-to-r from-slate-950 via-indigo-950 to-blue-900 px-6 py-16 text-white">
-        <div className="mx-auto max-w-7xl"><Link href="/landing" className="text-sm font-bold text-blue-200 hover:text-white">← Back to CS Master</Link><p className="mt-10 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Simple, transparent access</p><h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl">Choose the CS Master access that fits you.</h1><p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">Start free as an individual student, unlock Premium when you need advanced tools, or license CS Master for your school.</p></div>
+        <div className="mx-auto max-w-7xl"><Link href="/" className="text-sm font-bold text-blue-200 hover:text-white">← Back to CS Master</Link><p className="mt-10 text-xs font-black uppercase tracking-[0.2em] text-cyan-300">Simple, transparent access</p><h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight sm:text-5xl">Choose the CS Master access that fits you.</h1><p className="mt-5 max-w-3xl text-lg leading-8 text-blue-100">Start free as an individual student, unlock Premium when you need advanced tools, or license CS Master for your school.</p></div>
       </section>
 
       <section className="mx-auto max-w-7xl px-6 py-12">

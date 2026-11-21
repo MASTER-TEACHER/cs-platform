@@ -24,7 +24,7 @@ export default function PublicInformationPage({
           aria-label="Public information"
           className="mb-8 flex flex-wrap gap-x-5 gap-y-2 text-sm font-bold text-slate-600"
         >
-          <Link href="/landing" className="text-blue-700">CS Master</Link>
+          <Link href="/" className="text-blue-700">CS Master</Link>
           <Link href="/about">About</Link>
           <Link href="/help">Help</Link>
           <Link href="/contact">Contact</Link>

@@ -120,3 +120,20 @@ SEND-FINAL-INSPECTION.txt
 README-*-FIX.txt
 README-SEARCH-VISIBILITY.txt
 README-HOME-LINKS.txt
+
+# Local update packages, logs and backups (never commit)
+*.zip
+*.log
+*.bak
+backups/
+*-backup-*/
+question-bank-upgrade-*/
+question-bank-*-coverage.csv
+reports/
+marking-*-inspection.txt
+marking-vision-*.txt
+marking-workflow-*.txt
+SEND-FINAL-INSPECTION.txt
+README-*-FIX.txt
+README-SEARCH-VISIBILITY.txt
+README-HOME-LINKS.txt

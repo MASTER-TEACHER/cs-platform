@@ -13,7 +13,7 @@ export default function LandingPage() {
     <main className="min-h-screen bg-slate-950 text-white">
       <section className="mx-auto max-w-7xl px-6 py-8">
         <nav className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
-          <Link href="/landing" className="text-xl font-black">CS MASTER</Link>
+          <Link href="/" className="text-xl font-black">CS MASTER</Link>
           <div className="flex flex-wrap gap-5 text-sm font-bold text-slate-300">
             <Link href="/about" className="hover:text-white">About</Link>
             <Link href="/pricing" className="hover:text-white">Pricing</Link>
