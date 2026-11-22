@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { loadReviewContext, extractReviewText, validateMarks } from "@/lib/marking/reviewContext";
 import { proposeMarks } from "@/lib/marking/proposeMarks";
+import { beginUsage, noteScriptMarked } from "@/lib/marking/usage";
 import { VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
 import { qualityFlags, isExplicitNonAnswer, unsupportedWorkingClaim } from "@/lib/marking/reviewFlags";
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ function fail(error: unknown) {
 CENTRE_STORAGE_UNAVAILABLE: [503, "Storage unavailable."],
     MARK_NO_KEY: [503, "AI marking not configured."], MARK_PROVIDER: [502, "AI marking service unavailable."], MARK_FORMAT: [422, "AI marking response failed validation."],
     CENTRE_STALE: [409, "Script or approved structure changed. Generate a new proposal."], CENTRE_FINAL: [409, "Approved marks are locked."], CENTRE_GUIDANCE: [422, "Add specific improvement guidance for each question with lost marks, or explain why guidance cannot be provided."], CENTRE_JUSTIFICATION: [422, "Add a teacher justification for changed marks or credit without an answer before approval."], CENTRE_EVIDENCE: [422, "Feedback claims working not evident in the extracted answer. Correct the feedback and verify the original script before approval."],
+    CENTRE_BUDGET: [402, "This month's AI marking budget has been reached. Raise MARKING_MONTHLY_BUDGET_USD in Vercel (or wait until next month) to continue. Approving and exporting still work."],
     CENTRE_FORBIDDEN: [403, "Teacher access required."], AUTH_REQUIRED: [401, "Sign in again."], AUTH_INVALID: [401, "Sign in again."],
   };
   const code = error instanceof Error ? error.message : "";
@@ -55,8 +57,10 @@ export async function POST(request: Request, params: Context) {
     const existing = await ctx.reviewRef.get(); const data = existing.data();
     if (data?.status === "approved" && data.scriptHash === ctx.scriptHash && data.structureHash === ctx.structureHash) throw new Error("CENTRE_FINAL");
     if (body.action === "propose") {
+      await beginUsage(ctx.actor.uid);
       const text = await extractReviewText(ctx);
       const result = await proposeMarks(text, ctx.questions);
+      noteScriptMarked(ctx.actor.uid);
       // Handwritten (vision) scripts are now the normal case: they are no longer blanket-flagged.
       // Individual questions are flagged only for objective reasons (see proposeMarks), and the
       // screen still states that answers are AI transcriptions. Use the accuracy report to confirm

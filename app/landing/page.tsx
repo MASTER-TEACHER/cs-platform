@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { APP_STAGE, APP_VERSION } from "@/lib/version";
 
 // /landing shows the same page as the home page; tell search engines to index "/".
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ export default function LandingPage() {
         </nav>
 
         <div className="flex min-h-[70vh] flex-col justify-center py-20">
-          <p className="mb-4 inline-flex w-fit rounded-full bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200">🚀 CS Master v1.0 Public Beta</p>
+          <p className="mb-4 inline-flex w-fit rounded-full bg-blue-500/20 px-4 py-2 text-sm font-semibold text-blue-200">🚀 CS Master v{APP_VERSION} {APP_STAGE}</p>
           <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight md:text-7xl">Master Computer Science.</h1>
           <p className="mt-6 max-w-3xl text-xl leading-8 text-slate-300">Curriculum-aligned learning, quizzes, programming, assessment, adaptive revision and teacher intelligence for GCSE and A-level Computer Science.</p>
           <div className="mt-10 flex flex-col gap-4 sm:flex-row">
@@ -53,7 +54,7 @@ export default function LandingPage() {
             <Link href="/about" className="hover:text-white">About</Link><Link href="/pricing" className="hover:text-white">Pricing</Link><Link href="/privacy" className="hover:text-white">Privacy</Link><Link href="/terms" className="hover:text-white">Terms</Link><Link href="/contact" className="hover:text-white">Contact</Link>
           </div>
           <p className="mt-4">CS Master — Computer Science Learning Platform</p>
-          <p className="mt-1">Built by Master Teacher (Mr. Richards) · Version 1.0 Public Beta</p>
+          <p className="mt-1">Built by Master Teacher (Mr. Richards) · Version {APP_VERSION} {APP_STAGE}</p>
         </footer>
       </section>
     </main>

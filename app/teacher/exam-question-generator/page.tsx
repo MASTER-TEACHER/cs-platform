@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import QuestionHubTabs from "@/components/teacher/QuestionHubTabs";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast";
@@ -232,6 +233,8 @@ export default function ExamQuestionGeneratorPage() {
 
   return (
     <div className="space-y-8">
+      <QuestionHubTabs />
+
       <Card className="border-0 bg-gradient-to-r from-slate-950 via-indigo-950 to-violet-900 text-white">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
@@ -252,7 +255,7 @@ export default function ExamQuestionGeneratorPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/teacher/question-bank"
+              href="/teacher/question-bank/enhanced"
               className="rounded-xl bg-white px-5 py-3 text-center font-bold text-indigo-800"
             >
               Question Bank

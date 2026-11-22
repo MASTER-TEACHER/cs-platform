@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, requireCentreTeacher } from "@/lib/marking/centre";
+import { studentFacing } from "@/lib/marking/studentText";
 import { GET as getResults } from "../results/route";
 
 export const runtime = "nodejs";
@@ -103,14 +104,15 @@ export async function GET(request: Request, context: Context) {
       for (const q of structure.questions as { id: string; maxMarks: number }[]) {
         const mark = (review.marks as Mark[]).find(m => m.questionId === q.id);
         if (!mark || !Number.isInteger(mark.awardedMarks) || mark.awardedMarks < 0 || mark.awardedMarks > q.maxMarks) continue;
-        const feedback = safe(mark.feedback);
+        // Student-facing text: strip any sentences about the marking process (older reviews).
+        const feedback = safe(studentFacing(mark.feedback) || (mark.awardedMarks === q.maxMarks ? "Full marks." : "See the improvement guidance for this question."));
         const saved = guidanceMap.get(guidanceKey(paper.id, row.candidateCode, q.id));
         const approved = saved?.status === "approved" && saved?.structureHash === hash && saved?.reviewRevision === review.revision && saved?.awardedMarks === mark.awardedMarks && typeof saved?.text === "string" && saved.text.trim().length > 0;
         // Integrated improvement guidance becomes approved only as part of the locked, current teacher-approved marking review.
         // Legacy separately approved guidance remains supported for older reviews.
         const integrated = typeof (mark as Mark & { improvementGuidance?: string }).improvementGuidance === "string" ? (mark as Mark & { improvementGuidance?: string }).improvementGuidance!.trim() : "";
         const integratedApproved = review.status === "approved" && integrated.length > 0;
-        details.push({ candidateCode: row.candidateCode, paper: paper.title || paper.id, paperId: paper.id, question: q.id, awarded: mark.awardedMarks, maximum: q.maxMarks, feedback, improvement: mark.awardedMarks === q.maxMarks ? "Full marks achieved." : integratedApproved ? safe(integrated) : approved ? safe(saved.text) : missingGuidance, evidence: safe(mark.evidence), guidanceStatus: mark.awardedMarks === q.maxMarks ? "not_required" : (integratedApproved || approved) ? "approved" : "needs_teacher_approval" });
+        details.push({ candidateCode: row.candidateCode, paper: paper.title || paper.id, paperId: paper.id, question: q.id, awarded: mark.awardedMarks, maximum: q.maxMarks, feedback, improvement: mark.awardedMarks === q.maxMarks ? "Full marks achieved." : integratedApproved ? safe(studentFacing(integrated)) : approved ? safe(studentFacing(saved.text)) : missingGuidance, evidence: safe(mark.evidence), guidanceStatus: mark.awardedMarks === q.maxMarks ? "not_required" : (integratedApproved || approved) ? "approved" : "needs_teacher_approval" });
       }
     }
     const url = new URL(request.url);

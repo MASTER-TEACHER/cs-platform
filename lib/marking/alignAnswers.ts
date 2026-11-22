@@ -1,5 +1,6 @@
 import "server-only";
 import { request as httpsRequest } from "node:https";
+import { recordUsage } from "@/lib/marking/usage";
 
 type Question = { id: string; maxMarks: number };
 type Answer = { questionId: string; answerText: string; confidence: "high" | "medium" | "low" | "missing"; warning: string };
@@ -41,7 +42,8 @@ export async function alignAnswers(text: string, questions: Question[]) {
   } catch { throw new Error("ALIGN_PROVIDER"); }
   let parsed: unknown;
   try {
-    const envelope = JSON.parse(raw) as { choices?: { message?: { content?: string | null }; finish_reason?: string }[] };
+    const envelope = JSON.parse(raw) as { choices?: { message?: { content?: string | null }; finish_reason?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
+    recordUsage(model, envelope.usage);
     if (envelope.choices?.[0]?.finish_reason !== "stop") throw new Error("incomplete");
     parsed = JSON.parse(envelope.choices?.[0]?.message?.content ?? "");
   } catch { throw new Error("ALIGN_FORMAT"); }

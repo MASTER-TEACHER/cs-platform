@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
+import { beginUsage } from "@/lib/marking/usage";
 import { extractCandidatePdf, VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
 import { transcriptCache } from "@/lib/marking/transcriptCache";
 import { alignAnswers } from "@/lib/marking/alignAnswers";
@@ -41,6 +42,7 @@ export async function POST(request: Request, context: Context) {
   try {
     const actor = await requireAuthenticatedUser(request);
     requireCentreTeacher(actor);
+    await beginUsage(actor.uid);
     const { examId } = await context.params;
     if (!/^[\w-]{1,128}$/.test(examId)) throw new Error("CENTRE_INVALID");
     const body: unknown = await request.json();

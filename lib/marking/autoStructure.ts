@@ -1,4 +1,5 @@
 import "server-only";
+import { recordUsage } from "@/lib/marking/usage";
 import { createHash } from "node:crypto";
 import { request as httpsRequest } from "node:https";
 
@@ -72,7 +73,8 @@ async function postAnthropic(model: string, system: string, user: string): Promi
       console.error("[Marking Centre] Claude structure HTTP status", response.status, (await response.text()).slice(0, 300));
       throw new Error("AUTO_PROVIDER");
     }
-    const data = await response.json() as { stop_reason?: string; content?: { type: string; text?: string }[] };
+    const data = await response.json() as { stop_reason?: string; content?: { type: string; text?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
+    recordUsage(model, data.usage);
     const text = (data.content ?? []).filter(b => b.type === "text").map(b => b.text ?? "").join("\n");
     const start = text.indexOf("{"), end = text.lastIndexOf("}");
     const content = start >= 0 && end > start ? text.slice(start, end + 1) : "";
@@ -115,7 +117,8 @@ export async function suggestPaperStructure(input: Input) {
   }
   let parsed: unknown;
   try {
-    const envelope = JSON.parse(raw) as { choices?: { message?: { content?: string | null } }[] };
+    const envelope = JSON.parse(raw) as { choices?: { message?: { content?: string | null } }[]; usage?: Parameters<typeof recordUsage>[1] };
+    if (!model.startsWith("claude")) recordUsage(model, envelope.usage);
     const choice = envelope.choices?.[0] as
       | { finish_reason?: string; message?: { content?: string | null } }
       | undefined;

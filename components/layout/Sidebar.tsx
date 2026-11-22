@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { questionHubPaths } from "@/components/teacher/QuestionHubTabs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
@@ -8,12 +9,14 @@ import { X } from "lucide-react";
 import LogoutButton from "@/components/layout/LogoutButton";
 import SubjectSwitcher from "@/components/student/SubjectSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
+import { APP_VERSION } from "@/lib/version";
 
 type SidebarLink = {
   href: string;
   label: string;
   aLevelOnly?: boolean;
   subjectOnly?: "COMPUTER_SCIENCE" | "CREATIVE_IMEDIA";
+  group?: string;
 };
 
 type SidebarProps = {
@@ -57,32 +60,27 @@ const studentLinks: SidebarLink[] = [
   { href: "/feedback", label: "Feedback / Report a Problem" },
 ];
 
+// Grouped so the teacher menu fits without long scrolling.
 const teacherLinks: SidebarLink[] = [
   { href: "/teacher", label: "Dashboard" },
-  { href: "/teacher/marking-centre", label: "AI Examination Marking" },
-  { href: "/teacher/analytics", label: "Analytics" },
-  { href: "/teacher/knowledge-map", label: "Class Knowledge Map" },
-  { href: "/teacher/interventions", label: "Interventions" },
-  { href: "/teacher/students", label: "Students" },
-  { href: "/teacher/classes", label: "Classes" },
-  {
-    href: "/teacher/nea",
-    label: "NEA Monitoring",
-  },
-  { href: "/teacher/school", label: "School" },
-  { href: "/teacher/billing", label: "Billing" },
-  { href: "/teacher/assignments", label: "Assignments" },
-  { href: "/teacher/exam-assignments", label: "Exam Assignments" },
-  { href: "/teacher/exam-builder", label: "Exam Builder" },
-  { href: "/teacher/question-bank/enhanced", label: "Question Bank" },
-  { href: "/teacher/assignment-wizard", label: "Assignment Wizard" },
-  { href: "/teacher/quiz-generator", label: "AI Quiz Generator" },
-  { href: "/teacher/quiz-library", label: "Quiz Library" },
-  { href: "/teacher/assistant", label: "AI Teacher Assistant" },
-  { href: "/teacher/content", label: "Content Hub" },
-  { href: "/teacher/resources", label: "Resource Library" },
-  { href: "/teacher/reports", label: "Reports" },
-  { href: "/feedback", label: "Feedback / Report a Problem" },
+  { href: "/teacher/classes", label: "Classes", group: "Teaching" },
+  { href: "/teacher/students", label: "Students", group: "Teaching" },
+  { href: "/teacher/question-bank/enhanced", label: "Question Bank", group: "Teaching" },
+  { href: "/teacher/assignment-wizard", label: "Assignment Wizard", group: "Teaching" },
+  { href: "/teacher/assignments", label: "Assignments", group: "Teaching" },
+  { href: "/teacher/exam-assignments", label: "Exam Assignments", group: "Teaching" },
+  { href: "/teacher/content", label: "Content Hub", group: "Teaching" },
+  { href: "/teacher/resources", label: "Resource Library", group: "Teaching" },
+  { href: "/teacher/assistant", label: "AI Teacher Assistant", group: "Teaching" },
+  { href: "/teacher/marking-centre", label: "AI Examination Marking", group: "Marking & insight" },
+  { href: "/teacher/analytics", label: "Analytics", group: "Marking & insight" },
+  { href: "/teacher/knowledge-map", label: "Class Knowledge Map", group: "Marking & insight" },
+  { href: "/teacher/interventions", label: "Interventions", group: "Marking & insight" },
+  { href: "/teacher/reports", label: "Reports", group: "Marking & insight" },
+  { href: "/teacher/nea", label: "NEA Monitoring", group: "Marking & insight" },
+  { href: "/teacher/school", label: "School", group: "School & account" },
+  { href: "/teacher/billing", label: "Billing", group: "School & account" },
+  { href: "/feedback", label: "Feedback / Report a Problem", group: "School & account" },
 ];
 
 const adminLinks: SidebarLink[] = [
@@ -154,6 +152,15 @@ export default function Sidebar({
       return pathname === href;
     }
 
+    /*
+     * Question Bank covers papers, AI exam questions and quizzes.
+     */
+    if (href === "/teacher/question-bank/enhanced") {
+      return questionHubPaths.some(
+        (path) => pathname === path || pathname.startsWith(`${path}/`),
+      );
+    }
+
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
@@ -210,15 +217,22 @@ export default function Sidebar({
       {isStudent && <SubjectSwitcher />}
 
       <nav className="flex-1 space-y-2 overflow-y-auto p-5">
-        {links.map((link) => {
+        {links.map((link, index) => {
           const active = isActive(link.href);
+          const showGroup = Boolean(link.group) && link.group !== links[index - 1]?.group;
 
           return (
+            <div key={link.href}>
+            {showGroup && (
+              <p className="px-4 pb-1 pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                {link.group}
+              </p>
+            )}
             <Link
               key={link.href}
               href={link.href}
               onClick={closeMobileNavigation}
-              className={`block rounded-xl px-4 py-3 font-semibold transition ${
+              className={`block rounded-xl px-4 ${link.group ? "py-2" : "py-3"} font-semibold transition ${
                 active
                   ? isAdmin
                     ? "bg-violet-600 text-white shadow-lg"
@@ -230,6 +244,7 @@ export default function Sidebar({
             >
               {link.label}
             </Link>
+            </div>
           );
         })}
 
@@ -250,7 +265,7 @@ export default function Sidebar({
 
       <div className="border-t border-slate-800 p-5">
         <LogoutButton />
-        <p className="mt-5 text-center text-xs text-slate-500">CS Master v1.6</p>
+        <p className="mt-5 text-center text-xs text-slate-500">CS Master v{APP_VERSION}</p>
       </div>
     </>
   );

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import QuestionHubTabs from "@/components/teacher/QuestionHubTabs";
 import toast from "react-hot-toast";
 import {
   collection,
@@ -156,6 +157,8 @@ export default function TeacherQuizLibraryPage() {
 
   return (
     <div className="space-y-8">
+      <QuestionHubTabs />
+
       <Card className="border-0 bg-gradient-to-r from-violet-700 via-indigo-700 to-blue-700 text-white">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
@@ -287,12 +290,21 @@ export default function TeacherQuizLibraryPage() {
                   </span>
                 </div>
 
-                <Link
-                  href={`/teacher/quiz-library/${quiz.id}`}
-                  className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
-                >
-                  View Quiz →
-                </Link>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <Link
+                    href={`/teacher/quiz-library/${quiz.id}`}
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 font-bold text-white transition hover:bg-indigo-700"
+                  >
+                    View Quiz →
+                  </Link>
+
+                  <Link
+                    href={`/teacher/assignment-wizard?quizId=${quiz.id}`}
+                    className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700"
+                  >
+                    Assign to class
+                  </Link>
+                </div>
               </div>
             ))}
           </div>

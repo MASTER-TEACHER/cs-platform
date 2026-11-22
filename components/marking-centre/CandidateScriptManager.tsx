@@ -30,6 +30,7 @@ type AlignmentResult = {
   markingEnabled: false;
 };
 type ReviewFlag = { questionId: string; code: string; detail: string };
+type UsageSummary = { month: string; costUsd: number; budgetUsd: number; scriptsMarked: number; calls: number; averageCostPerScriptUsd: number };
 type AccuracyReport = {
   verdict: "not_enough_data" | "ready_for_bulk_approval" | "keep_reviewing";
   advice: string;
@@ -113,6 +114,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   const [queueError, setQueueError] = useState("");
   const [queueBusy, setQueueBusy] = useState(false);
   const [accuracy, setAccuracy] = useState<AccuracyReport | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [accuracyError, setAccuracyError] = useState("");
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [moderationNote, setModerationNote] = useState("");
@@ -558,7 +560,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   }
   // Load the review queue as soon as the marking stage opens.
   useEffect(() => {
-    if (mode === "marking" && user) void loadQueue();
+    if (mode === "marking" && user) { void loadQueue(); void loadUsage(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, user, examId]);
   async function reflag() {
@@ -573,12 +575,28 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     } catch (error) { setQueueError(error instanceof Error ? error.message : "Re-check failed."); }
     finally { setQueueBusy(false); }
   }
+  async function loadUsage(): Promise<UsageSummary | null> {
+    if (!user) return null;
+    try {
+      const response = await fetch("/api/marking-centre/usage", { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+      if (!response.ok) return null;
+      const data = await response.json() as UsageSummary;
+      setUsage(data);
+      return data;
+    } catch { return null; }
+  }
   async function proposeBatch() {
     if (!user || queueBusy) return;
     const latestQueue = await loadQueue();
     const todo = latestQueue.filter(row => row.status === "unprocessed");
     if (!todo.length) { setQueueError("No unprocessed scripts in the current queue. Refresh the queue first."); return; }
-    if (!window.confirm(`Mark all ${todo.length} remaining scripts with AI? This does not approve any marks. Keep this tab open until the batch finishes.`)) return;
+    const spend = await loadUsage();
+    const estimate = spend ? todo.length * spend.averageCostPerScriptUsd : null;
+    const costLine = spend && estimate !== null
+      ? `\n\nEstimated cost: about $${estimate.toFixed(2)} (≈ $${spend.averageCostPerScriptUsd.toFixed(2)} per script). Spent this month: $${spend.costUsd.toFixed(2)}${spend.budgetUsd > 0 ? ` of your $${spend.budgetUsd.toFixed(0)} monthly cap` : ""}.`
+        + (spend.budgetUsd > 0 && spend.costUsd + estimate > spend.budgetUsd ? "\n\nWarning: this batch may reach the monthly cap; marking stops when it is reached." : "")
+      : "";
+    if (!window.confirm(`Mark all ${todo.length} remaining scripts with AI? This does not approve any marks. Keep this tab open until the batch finishes.${costLine}`)) return;
     setQueueBusy(true); setQueueError("");
     const token = await user.getIdToken();
     let completed = 0, failed = 0;
@@ -600,6 +618,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     }
     setBatchProgress(`Finished: ${completed} proposed, ${failed} failed. No marks were approved.`);
     setQueueBusy(false);
+    void loadUsage();
     await loadQueue();
   }
   async function loadResults() {
@@ -717,6 +736,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     </>}
     {mode === "marking" && <div className="space-y-3 rounded-lg border p-4">
       <h4 className="font-semibold">Mark your whole class</h4>
+      {usage && <p className="rounded bg-slate-50 p-2 text-xs text-slate-700">Estimated AI spend this month: <strong>${usage.costUsd.toFixed(2)}</strong>{usage.budgetUsd > 0 ? ` of $${usage.budgetUsd.toFixed(0)} cap` : " (no cap set)"} · {usage.scriptsMarked} script(s) marked · about ${usage.averageCostPerScriptUsd.toFixed(2)} per script. Estimates only; check your provider's billing page for exact charges.</p>}
       <p className="text-xs text-slate-600">Mark every remaining selectable-text script in one action. Keep this tab open while marking runs. Completed proposals are saved, so you can retry failures without repeating successful work. You approve marks after checking exceptions and a suitable sample.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="rounded border px-3 py-2 text-sm" disabled={queueBusy} onClick={() => void loadQueue()}>Refresh review queue</button>

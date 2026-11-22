@@ -25,7 +25,11 @@ type Feedback = {
   markingPoints: string[];
   guidance: string[];
   teacherReviewRequired: boolean;
-  awardedMarks: null;
+  awardedMarks: number | null;
+  maxMarks?: number | null;
+  aiFeedback?: string;
+  aiImprovement?: string;
+  markingStatus?: string;
 };
 
 type Attempt = {
@@ -501,9 +505,20 @@ export default function StudentQuestionBankPage() {
                   }))}
                 />
 
+                {review && review.awardedMarks !== null && (
+                  <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                    <h4 className="font-semibold">
+                      Practice mark: {review.awardedMarks}/{review.maxMarks ?? q.marks}
+                    </h4>
+                    {review.aiFeedback && <p className="whitespace-pre-wrap text-sm">{review.aiFeedback}</p>}
+                    {review.aiImprovement && <p className="whitespace-pre-wrap text-sm"><strong>Next time:</strong> {review.aiImprovement}</p>}
+                    <p className="text-xs text-slate-600">Instant AI practice mark. Check it against the mark scheme below; your teacher&apos;s marks are the ones that count.</p>
+                  </div>
+                )}
+
                 {review && (
                   <div className="space-y-2 rounded-lg border p-4">
-                    <h4 className="font-semibold">Self-review guidance</h4>
+                    <h4 className="font-semibold">{review.awardedMarks !== null ? "Mark scheme" : "Self-review guidance"}</h4>
                     {review.modelAnswer && (
                       <p className="whitespace-pre-wrap">
                         Model answer: {review.modelAnswer}

@@ -4,6 +4,7 @@ import { Storage } from "@google-cloud/storage";
 import { extractMarkingPdf } from "@/lib/marking/extractPdf";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
+import { beginUsage } from "@/lib/marking/usage";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,9 +16,10 @@ type Question = { id: string; maxMarks: number; criteria: string; notes: string 
 const MAX_QUESTIONS = 150;
 
 
-async function owned(request: Request, context: Context) {
+async function owned(request: Request, context: Context, usesAi = false) {
   const actor = await requireAuthenticatedUser(request);
   requireCentreTeacher(actor);
+  if (usesAi) await beginUsage(actor.uid);
   const { examId, paperId } = await context.params;
   if (!/^[\w-]{1,128}$/.test(examId) || !/^paper-\d{1,2}$/.test(paperId)) throw new Error("CENTRE_NOT_FOUND");
   const ref = centreCollection.doc(examId);
@@ -55,7 +57,7 @@ export async function GET(request: Request, context: Context) {
 // Extraction provides source text only. It never invents marks, answers or question boundaries.
 export async function POST(request: Request, context: Context) {
   try {
-    const { ref, paperId } = await owned(request, context);
+    const { ref, paperId } = await owned(request, context, true);
     const structureRef = ref.collection("paperStructures").doc(paperId);
     const previous = await structureRef.get();
     if (previous.data()?.status === "approved") throw new Error("CENTRE_APPROVED");
@@ -162,7 +164,7 @@ export async function PUT(request: Request, context: Context) {
 // Phase 3.1: AI generates a proposal only; it never changes an approved or draft structure.
 export async function PATCH(request: Request, context: Context) {
   try {
-    const { ref, paperId } = await owned(request, context);
+    const { ref, paperId } = await owned(request, context, true);
     const body: unknown = await request.json();
     if (!body || typeof body !== "object" || (body as { action?: unknown }).action !== "suggest") throw new Error("CENTRE_INVALID");
     const snap = await ref.collection("paperStructures").doc(paperId).get();

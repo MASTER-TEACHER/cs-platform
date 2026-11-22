@@ -64,25 +64,26 @@ export function deduplicateQuestions(
 export function composeQuestionSet(
   title: string,
   selected: BankQuestion[],
+  preferredBoard?: string,
 ): GeneratedExamQuestionSet {
   if (!selected.length) {
     throw new Error("Select at least one question.");
   }
 
   const qualification = selected[0].qualification;
-  const examBoard = selected[0].examBoard;
 
-  if (
-    selected.some(
-      (item) =>
-        item.qualification !== qualification ||
-        item.examBoard !== examBoard,
-    )
-  ) {
-    throw new Error(
-      "A paper must use one qualification and exam board.",
-    );
+  if (selected.some((item) => item.qualification !== qualification)) {
+    throw new Error("A paper must use one qualification.");
   }
+
+  // Questions tagged for other boards may be included (most content is shared);
+  // the paper takes the teacher's chosen board, or the most common one selected.
+  const boardCounts = new Map<string, number>();
+  for (const item of selected) boardCounts.set(item.examBoard, (boardCounts.get(item.examBoard) ?? 0) + 1);
+  const examBoard =
+    preferredBoard && boardCounts.has(preferredBoard)
+      ? preferredBoard
+      : [...boardCounts.entries()].sort((a, b) => b[1] - a[1])[0][0];
 
   const questions = selected.map((item, index) => ({
     ...item.question,

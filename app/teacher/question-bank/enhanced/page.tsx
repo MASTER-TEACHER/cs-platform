@@ -36,6 +36,7 @@ import { batch5Questions } from "@/lib/question-bank/staticCatalogueBatch5";
 import { batch6Questions } from "@/lib/question-bank/staticCatalogueBatch6";
 import { batch7Questions } from "@/lib/question-bank/staticCatalogueBatch7";
 import { isRetiredQuestion } from "@/lib/question-bank/retiredQuestions";
+import { specReference } from "@/lib/question-bank/specReferences";
 import { imediaCatalogueQuestions } from "@/lib/question-bank/imediaCatalogue";
 import { imediaBatch2Questions } from "@/lib/question-bank/imediaCatalogueBatch2";
 import {
@@ -65,6 +66,7 @@ const teacherId = user?.uid ?? "";
   const [subject, setSubject] = useState("computer-science");
   const [qualification, setQualification] = useState("all");
   const [board, setBoard] = useState("all");
+  const [includeOtherBoards, setIncludeOtherBoards] = useState(false);
   const [difficulty, setDifficulty] = useState("all");
   const [topic, setTopic] = useState("all");
   const [pageSize, setPageSize] = useState(20);
@@ -146,7 +148,7 @@ const normaliseFilter = (value: string): string =>
       return (
         (qualification === "all" ||
           normaliseFilter(item.qualification) === normaliseFilter(qualification)) &&
-        (board === "all" ||
+        (board === "all" || includeOtherBoards ||
           normaliseFilter(item.examBoard) === normaliseFilter(board))
       );
     });
@@ -154,7 +156,7 @@ const normaliseFilter = (value: string): string =>
     return [...new Set(matching.map((item) => canonicalTopic(item.question.topic)))]
       .filter(Boolean)
       .sort((a, b) => a.localeCompare(b));
-  }, [subjectQuestions, qualification, board]);
+  }, [subjectQuestions, qualification, board, includeOtherBoards]);
 
   const visible = useMemo(() => {
   const term = normaliseFilter(search);
@@ -169,6 +171,7 @@ const normaliseFilter = (value: string): string =>
 
     const matchesBoard =
       board === "all" ||
+      includeOtherBoards ||
       normaliseFilter(item.examBoard) === normaliseFilter(board);
 
     const matchesTopic =
@@ -189,6 +192,7 @@ const normaliseFilter = (value: string): string =>
         // Source paper title excluded from question search.
         item.qualification,
         item.examBoard,
+        specReference(item),
       ].join(" "),
     );
 
@@ -204,7 +208,7 @@ const normaliseFilter = (value: string): string =>
       matchesSearch
     );
   });
-}, [subjectQuestions, search, qualification, board, difficulty, topic]);
+}, [subjectQuestions, search, qualification, board, includeOtherBoards, difficulty, topic]);
 
 
 
@@ -431,7 +435,7 @@ const normaliseFilter = (value: string): string =>
     setMessage("");
 
     try {
-      const paper = composeQuestionSet(title, selected);
+      const paper = composeQuestionSet(title, selected, board !== "all" ? board : undefined);
 
       if (editingId) {
         await updateTeacherExamQuestionSet(
@@ -517,7 +521,7 @@ const normaliseFilter = (value: string): string =>
     setMessage("");
 
     try {
-      const paper = composeQuestionSet(title, selected);
+      const paper = composeQuestionSet(title, selected, board !== "all" ? board : undefined);
       let id = editingId;
 
       if (id) {
@@ -544,11 +548,31 @@ const normaliseFilter = (value: string): string =>
     }
   }
 
+  async function reportQuestion(item: BankQuestion) {
+    if (!user) return;
+    const reason = window.prompt("What is wrong with this question? (e.g. incorrect answer, unclear wording, wrong topic)");
+    if (!reason || reason.trim().length < 3) return;
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${await user.getIdToken()}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "content",
+          message: `Question bank report for ${item.key} (${item.qualification} ${item.examBoard}, ${item.question.topic}): ${reason.trim()}\n\nQuestion: ${item.question.question.slice(0, 500)}`,
+          pageUrl: window.location.href,
+        }),
+      });
+      setMessage(response.ok ? "Thanks: the problem has been reported." : "The report could not be sent. Please try again.");
+    } catch {
+      setMessage("The report could not be sent. Please try again.");
+    }
+  }
+
   function printPaper(includeAnswers: boolean) {
     if (selected.length === 0) return;
 
     try {
-      const paper = composeQuestionSet(title, selected);
+      const paper = composeQuestionSet(title, selected, board !== "all" ? board : undefined);
       const html = generatePrintableDocument(paper, includeAnswers);
 
       const blob = new Blob([html], {
@@ -739,6 +763,17 @@ const normaliseFilter = (value: string): string =>
                 </option>
               ))}
           </select>
+          {board !== "all" && subject !== "creative-imedia" && (
+            <span className="mt-2 flex items-start gap-2 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={includeOtherBoards}
+                onChange={(event) => { setIncludeOtherBoards(event.target.checked); setTopic("all"); setPage(1); }}
+                className="mt-0.5"
+              />
+              Also show questions tagged for other boards (most content is shared; papers keep your chosen board)
+            </span>
+          )}
         </label>
 
         <label>
@@ -844,6 +879,7 @@ const normaliseFilter = (value: string): string =>
                 <span className="block text-xs font-bold text-indigo-700">
                   {item.qualification} | {item.examBoard} |{" "}
                   {canonicalTopic(item.question.topic)} | {item.question.marks} marks
+                  {specReference(item) && <> | {specReference(item)}</>}
                 </span>
 
                 <span className="mt-2 block whitespace-pre-wrap text-sm">
@@ -858,8 +894,15 @@ const normaliseFilter = (value: string): string =>
                     Teacher review recommended: {warning}
                   </span>
                 ))}
-                <span className="mt-3 block text-xs text-slate-500">
-                  {item.sourceTitle}
+                <span className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                  <span>{item.sourceTitle}</span>
+                  <button
+                    type="button"
+                    onClick={(event) => { event.preventDefault(); event.stopPropagation(); void reportQuestion(item); }}
+                    className="rounded border px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  >
+                    Report a problem
+                  </button>
                 </span>
               </span>
             </label>

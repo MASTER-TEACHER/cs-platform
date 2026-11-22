@@ -78,6 +78,34 @@ export default function PrivacyPage() {
           ),
         },
         {
+          title: "AI examination marking (teachers)",
+          content: (
+            <>
+              <p>
+                When a teacher uses the AI Examination Marking Centre, uploaded candidate
+                scripts are processed by AI providers to read handwriting and propose marks.
+                The providers currently used are Anthropic (Claude) and OpenAI. They receive
+                images or text of the candidate&apos;s answers, the question paper and mark
+                scheme, and the candidate code. Candidate names are not sent: scripts are
+                identified by codes that only the school can link to a student.
+              </p>
+              <p>
+                These providers act as data processors and may process data outside the
+                UK, including in the United States, under their commercial API terms and
+                appropriate transfer safeguards. Under those terms, data sent through their
+                APIs is not used to train their models by default; schools should review the
+                providers&apos; current terms as part of their own data protection assessment.
+              </p>
+              <p>
+                AI-proposed marks are always reviewed and approved by a teacher before they
+                become results. Uploaded script files and their transcripts are deleted
+                automatically after a set retention period (12 months by default); approved
+                marks and feedback are kept as part of the school&apos;s assessment records.
+              </p>
+            </>
+          ),
+        },
+        {
           title: "Assessment integrity and visibility events",
           content: (
             <p>

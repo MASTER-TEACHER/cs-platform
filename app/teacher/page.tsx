@@ -63,10 +63,10 @@ const assessmentTools = [
       "Question Bank",
 
     description:
-      "Review saved question sets, inspect mark schemes and assign papers to classes.",
+      "Build papers, generate AI questions and quizzes, print, and assign to classes in one place.",
 
     href:
-      "/teacher/question-bank",
+      "/teacher/question-bank/enhanced",
 
     icon:
       "🗂️",

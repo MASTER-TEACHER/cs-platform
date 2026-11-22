@@ -12,6 +12,7 @@ export function centreError(error: unknown) {
   if (code === "CENTRE_FORBIDDEN") return { status: 403, error: "Approved teacher access is required." };
   if (code === "CENTRE_NOT_FOUND") return { status: 404, error: "Examination not found." };
   if (code === "CENTRE_INVALID") return { status: 400, error: "Invalid examination details." };
+  if (code === "CENTRE_BUDGET") return { status: 402, error: "This month's AI marking budget has been reached. Raise MARKING_MONTHLY_BUDGET_USD in your Vercel settings (or wait until next month) to continue. Approving and exporting still work." };
   if (code === "CENTRE_LIMIT") return { status: 400, error: "Candidate limit exceeded (maximum 100 per request, 1,000 per examination)." };
   if (["AUTH_REQUIRED", "AUTH_INVALID"].includes(code)) return { status: 401, error: "Please sign in again." };
   if (["ACCOUNT_DISABLED", "PROFILE_NOT_FOUND"].includes(code)) return { status: 403, error: "Account unavailable." };

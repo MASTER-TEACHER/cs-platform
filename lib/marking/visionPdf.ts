@@ -1,4 +1,5 @@
 import "server-only";
+import { recordUsage } from "@/lib/marking/usage";
 import { createCanvas } from "@napi-rs/canvas";
 import { extractMarkingPdf } from "./extractPdf";
 
@@ -210,7 +211,8 @@ async function transcribePageOpenAI(tiles: Buffer[], pageNumber: number, key: st
       console.error("[Marking Centre] vision HTTP status", response.status, "page", pageNumber);
       throw new Error(response.status === 401 ? "VISION_NO_KEY" : "VISION_PROVIDER");
     }
-    const data = await response.json() as { choices?: { finish_reason?: string; message?: { content?: string | null } }[] };
+    const data = await response.json() as { choices?: { finish_reason?: string; message?: { content?: string | null } }[]; usage?: Parameters<typeof recordUsage>[1] };
+    recordUsage(visionModel(), data.usage);
     const choice = data.choices?.[0];
     if (choice?.finish_reason !== "stop" || !choice.message?.content?.trim()) throw new Error("VISION_INCOMPLETE");
     return choice.message.content.trim();
@@ -261,7 +263,8 @@ async function transcribePageAnthropic(tiles: Buffer[], pageNumber: number, key:
       }
       throw new Error(response.status === 401 ? "VISION_NO_KEY" : "VISION_PROVIDER");
     }
-    const data = await response.json() as { stop_reason?: string; content?: { type: string; text?: string }[] };
+    const data = await response.json() as { stop_reason?: string; content?: { type: string; text?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
+    recordUsage(visionModel(), data.usage);
     const text = (data.content ?? []).filter(block => block.type === "text" && typeof block.text === "string").map(block => block.text).join("\n").trim();
     if (data.stop_reason === "max_tokens" || data.stop_reason === "refusal" || !text) throw new Error("VISION_INCOMPLETE");
     return text;
