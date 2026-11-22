@@ -61,8 +61,21 @@ function schemeText(q: GeneratedExamQuestion): string {
   return [points, levels && `Levels:\n${levels}`, q.modelAnswer && `Model answer: ${q.modelAnswer}`].filter(Boolean).join("\n");
 }
 
+// Try the configured model; if its provider fails (no key, no credit, outage), fall back to
+// the model the Marking Centre already uses, so practice marking keeps working.
 async function callModel(system: string, user: string): Promise<{ text: string }> {
-  const model = process.env.STUDENT_MARKING_MODEL?.trim() || "gpt-4.1-mini";
+  const primary = process.env.STUDENT_MARKING_MODEL?.trim() || "gpt-4.1-mini";
+  const fallback = process.env.MARKING_CENTRE_MARKING_MODEL?.trim() || "";
+  try {
+    return await callOne(primary, system, user);
+  } catch (error) {
+    console.error("[Student Question Bank] practice marking failed with", primary, error instanceof Error ? error.message : error);
+    if (!fallback || fallback === primary) throw error;
+    return callOne(fallback, system, user);
+  }
+}
+
+async function callOne(model: string, system: string, user: string): Promise<{ text: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 45000);
   try {
@@ -72,9 +85,12 @@ async function callModel(system: string, user: string): Promise<{ text: string }
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST", signal: controller.signal,
         headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model, max_tokens: 800, system, messages: [{ role: "user", content: user }] }),
+        body: JSON.stringify({ model, max_tokens: 1500, system, messages: [{ role: "user", content: user }] }),
       });
-      if (!response.ok) throw new Error("PRACTICE_PROVIDER");
+      if (!response.ok) {
+        console.error("[Student Question Bank] Claude HTTP", response.status, (await response.text()).slice(0, 300));
+        throw new Error("PRACTICE_PROVIDER");
+      }
       const data = await response.json() as { content?: { type: string; text?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
       recordUsage(model, data.usage);
       return { text: (data.content ?? []).filter(b => b.type === "text").map(b => b.text ?? "").join("\n") };
@@ -86,7 +102,10 @@ async function callModel(system: string, user: string): Promise<{ text: string }
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model, temperature: 0, max_tokens: 800, response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
     });
-    if (!response.ok) throw new Error("PRACTICE_PROVIDER");
+    if (!response.ok) {
+      console.error("[Student Question Bank] OpenAI HTTP", response.status, (await response.text()).slice(0, 300));
+      throw new Error("PRACTICE_PROVIDER");
+    }
     const data = await response.json() as { choices?: { message?: { content?: string } }[]; usage?: Parameters<typeof recordUsage>[1] };
     recordUsage(model, data.usage);
     return { text: data.choices?.[0]?.message?.content ?? "" };

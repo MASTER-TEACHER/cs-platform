@@ -25,6 +25,8 @@ export async function GET(request: Request) {
         id: doc.id,
         questionCount: data.questionCount || 0,
         markingStatus: data.markingStatus || "self-review",
+        totalAwarded: typeof data.totalAwarded === "number" ? data.totalAwarded : null,
+        totalAvailable: typeof data.totalAvailable === "number" ? data.totalAvailable : null,
         createdAt: data.createdAt?.toDate?.()?.toISOString() || null,
       };
     });

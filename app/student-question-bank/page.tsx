@@ -36,6 +36,8 @@ type Attempt = {
   id: string;
   questionCount: number;
   markingStatus: string;
+  totalAwarded?: number | null;
+  totalAvailable?: number | null;
   createdAt: string | null;
 };
 
@@ -253,7 +255,7 @@ export default function StudentQuestionBankPage() {
         <h1 className="mt-3 text-3xl font-bold">Student Question Bank</h1>
         <p className="mt-2 text-sm text-gray-500">
           Build a practice paper, answer questions and review feedback.
-          Written answers are not automatically awarded examination marks.
+          Answers get an instant AI practice mark with feedback. Practice marks are not official examination results.
         </p>
       </header>
 
@@ -584,7 +586,11 @@ export default function StudentQuestionBankPage() {
                 ? new Date(item.createdAt).toLocaleString()
                 : "Recently submitted"}
             </span>
-            <p className="text-sm">Self-review completed</p>
+            <p className="text-sm">
+              {item.markingStatus !== "self-review" && typeof item.totalAwarded === "number" && item.totalAvailable
+                ? `Practice mark: ${item.totalAwarded}/${item.totalAvailable}${item.markingStatus === "partly-ai-marked" ? " (some answers self-reviewed)" : ""}`
+                : "Self-review completed"}
+            </p>
           </div>
         ))}
       </section>

@@ -103,6 +103,7 @@ export async function POST(request: Request) {
         }));
         results.forEach((result, index) => {
           if (result.status === "fulfilled") marks.set(toMark[index].questionId, result.value);
+          else console.error("[Student Question Bank] could not mark", toMark[index].questionId, result.reason instanceof Error ? result.reason.message : result.reason);
         });
         if (results.some(result => result.status === "rejected")) markingNote = markingNote || "Some answers could not be marked instantly; use the self-review guidance.";
       }
