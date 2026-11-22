@@ -114,6 +114,17 @@ html:is([data-cs-background="dark"], [data-cs-background="black"]) :is(img, vide
   filter: invert(1) hue-rotate(180deg);
 }
 
+/* Surfaces that are already dark (sidebar, dark banners) stay dark:
+   invert the outermost one back. Images inside it are then already the
+   right way round, so they are left alone. */
+html:is([data-cs-background="dark"], [data-cs-background="black"]) :is(.bg-slate-900, .bg-slate-950, .bg-gray-900, [class*="from-slate-950"], [class*="from-slate-900"]):not(:is(.bg-slate-900, .bg-slate-950, .bg-gray-900, [class*="from-slate-950"], [class*="from-slate-900"]) *) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+html:is([data-cs-background="dark"], [data-cs-background="black"]) :is(.bg-slate-900, .bg-slate-950, .bg-gray-900, [class*="from-slate-950"], [class*="from-slate-900"]) :is(img, video, picture, canvas, iframe, embed, object) {
+  filter: none;
+}
+
 /* High contrast: darker text and borders on light surfaces, never on
    dark panels such as the sidebar. */
 html[data-cs-contrast="high"] :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, .text-gray-400, .text-gray-500, .text-gray-600):not(:is(.bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-gray-900, .bg-black, [class*="bg-gradient"], [class*="bg-linear"]) *) {
@@ -124,7 +135,7 @@ html[data-cs-contrast="high"] :is(.border-slate-100, .border-slate-200, .border-
   border-color: #334155;
 }
 
-html[data-cs-contrast="high"] a {
+html[data-cs-contrast="high"] a:not(:is(nav, aside) a) {
   text-decoration: underline;
   text-underline-offset: 0.15em;
 }
