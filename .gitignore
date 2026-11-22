@@ -137,3 +137,10 @@ SEND-FINAL-INSPECTION.txt
 README-*-FIX.txt
 README-SEARCH-VISIBILITY.txt
 README-HOME-LINKS.txt
+
+# Local helper scripts and notes
+CS-MASTER-CATALOGUE-STRUCTURE.txt
+CSMaster-Vision-Prototype-Batch.ps1
+firestore-reviewed-candidate.rules
+fix-*.py
+test-vision-render.cjs
