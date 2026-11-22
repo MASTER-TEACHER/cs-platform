@@ -39,250 +39,89 @@ textarea, [contenteditable="true"], [role="textbox"] {
 input::placeholder, textarea::placeholder { color: #64748b; opacity: 1; }
 
 
-/* CS MASTER ACCESSIBILITY FOUNDATION */
-html[data-cs-font="arial"] { --cs-reading-font: Arial, sans-serif; }
-html[data-cs-font="verdana"] { --cs-reading-font: Verdana, sans-serif; }
-html[data-cs-font="tahoma"] { --cs-reading-font: Tahoma, sans-serif; }
-html[data-cs-font="georgia"] { --cs-reading-font: Georgia, serif; }
-html[data-cs-font="trebuchet"] { --cs-reading-font: "Trebuchet MS", sans-serif; }
-
-html {
-  --cs-accessibility-scale: 1;
-  --cs-reading-font: Arial, sans-serif;
-  --cs-reading-line-height: 1.5;
-  --cs-reading-surface: transparent;
-  --cs-reading-foreground: inherit;
-}
-
-html[data-cs-spacing="comfortable"] {
-  --cs-reading-line-height: 1.8;
-}
-
-html[data-cs-spacing="wide"] {
-  --cs-reading-line-height: 2.1;
-}
-
-html[data-cs-background="cream"] {
-  --cs-reading-surface: #fff5d9;
-  --cs-reading-foreground: #242424;
-}
-
-html[data-cs-background="blue"] {
-  --cs-reading-surface: #e5f2ff;
-  --cs-reading-foreground: #182c43;
-}
-
-html[data-cs-background="green"] {
-  --cs-reading-surface: #e7f3e8;
-  --cs-reading-foreground: #193521;
-}
-
-html[data-cs-background="dark"] {
-  --cs-reading-surface: #202735;
-  --cs-reading-foreground: #ffffff;
-}
-
-html[data-cs-background]:not([data-cs-background="default"]) body {
-  background-color: var(--cs-reading-surface);
-  color: var(--cs-reading-foreground);
-}
-
-html[data-cs-font] body {
-  font-family: var(--cs-reading-font);
-}
-
-html[data-cs-font] p,
-html[data-cs-font] li,
-html[data-cs-font] label,
-html[data-cs-font] input,
-html[data-cs-font] textarea {
-  font-family: var(--cs-reading-font);
-}
-
-html[data-cs-spacing] p,
-html[data-cs-spacing] li {
-  line-height: var(--cs-reading-line-height);
-}
-
-html[data-cs-reading="simplified"] p {
-  max-width: 75ch;
-}
-
-html[data-cs-motion="reduced"] *,
-html[data-cs-motion="reduced"] *::before,
-html[data-cs-motion="reduced"] *::after {
-  animation-duration: 0.01ms !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
-}
-
-.cs-accessibility-widget {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1000;
-  font-family: Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.cs-accessibility-trigger,
-.cs-accessibility-reset {
-  background: #163b76;
-  color: white;
-  border: 1px solid #ffffff;
-  border-radius: 10px;
-  padding: 10px 15px;
-  cursor: pointer;
-}
-
-.cs-accessibility-panel {
-  position: absolute;
-  right: 0;
-  bottom: 55px;
-  width: min(350px, calc(100vw - 30px));
-  max-height: min(75vh, 650px);
-  overflow-y: auto;
-  padding: 18px;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #172033;
-  border: 1px solid #b8c2d1;
-  box-shadow: 0 8px 32px #00000030;
-}
-
-.cs-accessibility-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.cs-accessibility-heading h2 {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.cs-accessibility-heading button {
-  padding: 5px 8px;
-  border: 1px solid #64748b;
-  border-radius: 6px;
-}
-
-.cs-accessibility-panel > label:not(.cs-accessibility-check) {
-  display: block;
-  margin-top: 14px;
-  margin-bottom: 5px;
-  font-weight: 600;
-}
-
-.cs-accessibility-panel select {
-  display: block;
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #64748b;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #172033;
-}
-
-.cs-accessibility-check {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-top: 14px;
-}
-
-.cs-accessibility-reset {
-  margin-top: 16px;
-}
-
-.cs-accessibility-note {
-  margin-top: 12px;
-  font-size: 12px;
-}
-
-.cs-accessibility-widget :focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 3px;
-}
-
-/* CS MASTER SEND CONSOLIDATED ACCESSIBILITY V2 */
+/* ==================================================================
+   CS MASTER ACCESSIBILITY v3 (single consolidated block)
+   Set by components/accessibility/AccessibilityPanel.tsx through
+   data-cs-* attributes on <html>.
+   ================================================================== */
 
 html {
   --cs-accessibility-scale: 1;
   --cs-reading-font: Arial, sans-serif;
   --cs-reading-line-height: 1.5;
   --cs-reading-letter-spacing: normal;
+  --cs-reading-surface: #ffffff;
   font-size: calc(16px * var(--cs-accessibility-scale));
 }
 
+/* Font */
 html[data-cs-font="arial"] { --cs-reading-font: Arial, sans-serif; }
 html[data-cs-font="verdana"] { --cs-reading-font: Verdana, sans-serif; }
 html[data-cs-font="tahoma"] { --cs-reading-font: Tahoma, sans-serif; }
 html[data-cs-font="georgia"] { --cs-reading-font: Georgia, serif; }
 html[data-cs-font="trebuchet"] { --cs-reading-font: "Trebuchet MS", sans-serif; }
 
-html[data-cs-font] body {
+html[data-cs-font] body,
+html[data-cs-font] :is(p, li, label, button, input, textarea, select) {
   font-family: var(--cs-reading-font);
 }
 
-html[data-cs-font] p,
-html[data-cs-font] li,
-html[data-cs-font] label,
-html[data-cs-font] button,
-html[data-cs-font] input,
-html[data-cs-font] textarea,
-html[data-cs-font] select {
-  font-family: var(--cs-reading-font);
+/* Line and letter spacing */
+html[data-cs-spacing="comfortable"] { --cs-reading-line-height: 1.8; }
+html[data-cs-spacing="wide"] { --cs-reading-line-height: 2.1; }
+html[data-cs-letter-spacing="comfortable"] { --cs-reading-letter-spacing: 0.035em; }
+html[data-cs-letter-spacing="wide"] { --cs-reading-letter-spacing: 0.075em; }
+
+html[data-cs-spacing] :is(p, li) { line-height: var(--cs-reading-line-height); }
+html[data-cs-letter-spacing] :is(p, li) { letter-spacing: var(--cs-reading-letter-spacing); }
+
+/* Coloured backgrounds: tint the page AND the white cards on it, like a
+   coloured overlay. Text stays dark, so contrast is preserved. */
+html[data-cs-background="cream"] { --cs-reading-surface: #fff4d6; }
+html[data-cs-background="blue"] { --cs-reading-surface: #eaf4ff; }
+html[data-cs-background="green"] { --cs-reading-surface: #e8f3e8; }
+html[data-cs-background="peach"] { --cs-reading-surface: #fff0e5; }
+html[data-cs-background="lavender"] { --cs-reading-surface: #f1edff; }
+
+html:is([data-cs-background="cream"], [data-cs-background="blue"], [data-cs-background="green"], [data-cs-background="peach"], [data-cs-background="lavender"]) :is(body, .bg-white, .bg-slate-50, .bg-gray-50) {
+  background-color: var(--cs-reading-surface);
 }
 
-html[data-cs-spacing="comfortable"] {
-  --cs-reading-line-height: 1.8;
+html:is([data-cs-background="cream"], [data-cs-background="blue"], [data-cs-background="green"], [data-cs-background="peach"], [data-cs-background="lavender"]) :is(.bg-slate-100, .bg-gray-100) {
+  background-color: color-mix(in srgb, var(--cs-reading-surface) 88%, #64748b);
 }
 
-html[data-cs-spacing="wide"] {
-  --cs-reading-line-height: 2.1;
+/* Keep pale grey text readable on a tint (WCAG AA). */
+html:is([data-cs-background="cream"], [data-cs-background="blue"], [data-cs-background="green"], [data-cs-background="peach"], [data-cs-background="lavender"]) :is(.text-slate-400, .text-slate-500, .text-gray-400, .text-gray-500):not(:is(.bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-gray-900, .bg-black) *) {
+  color: #475569;
 }
 
-html[data-cs-letter-spacing="comfortable"] {
-  --cs-reading-letter-spacing: 0.035em;
-}
-
-html[data-cs-letter-spacing="wide"] {
-  --cs-reading-letter-spacing: 0.075em;
-}
-
-html[data-cs-spacing] p,
-html[data-cs-spacing] li {
-  line-height: var(--cs-reading-line-height);
-}
-
-html[data-cs-letter-spacing] p,
-html[data-cs-letter-spacing] li {
-  letter-spacing: var(--cs-reading-letter-spacing);
-}
-
-html[data-cs-background="cream"] body {
-  background: #fff5d9;
-}
-
-html[data-cs-background="blue"] body {
-  background: #e5f2ff;
-}
-
-html[data-cs-background="green"] body {
-  background: #e7f3e8;
-}
-
-html[data-cs-background="dark"] body {
-  background: #202735;
-  color: #ffffff;
-}
-
-html[data-cs-contrast="high"] body {
+/* Dark and black: invert the whole page so every card, heading and
+   table turns dark consistently, then turn images back the right way. */
+html:is([data-cs-background="dark"], [data-cs-background="black"]) {
   background: #ffffff;
-  color: #000000;
+}
+
+html:is([data-cs-background="dark"], [data-cs-background="black"]) body {
+  background: #ffffff;
+  color: #111827;
+}
+
+html[data-cs-background="dark"] { filter: invert(0.88) hue-rotate(180deg); }
+html[data-cs-background="black"] { filter: invert(1) hue-rotate(180deg) contrast(1.1); }
+
+html:is([data-cs-background="dark"], [data-cs-background="black"]) :is(img, video, picture, canvas, iframe, embed, object, .cs-accessibility-swatch-colour) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* High contrast: darker text and borders on light surfaces, never on
+   dark panels such as the sidebar. */
+html[data-cs-contrast="high"] :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, .text-gray-400, .text-gray-500, .text-gray-600):not(:is(.bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-slate-950, .bg-gray-900, .bg-black, [class*="bg-gradient"], [class*="bg-linear"]) *) {
+  color: #0f172a;
+}
+
+html[data-cs-contrast="high"] :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-gray-200, .border-gray-300) {
+  border-color: #334155;
 }
 
 html[data-cs-contrast="high"] a {
@@ -290,55 +129,133 @@ html[data-cs-contrast="high"] a {
   text-underline-offset: 0.15em;
 }
 
-html[data-cs-reading="simplified"] p {
-  max-width: 75ch;
+html[data-cs-contrast="high"] :focus-visible {
+  outline: 3px solid #000000;
+  outline-offset: 2px;
 }
 
-html[data-cs-focus="on"] p,
-html[data-cs-focus="on"] li {
-  line-height: 1.9;
+/* Simplified reading layout (switched off in exams) */
+html[data-cs-reading="simplified"] :is(p, li) {
+  max-width: 70ch;
+  text-align: left;
 }
 
+html[data-cs-reading="simplified"] * {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html[data-cs-reading="simplified"] [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+}
+
+/* Reduced motion (also respects the operating-system setting) */
 html[data-cs-motion="reduced"] *,
 html[data-cs-motion="reduced"] *::before,
 html[data-cs-motion="reduced"] *::after {
   animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .cs-accessibility-widget *,
+  .cs-reading-ruler,
+  .cs-reading-mask {
+    transition: none !important;
+  }
+}
+
+/* Reading ruler and focus-mode mask */
+.cs-reading-ruler {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 36px;
+  pointer-events: none;
+  z-index: 900;
+  border-top: 2px solid #d97706;
+  border-bottom: 2px solid #d97706;
+  background: #fbbf2430;
+}
+
+.cs-reading-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 890;
+  background: rgb(15 23 42 / 0.55);
+}
+
+/* Floating widget */
 .cs-accessibility-widget {
   position: fixed;
   right: 20px;
   bottom: 20px;
-  z-index: 1000;
+  z-index: 9999;
   font-family: Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.cs-accessibility-widget[data-position="left"] {
+  right: auto;
+  left: 20px;
+}
+
+/* In exams, the pause and fullscreen warnings must cover the widget. */
+html[data-cs-exam="on"] .cs-accessibility-widget {
+  z-index: 150;
 }
 
 .cs-accessibility-trigger,
 .cs-accessibility-reset,
 .cs-accessibility-actions button {
-  padding: 10px 14px;
+  min-height: 40px;
+  padding: 8px 14px;
   border: 1px solid #ffffff;
-  border-radius: 10px;
+  border-radius: 999px;
   background: #163b76;
   color: #ffffff;
+  font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 4px 14px #00000030;
+}
+
+.cs-accessibility-reset,
+.cs-accessibility-actions button {
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.cs-accessibility-trigger span {
+  margin-right: 4px;
+  font-weight: 800;
 }
 
 .cs-accessibility-panel {
   position: absolute;
   right: 0;
-  bottom: 55px;
-  width: min(370px, calc(100vw - 32px));
-  max-height: min(76vh, 680px);
+  bottom: calc(100% + 12px);
+  width: min(390px, calc(100vw - 32px));
+  max-height: min(72dvh, 650px);
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 18px;
+  overscroll-behavior: contain;
+  padding: 0 18px 18px;
+  box-sizing: border-box;
   border: 1px solid #94a3b8;
   border-radius: 14px;
   background: #ffffff;
   color: #172033;
   box-shadow: 0 12px 36px #00000040;
+}
+
+.cs-accessibility-widget[data-position="left"] .cs-accessibility-panel {
+  right: auto;
+  left: 0;
 }
 
 .cs-accessibility-profile {
@@ -357,10 +274,16 @@ html[data-cs-motion="reduced"] *::after {
 }
 
 .cs-accessibility-heading {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding: 16px 0 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 
 .cs-accessibility-heading h2 {
@@ -369,12 +292,20 @@ html[data-cs-motion="reduced"] *::after {
 }
 
 .cs-accessibility-heading button {
-  padding: 5px 8px;
+  min-height: 40px;
+  padding: 5px 12px;
   border: 1px solid #64748b;
   border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
 }
 
-.cs-accessibility-controls > label:not(.cs-accessibility-check) {
+.cs-accessibility-controls {
+  min-width: 0;
+}
+
+.cs-accessibility-controls > label:not(.cs-accessibility-check),
+.cs-accessibility-swatches legend {
   display: block;
   margin-top: 14px;
   margin-bottom: 5px;
@@ -384,199 +315,27 @@ html[data-cs-motion="reduced"] *::after {
 .cs-accessibility-controls select {
   display: block;
   width: 100%;
-  padding: 9px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px;
   border: 1px solid #64748b;
   border-radius: 7px;
   background: #ffffff;
   color: #172033;
 }
 
-.cs-accessibility-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.cs-accessibility-check input {
-  width: 17px;
-  height: 17px;
-}
-
-.cs-accessibility-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.cs-accessibility-actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.cs-accessibility-reset {
-  margin-top: 16px;
-}
-
-.cs-accessibility-note {
-  margin-top: 12px;
-  font-size: 0.8rem;
-}
-
-.cs-accessibility-intro {
-  margin-top: 8px;
-}
-
-.cs-accessibility-widget :focus-visible,
-.cs-accessibility-profile :focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 3px;
-}
-
-.cs-reading-ruler {
-  position: fixed;
-  left: 0;
-  right: 0;
-  height: 36px;
-  pointer-events: none;
-  z-index: 900;
-  border-top: 2px solid #d97706;
-  border-bottom: 2px solid #d97706;
-  background: #fbbf2430;
-}
-
-@media (max-width: 640px) {
-  .cs-accessibility-widget {
-    right: 12px;
-    bottom: 12px;
-  }
-
-  .cs-accessibility-panel {
-    width: min(340px, calc(100vw - 24px));
-    max-height: 70vh;
-  }
-}
-
-/* CS MASTER SEND FINAL CORRECTIONS */
-
-html[data-cs-background="cream"] {
-  --cs-reading-surface: #fff4d6;
-  --cs-reading-ink: #252525;
-}
-
-html[data-cs-background="blue"] {
-  --cs-reading-surface: #eaf4ff;
-  --cs-reading-ink: #18324b;
-}
-
-html[data-cs-background="green"] {
-  --cs-reading-surface: #e8f3e8;
-  --cs-reading-ink: #203a29;
-}
-
-html[data-cs-background="peach"] {
-  --cs-reading-surface: #fff0e5;
-  --cs-reading-ink: #493025;
-}
-
-html[data-cs-background="lavender"] {
-  --cs-reading-surface: #f1edff;
-  --cs-reading-ink: #30274d;
-}
-
-html[data-cs-background="dark"] {
-  --cs-reading-surface: #202735;
-  --cs-reading-ink: #ffffff;
-}
-
-html[data-cs-background="black"] {
-  --cs-reading-surface: #000000;
-  --cs-reading-ink: #ffffff;
-}
-
-html[data-cs-background]:not([data-cs-background="default"]) body {
-  background-color: var(--cs-reading-surface);
-  color: var(--cs-reading-ink);
-}
-
-.cs-accessibility-widget {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 9999;
-}
-
-.cs-accessibility-panel {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 12px);
-  width: min(390px, calc(100vw - 32px));
-  max-height: min(72dvh, 650px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 0 18px 18px;
-  box-sizing: border-box;
-  background: #ffffff;
-  color: #172033;
-}
-
-.cs-accessibility-heading {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #ffffff;
-  padding: 16px 0 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.cs-accessibility-controls {
-  min-width: 0;
-}
-
-.cs-accessibility-controls select {
-  max-width: 100%;
-  min-width: 0;
-}
-
-.cs-accessibility-trigger {
-  min-height: 44px;
-  min-width: 110px;
-}
-
-.cs-accessibility-panel button,
-.cs-accessibility-panel select,
-.cs-accessibility-profile button,
-.cs-accessibility-profile select {
-  min-height: 40px;
-}
-
-.cs-accessibility-panel :focus-visible,
-.cs-accessibility-profile :focus-visible {
-  outline: 3px solid #2563eb;
-  outline-offset: 2px;
-}
-
-@media (max-width: 640px) {
-  .cs-accessibility-widget {
-    right: 12px;
-    bottom: 12px;
-  }
-
-  .cs-accessibility-panel {
-    max-height: 68dvh;
-    width: min(360px, calc(100vw - 24px));
-  }
-}
-
-/* CS MASTER SEND COLOUR SWATCH RELEASE */
-
 .cs-accessibility-swatches {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cs-accessibility-swatches legend {
+  grid-column: 1 / -1;
+  padding: 0;
 }
 
 .cs-accessibility-swatch {
@@ -610,13 +369,76 @@ html[data-cs-background]:not([data-cs-background="default"]) body {
   border-radius: 6px;
 }
 
-.cs-accessibility-swatch:focus-visible {
+.cs-accessibility-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.cs-accessibility-check input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+
+.cs-accessibility-hint {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #475569;
+}
+
+.cs-accessibility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cs-accessibility-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cs-accessibility-reset {
+  margin-top: 16px;
+}
+
+.cs-accessibility-intro {
+  margin-top: 8px;
+}
+
+.cs-accessibility-note {
+  margin-top: 12px;
+  font-size: 0.8rem;
+}
+
+.cs-accessibility-warning {
+  padding: 8px 10px;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.cs-accessibility-widget :focus-visible,
+.cs-accessibility-profile :focus-visible {
   outline: 3px solid #2563eb;
-  outline-offset: 3px;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .cs-accessibility-widget { right: 12px; bottom: 12px; }
+  .cs-accessibility-widget[data-position="left"] { left: 12px; }
+  .cs-accessibility-panel {
+    width: min(360px, calc(100vw - 24px));
+    max-height: 68dvh;
+  }
 }
 
 @media (max-width: 360px) {
-  .cs-accessibility-swatches {
-    grid-template-columns: 1fr;
-  }
+  .cs-accessibility-swatches { grid-template-columns: 1fr; }
 }
