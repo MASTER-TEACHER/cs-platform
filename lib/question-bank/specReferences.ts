@@ -2,8 +2,8 @@ import type { BankQuestion } from "./bankUtilities";
 
 /*
  * Specification section for a question, from its qualification and topic.
- * Currently mapped for OCR (J277 GCSE and H446 A Level). Other boards show no
- * reference until mapped. Sections are at topic level, e.g. "J277 1.3".
+ * Mapped for OCR (J277, H446), AQA (8525, 7517) and Edexcel GCSE (1CP2), at
+ * specification-section level, e.g. "J277 1.3". Edexcel A Level is not mapped yet.
  */
 const OCR_GCSE: Record<string, string> = {
   "cpu architecture": "J277 1.1 Systems architecture",
@@ -51,10 +51,87 @@ const OCR_A_LEVEL: Record<string, string> = {
   "computational complexity": "H446 2.3 Algorithms",
 };
 
+const AQA_GCSE: Record<string, string> = {
+  "algorithms": "AQA 8525 3.1 Fundamentals of algorithms",
+  "programming": "AQA 8525 3.2 Programming",
+  "defensive design": "AQA 8525 3.2 Programming (robust and secure programming)",
+  "software development and testing": "AQA 8525 3.2 Programming (robust and secure programming)",
+  "data representation": "AQA 8525 3.3 Fundamentals of data representation",
+  "binary representation and arithmetic": "AQA 8525 3.3 Fundamentals of data representation",
+  "binary numbers": "AQA 8525 3.3 Fundamentals of data representation",
+  "hexadecimal": "AQA 8525 3.3 Fundamentals of data representation",
+  "character representation": "AQA 8525 3.3 Fundamentals of data representation",
+  "image representation": "AQA 8525 3.3 Fundamentals of data representation",
+  "sound representation": "AQA 8525 3.3 Fundamentals of data representation",
+  "data compression": "AQA 8525 3.3 Fundamentals of data representation",
+  "cpu architecture": "AQA 8525 3.4 Computer systems",
+  "cpu and processor architecture": "AQA 8525 3.4 Computer systems",
+  "memory and storage": "AQA 8525 3.4 Computer systems",
+  "boolean logic": "AQA 8525 3.4 Computer systems",
+  "logic gates": "AQA 8525 3.4 Computer systems",
+  "systems software": "AQA 8525 3.4 Computer systems",
+  "programming languages and ides": "AQA 8525 3.4 Computer systems",
+  "computer networks": "AQA 8525 3.5 Fundamentals of computer networks",
+  "cybersecurity": "AQA 8525 3.6 Cyber security",
+  "databases and sql": "AQA 8525 3.7 Relational databases and SQL",
+  "ethical, legal and environmental impacts": "AQA 8525 3.8 Ethical, legal and environmental impacts",
+  "legal, moral and ethical": "AQA 8525 3.8 Ethical, legal and environmental impacts",
+};
+
+const AQA_A_LEVEL: Record<string, string> = {
+  "programming": "AQA 7517 4.1 Fundamentals of programming",
+  "object-oriented programming": "AQA 7517 4.1 Fundamentals of programming",
+  "recursion": "AQA 7517 4.1 Fundamentals of programming",
+  "data structures": "AQA 7517 4.2 Fundamentals of data structures",
+  "algorithms": "AQA 7517 4.3 Fundamentals of algorithms",
+  "theory of computation": "AQA 7517 4.4 Theory of computation",
+  "computational complexity": "AQA 7517 4.4 Theory of computation",
+  "data representation": "AQA 7517 4.5 Fundamentals of data representation",
+  "boolean algebra": "AQA 7517 4.6 Fundamentals of computer systems",
+  "operating systems": "AQA 7517 4.6 Fundamentals of computer systems",
+  "computer organisation": "AQA 7517 4.7 Computer organisation and architecture",
+  "ethical, legal and environmental impacts": "AQA 7517 4.8 Consequences of uses of computing",
+  "networking": "AQA 7517 4.9 Communication and networking",
+  "cybersecurity": "AQA 7517 4.5/4.9 Encryption and network security",
+  "databases": "AQA 7517 4.10 Fundamentals of databases",
+  "big data": "AQA 7517 4.11 Big Data",
+  "functional programming": "AQA 7517 4.12 Fundamentals of functional programming",
+  "software development": "AQA 7517 4.13 Systematic approach to problem solving",
+};
+
+const EDEXCEL_GCSE: Record<string, string> = {
+  "algorithms": "Edexcel 1CP2 Topic 1 Computational thinking",
+  "boolean logic": "Edexcel 1CP2 Topic 1 Computational thinking",
+  "logic gates": "Edexcel 1CP2 Topic 1 Computational thinking",
+  "data representation": "Edexcel 1CP2 Topic 2 Data",
+  "binary representation and arithmetic": "Edexcel 1CP2 Topic 2 Data",
+  "binary numbers": "Edexcel 1CP2 Topic 2 Data",
+  "hexadecimal": "Edexcel 1CP2 Topic 2 Data",
+  "character representation": "Edexcel 1CP2 Topic 2 Data",
+  "image representation": "Edexcel 1CP2 Topic 2 Data",
+  "sound representation": "Edexcel 1CP2 Topic 2 Data",
+  "data compression": "Edexcel 1CP2 Topic 2 Data",
+  "cpu architecture": "Edexcel 1CP2 Topic 3 Computers",
+  "cpu and processor architecture": "Edexcel 1CP2 Topic 3 Computers",
+  "memory and storage": "Edexcel 1CP2 Topic 3 Computers",
+  "systems software": "Edexcel 1CP2 Topic 3 Computers",
+  "programming languages and ides": "Edexcel 1CP2 Topic 3 Computers",
+  "computer networks": "Edexcel 1CP2 Topic 4 Networks",
+  "cybersecurity": "Edexcel 1CP2 Topics 4–5 Network security and cybersecurity",
+  "ethical, legal and environmental impacts": "Edexcel 1CP2 Topic 5 Issues and impact",
+  "legal, moral and ethical": "Edexcel 1CP2 Topic 5 Issues and impact",
+  "programming": "Edexcel 1CP2 Topic 6 Problem solving with programming",
+  "defensive design": "Edexcel 1CP2 Topic 6 Problem solving with programming",
+  "software development and testing": "Edexcel 1CP2 Topic 6 Problem solving with programming",
+};
+
 export function specReference(item: Pick<BankQuestion, "qualification" | "examBoard"> & { question: { topic: string } }): string {
-  if (item.examBoard.trim().toUpperCase() !== "OCR") return "";
+  const board = item.examBoard.trim().toUpperCase();
   const topic = item.question.topic.trim().toLowerCase();
-  if (/^gcse$/i.test(item.qualification.trim())) return OCR_GCSE[topic] ?? "";
-  if (/^a\s*level$/i.test(item.qualification.trim())) return OCR_A_LEVEL[topic] ?? "";
+  const gcse = /^gcse$/i.test(item.qualification.trim());
+  const aLevel = /^a\s*level$/i.test(item.qualification.trim());
+  if (board === "OCR") return (gcse ? OCR_GCSE[topic] : aLevel ? OCR_A_LEVEL[topic] : "") ?? "";
+  if (board === "AQA") return (gcse ? AQA_GCSE[topic] : aLevel ? AQA_A_LEVEL[topic] : "") ?? "";
+  if (board === "EDEXCEL") return (gcse ? EDEXCEL_GCSE[topic] : "") ?? "";
   return "";
 }

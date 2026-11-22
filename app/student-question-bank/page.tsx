@@ -240,6 +240,41 @@ export default function StudentQuestionBankPage() {
     }
   }
 
+  // Topics where marks were dropped in the last submitted paper.
+  const weakTopics = feedback
+    .filter(item => item.awardedMarks !== null && typeof item.maxMarks === "number" && item.awardedMarks < item.maxMarks)
+    .map(item => questions.find(q => q.id === item.questionId))
+    .filter((q): q is Question => Boolean(q));
+
+  function retryWeakTopics() {
+    const used = new Set(active.map(q => q.id));
+    const picked: string[] = [];
+    for (const weak of weakTopics) {
+      const similar = questions.filter(q =>
+        !used.has(q.id) &&
+        !picked.includes(q.id) &&
+        q.subject === weak.subject &&
+        q.qualification === weak.qualification &&
+        q.examBoard === weak.examBoard &&
+        q.topic === weak.topic
+      );
+      // Up to two fresh questions per weak topic, chosen at random.
+      for (const q of [...similar].sort(() => Math.random() - 0.5).slice(0, 2)) {
+        if (picked.length < 10) picked.push(q.id);
+      }
+    }
+    if (!picked.length) {
+      setMessage("No new questions are left on those topics. Try building a paper on a different topic.");
+      return;
+    }
+    setSelected(picked);
+    setAnswers({});
+    setFeedback([]);
+    setPractising(true);
+    setMessage(`New practice paper: ${picked.length} fresh question(s) on the topics where you dropped marks.`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   if (loading || !profile || !user) {
     return <main className="p-8">Loading student practice...</main>;
   }
@@ -561,16 +596,27 @@ export default function StudentQuestionBankPage() {
               {busy ? "Submitting..." : "Submit answers"}
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                resetSelection();
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
-              className="rounded bg-blue-700 px-5 py-3 text-white"
-            >
-              Build another paper
-            </button>
+            <div className="flex flex-wrap gap-3">
+              {weakTopics.length > 0 && (
+                <button
+                  type="button"
+                  onClick={retryWeakTopics}
+                  className="rounded bg-emerald-700 px-5 py-3 text-white"
+                >
+                  Practise what I got wrong
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  resetSelection();
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="rounded bg-blue-700 px-5 py-3 text-white"
+              >
+                Build another paper
+              </button>
+            </div>
           )}
         </section>
       )}

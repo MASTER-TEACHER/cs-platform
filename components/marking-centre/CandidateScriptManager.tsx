@@ -30,6 +30,40 @@ type AlignmentResult = {
   markingEnabled: false;
 };
 type ReviewFlag = { questionId: string; code: string; detail: string };
+// Short, grouped labels for queue warnings ("Unclear reading: Q2, Q5"). Full detail stays available.
+function flagLabel(flag: { code: string; detail: string }): string {
+  const detail = flag.detail.toLowerCase();
+  if (flag.code === "UNCERTAIN") {
+    if (detail.includes("markers disagreed")) return "Markers disagreed";
+    if (detail.includes("moderation unavailable")) return "One marker only";
+    if (detail.includes("could not mark")) return "Not marked by AI";
+    if (detail.includes("check:")) return "Auto-check changed mark";
+    if (detail.includes("uncertain")) return "Unclear reading";
+    return "Needs a look";
+  }
+  const labels: Record<string, string> = {
+    UNSUPPORTED_CREDIT: "Credit for a non-answer",
+    UNSUPPORTED_WORKING: "Method claim to check",
+    MISSING_EVIDENCE: "Missing evidence",
+    MISSING_FEEDBACK: "Missing feedback",
+    MISSING_GUIDANCE: "Missing guidance",
+    OVERRIDE_FEEDBACK_CHECK: "Check your override",
+    ALIGNMENT: "Answer location",
+  };
+  return labels[flag.code] ?? flag.code.replace(/_/g, " ").toLowerCase();
+}
+function groupedFlags(flags: { questionId: string; code: string; detail: string }[]): string {
+  const groups = new Map<string, string[]>();
+  for (const flag of flags) {
+    const label = flagLabel(flag);
+    const list = groups.get(label) ?? [];
+    const where = flag.questionId === "*" ? "whole script" : `Q${flag.questionId}`;
+    if (!list.includes(where)) list.push(where);
+    groups.set(label, list);
+  }
+  return [...groups.entries()].map(([label, qs]) => `${label}: ${qs.join(", ")}`).join(" · ");
+}
+
 type UsageSummary = { month: string; costUsd: number; budgetUsd: number; scriptsMarked: number; calls: number; averageCostPerScriptUsd: number };
 type AccuracyReport = {
   verdict: "not_enough_data" | "ready_for_bulk_approval" | "keep_reviewing";
@@ -777,8 +811,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       </div>
       {batchProgress && <p role="status" className="text-sm">{batchProgress}</p>}
       {queueError && <p role="alert" className="text-sm text-red-700">{queueError}</p>}
-      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.flagged).length} flagged · {queue.filter(r => r.status === "unprocessed").length} unprocessed</p>
-        <div className="max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr><th className="border p-2"><label className="flex items-center gap-1"><input type="checkbox" aria-label="Select all eligible scripts" disabled={queueBusy || !queue.some(r => eligible(r))} checked={queue.some(r => eligible(r)) && queue.filter(r => eligible(r)).every(r => bulkSelected.includes(`${r.paperId}_${r.candidateCode}`))} onChange={e => setBulkSelected(e.target.checked ? queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`) : [])} />All</label></th><th className="border p-2">Candidate</th><th className="border p-2">Paper</th><th className="border p-2">Status</th><th className="border p-2">Review warnings</th><th className="border p-2">Open</th></tr></thead><tbody>{queue.map(item => <tr key={`${item.paperId}_${item.candidateCode}`}><td className="border p-2"><input type="checkbox" aria-label={`Select ${item.candidateCode} ${item.paperId} for bulk approval`} disabled={!eligible(item) || queueBusy} checked={bulkSelected.includes(`${item.paperId}_${item.candidateCode}`)} onChange={e => setBulkSelected(old => e.target.checked ? [...old, `${item.paperId}_${item.candidateCode}`].slice(0, 20) : old.filter(k => k !== `${item.paperId}_${item.candidateCode}`))} /></td><td className="border p-2">{item.candidateCode}</td><td className="border p-2">{item.paperId}</td><td className="border p-2">{item.status}</td><td className="border p-2">{item.flags.length ? item.flags.map(f => `Q${f.questionId}: ${f.code === "UNCERTAIN" ? f.detail : f.code}`).join(" · ") : "No automated flags (teacher verification still required)"}</td><td className="border p-2"><button type="button" className="text-indigo-700 underline" disabled={queueBusy} onClick={() => void previewScript({ paperId: item.paperId, candidateCode: item.candidateCode, filename: item.filename, size: 0, uploadedAt: null })}>Review</button></td></tr>)}</tbody></table></div>
+      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.flagged && r.status !== "approved").length} flagged awaiting review · {queue.filter(r => r.status === "unprocessed").length} unprocessed</p>
+        <div className="max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr><th className="border p-2"><label className="flex items-center gap-1"><input type="checkbox" aria-label="Select all eligible scripts" disabled={queueBusy || !queue.some(r => eligible(r))} checked={queue.some(r => eligible(r)) && queue.filter(r => eligible(r)).every(r => bulkSelected.includes(`${r.paperId}_${r.candidateCode}`))} onChange={e => setBulkSelected(e.target.checked ? queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`) : [])} />All</label></th><th className="border p-2">Candidate</th><th className="border p-2">Paper</th><th className="border p-2">Status</th><th className="border p-2">Review warnings</th><th className="border p-2">Open</th></tr></thead><tbody>{queue.map(item => <tr key={`${item.paperId}_${item.candidateCode}`}><td className="border p-2"><input type="checkbox" aria-label={`Select ${item.candidateCode} ${item.paperId} for bulk approval`} disabled={!eligible(item) || queueBusy} checked={bulkSelected.includes(`${item.paperId}_${item.candidateCode}`)} onChange={e => setBulkSelected(old => e.target.checked ? [...old, `${item.paperId}_${item.candidateCode}`].slice(0, 20) : old.filter(k => k !== `${item.paperId}_${item.candidateCode}`))} /></td><td className="border p-2">{item.candidateCode}</td><td className="border p-2">{item.paperId}</td><td className="border p-2">{item.status}</td><td className="border p-2">{item.flags.length ? <details><summary className={`cursor-pointer ${item.status === "approved" ? "text-slate-500" : ""}`}>{item.status === "approved" ? `Approved · ${groupedFlags(item.flags)}` : groupedFlags(item.flags)}</summary><ul className="mt-1 list-disc pl-4 text-slate-600">{item.flags.map((f, i) => <li key={i}>Q{f.questionId}: {f.code === "UNCERTAIN" ? f.detail : f.detail || f.code}</li>)}</ul></details> : "No automated flags (teacher verification still required)"}</td><td className="border p-2"><button type="button" className="text-indigo-700 underline" disabled={queueBusy} onClick={() => void previewScript({ paperId: item.paperId, candidateCode: item.candidateCode, filename: item.filename, size: 0, uploadedAt: null })}>Review</button></td></tr>)}</tbody></table></div>
       </>}
     </div>}
     {mode === "marking" && <div className="space-y-2 rounded-lg border p-4">

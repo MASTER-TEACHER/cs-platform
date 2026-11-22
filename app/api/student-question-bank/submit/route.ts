@@ -87,6 +87,9 @@ export async function POST(request: Request) {
     }
 
     // Instant practice marking (formative), within daily and monthly limits.
+    // Practice attempts are private to the student: they are stored under the student's own
+    // record (server access only) and are NOT used in teacher analytics or progress tracking,
+    // which use teacher-set assignments and assessments only.
     const marks = new Map<string, PracticeMark>();
     let markingNote = "";
     if (practiceMarkingEnabled()) {

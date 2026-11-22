@@ -47,7 +47,7 @@ export async function GET(request: Request, context: Context) {
       };
     });
     rows.sort((a, b) => Number(b.flagged) - Number(a.flagged) || (a.status === "approved" ? 1 : 0) - (b.status === "approved" ? 1 : 0) || a.candidateCode.localeCompare(b.candidateCode));
-    return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.flagged).length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length } }, { headers });
+    return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.flagged && r.status !== "approved").length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length } }, { headers });
   } catch (error) {
     const result = centreError(error);
     return NextResponse.json({ error: result.error }, { status: result.status, headers });

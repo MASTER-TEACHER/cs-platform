@@ -28,24 +28,71 @@ function post(key: string, payload: string): Promise<string> {
     req.end(payload);
   });
 }
-export async function alignAnswers(text: string, questions: Question[]) {
+// One alignment request. Returns the model's JSON text, or throws ALIGN_* errors.
+async function alignWith(model: string, userContent: string): Promise<string> {
+  if (model.startsWith("claude")) {
+    const key = process.env.ANTHROPIC_API_KEY?.trim();
+    if (!key) throw new Error("ALIGN_NO_KEY");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST", signal: controller.signal,
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: 16000, system: `${SYSTEM} Return the JSON object only, with no other text.`, messages: [{ role: "user", content: userContent }] }),
+      });
+      if (!response.ok) {
+        console.error("[Marking Centre] Claude alignment HTTP", response.status, (await response.text()).slice(0, 300));
+        throw new Error("ALIGN_PROVIDER");
+      }
+      const data = await response.json() as { stop_reason?: string; content?: { type: string; text?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
+      recordUsage(model, data.usage);
+      if (data.stop_reason !== "end_turn") throw new Error("ALIGN_FORMAT");
+      const text = (data.content ?? []).filter(b => b.type === "text").map(b => b.text ?? "").join("\n");
+      const start = text.indexOf("{"), end = text.lastIndexOf("}");
+      if (start < 0 || end <= start) throw new Error("ALIGN_FORMAT");
+      return text.slice(start, end + 1);
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("ALIGN_")) throw error;
+      throw new Error("ALIGN_PROVIDER");
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new Error("ALIGN_NO_KEY");
-  if (!text.trim() || text.length > 85000 || questions.length < 1 || questions.length > 150) throw new Error("ALIGN_INVALID");
-  const model = process.env.MARKING_CENTRE_ALIGNMENT_MODEL?.trim() || "gpt-4.1-mini";
   let raw: string;
   try {
     raw = await post(key, JSON.stringify({ model, temperature: 0, response_format: { type: "json_object" }, messages: [
       { role: "system", content: SYSTEM },
-      { role: "user", content: JSON.stringify({ approvedQuestions: questions, candidatePdfText: text }) },
+      { role: "user", content: userContent },
     ] }));
   } catch { throw new Error("ALIGN_PROVIDER"); }
-  let parsed: unknown;
   try {
     const envelope = JSON.parse(raw) as { choices?: { message?: { content?: string | null }; finish_reason?: string }[]; usage?: Parameters<typeof recordUsage>[1] };
     recordUsage(model, envelope.usage);
     if (envelope.choices?.[0]?.finish_reason !== "stop") throw new Error("incomplete");
-    parsed = JSON.parse(envelope.choices?.[0]?.message?.content ?? "");
+    return envelope.choices?.[0]?.message?.content ?? "";
+  } catch { throw new Error("ALIGN_FORMAT"); }
+}
+
+export async function alignAnswers(text: string, questions: Question[]) {
+  if (!text.trim() || text.length > 85000 || questions.length < 1 || questions.length > 150) throw new Error("ALIGN_INVALID");
+  const model = process.env.MARKING_CENTRE_ALIGNMENT_MODEL?.trim() || "gpt-4.1-mini";
+  // If the alignment provider fails (bad key, no credit, outage), use the marking model instead.
+  const fallback = process.env.MARKING_CENTRE_MARKING_MODEL?.trim() || "";
+  const userContent = JSON.stringify({ approvedQuestions: questions, candidatePdfText: text });
+  let content: string;
+  try {
+    content = await alignWith(model, userContent);
+  } catch (error) {
+    console.error("[Marking Centre] alignment failed with", model, error instanceof Error ? error.message : error);
+    if (!fallback || fallback === model) throw error;
+    content = await alignWith(fallback, userContent);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
   } catch { throw new Error("ALIGN_FORMAT"); }
   if (!parsed || typeof parsed !== "object") throw new Error("ALIGN_FORMAT");
   const root = parsed as { answers?: unknown; warnings?: unknown };
