@@ -64,7 +64,7 @@ export async function POST(request: Request, context: Context) {
       const file = form.get(`file_${i}`);
       const paperId = item?.paperId;
       const candidateCode = item?.candidateCode;
-      if (typeof paperId !== "string" || !validPapers.has(paperId) || typeof candidateCode !== "string" || !/^EX-[A-F0-9]{16}$/i.test(candidateCode) || !(file instanceof File) || file.size < 5 || file.size > MAX_BYTES || !file.name.toLowerCase().endsWith(".pdf") || (file.type !== "application/pdf" && file.type !== "")) throw new Error("CENTRE_INVALID");
+      if (typeof paperId !== "string" || !validPapers.has(paperId) || typeof candidateCode !== "string" || !/^(?:[0-9]{4}|[0-9]{6}|[A-Z0-9][A-Z0-9_-]{2,31})$/i.test(candidateCode) || !(file instanceof File) || file.size < 5 || file.size > MAX_BYTES || !file.name.toLowerCase().endsWith(".pdf") || (file.type !== "application/pdf" && file.type !== "")) throw new Error("CENTRE_INVALID");
       const code = candidateCode.toUpperCase();
       const key = `${paperId}_${code}`;
       if (unique.has(key)) throw new Error("CENTRE_INVALID");
