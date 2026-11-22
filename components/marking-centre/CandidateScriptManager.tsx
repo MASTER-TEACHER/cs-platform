@@ -217,16 +217,6 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       cancelled = true;
     };
   }, [endpoint, user]);
-  function downloadCandidateRegister() {
-    // Anonymous codes only: the Script Separator register needs no names.
-    const csv = ["Candidate Code", ...candidateCodes].join("\r\n") + "\r\n";
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `candidate-register-${examId}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }
   const existing = useMemo(() => new Set(scripts.map(s => `${s.paperId}_${s.candidateCode}`)), [scripts]);
   function addFiles(files: FileList | null, selectedPaper: string, selectedCandidate = "") {
     if (!files) return;
@@ -753,8 +743,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   }
   return <section className="space-y-4 border-t pt-5">
     {mode === "scripts" && <>
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">Candidate answer scripts</h3><p className="text-sm text-slate-600">Upload individual PDFs or select your entire cohort at once. Match every file to a candidate and paper before saving. Filename matching uses an existing candidate code.</p></div>
-      <button type="button" className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50" disabled={!candidateCodes.length} onClick={downloadCandidateRegister} title="Anonymous codes only, for the Script Separator's candidate register">Download candidate codes (CSV)</button></div>
+    <div><h3 className="text-lg font-semibold">Candidate answer scripts</h3><p className="text-sm text-slate-600">Upload individual PDFs or select your entire cohort at once. Match every file to a candidate and paper before saving. Filename matching uses an existing candidate code.</p></div>
     <div className="grid gap-3 sm:grid-cols-3">{papers.map(p => <div key={p.id} className="rounded-lg border bg-slate-50 p-3"><strong>{p.title}</strong><p className="text-sm">{scripts.filter(s => s.paperId === p.id).length} / {candidateCodes.length} uploaded</p></div>)}</div>
     <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-3">
       <label className="text-sm">Paper<select className="mt-1 block w-full rounded border p-2" value={paperId} onChange={e => setPaperId(e.target.value)}>{papers.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
