@@ -5,7 +5,12 @@ import { stageTwoQuestions } from "./staticCatalogueStage2";
 import { expandedCatalogueQuestions } from "./staticCatalogueExpanded";
 import { largeBatchQuestions } from "./staticCatalogueLargeBatch";
 import { batch4Questions } from "./staticCatalogueBatch4";
+import { batch5Questions } from "./staticCatalogueBatch5";
+import { batch6Questions } from "./staticCatalogueBatch6";
+import { batch7Questions } from "./staticCatalogueBatch7";
+import { isRetiredQuestion } from "./retiredQuestions";
 import { imediaCatalogueQuestions } from "./imediaCatalogue";
+import { imediaBatch2Questions } from "./imediaCatalogueBatch2";
 import type { BankQuestion } from "./bankUtilities";
 
 export type StudentQuestion = {
@@ -26,7 +31,11 @@ const source: BankQuestion[] = [
   ...expandedCatalogueQuestions,
   ...largeBatchQuestions,
   ...batch4Questions,
+  ...batch5Questions,
+  ...batch6Questions,
+  ...batch7Questions,
   ...imediaCatalogueQuestions,
+  ...imediaBatch2Questions,
 ];
 
 const byId = new Map<string, BankQuestion>();
@@ -37,7 +46,8 @@ for (const entry of source) {
 }
 
 export function getStudentCatalogue() {
-  return [...byId.entries()].map(([id, entry]) => {
+  // Retired repeats stay findable (for past submissions) but are not offered.
+  return [...byId.entries()].filter(([id]) => !isRetiredQuestion(id)).map(([id, entry]) => {
     const imedia = entry.sourceId?.startsWith("imedia-") ||
       entry.qualification === "Cambridge National J834";
 

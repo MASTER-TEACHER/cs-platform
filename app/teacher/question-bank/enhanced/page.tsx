@@ -2,13 +2,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import QuestionHubTabs from "@/components/teacher/QuestionHubTabs";
 import { useAuth } from "@/contexts/AuthContext";
 
 import {
   getTeacherExamQuestionSets,
   getTeacherPaperReview,
   saveExamQuestionSet,
+  updateExamQuestionSetStatus,
   updateTeacherExamQuestionSet,
 } from "@/services/examQuestionService";
 
@@ -30,7 +32,12 @@ import { stageTwoQuestions } from "@/lib/question-bank/staticCatalogueStage2";
 import { expandedCatalogueQuestions } from "@/lib/question-bank/staticCatalogueExpanded";
 import { largeBatchQuestions } from "@/lib/question-bank/staticCatalogueLargeBatch";
 import { batch4Questions } from "@/lib/question-bank/staticCatalogueBatch4";
+import { batch5Questions } from "@/lib/question-bank/staticCatalogueBatch5";
+import { batch6Questions } from "@/lib/question-bank/staticCatalogueBatch6";
+import { batch7Questions } from "@/lib/question-bank/staticCatalogueBatch7";
+import { isRetiredQuestion } from "@/lib/question-bank/retiredQuestions";
 import { imediaCatalogueQuestions } from "@/lib/question-bank/imediaCatalogue";
+import { imediaBatch2Questions } from "@/lib/question-bank/imediaCatalogueBatch2";
 import {
   canonicalBankTopic,
   isIMediaQualification,
@@ -50,6 +57,8 @@ const teacherId = user?.uid ?? "";
   const [sets, setSets] = useState<SavedExamQuestionSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const router = useRouter();
   const [message, setMessage] = useState("");
 
   const [search, setSearch] = useState("");
@@ -98,7 +107,22 @@ const teacherId = user?.uid ?? "";
 }, [teacherId]);
 
   const allQuestions = useMemo(
-    () => deduplicateQuestions([...catalogueQuestions, ...stageTwoQuestions, ...expandedCatalogueQuestions, ...largeBatchQuestions, ...batch4Questions, ...imediaCatalogueQuestions, ...flattenQuestionSets(sets)]),
+    () =>
+      deduplicateQuestions(
+        [
+          ...catalogueQuestions,
+          ...stageTwoQuestions,
+          ...expandedCatalogueQuestions,
+          ...largeBatchQuestions,
+          ...batch4Questions,
+          ...batch5Questions,
+          ...batch6Questions,
+          ...batch7Questions,
+          ...imediaCatalogueQuestions,
+          ...imediaBatch2Questions,
+          ...flattenQuestionSets(sets),
+        ].filter((item) => !isRetiredQuestion(item.key)),
+      ),
     [sets],
   );
 
@@ -261,7 +285,7 @@ const normaliseFilter = (value: string): string =>
       );
     }
 
-    if (isCreativeIMedia(item)) {
+    if (isCreativeIMedia(item) && markingPoints.length === 0) {
       warnings.push(
         "Creative iMedia formative adaptation: verify specification alignment and marking criteria before formal assessment."
       );
@@ -457,6 +481,69 @@ const normaliseFilter = (value: string): string =>
     }
   }
 
+  /*
+   * Assigning opens the Assignment Wizard with this paper selected. A paper
+   * must be published to be assigned, so drafts are published first (the
+   * assignment keeps its own copy; edit later with "Open as Copy").
+   */
+  async function assignPaper(set: SavedExamQuestionSet) {
+    if (!user?.uid || assigningId) return;
+
+    setAssigningId(set.id);
+    setMessage("");
+
+    try {
+      if (set.status !== "published") {
+        await updateExamQuestionSetStatus(set.id, "published");
+      }
+
+      router.push(
+        `/teacher/assignment-wizard?contentType=exam-paper&contentId=${encodeURIComponent(set.id)}`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not prepare the paper for assignment.",
+      );
+      setAssigningId(null);
+    }
+  }
+
+  async function saveAndAssign() {
+    if (!user?.uid || selected.length === 0 || saving) return;
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const paper = composeQuestionSet(title, selected);
+      let id = editingId;
+
+      if (id) {
+        await updateTeacherExamQuestionSet(user.uid, id, paper, review);
+      } else {
+        id = await saveExamQuestionSet(user.uid, paper);
+
+        if (Object.keys(review).length > 0) {
+          await updateTeacherExamQuestionSet(user.uid, id, paper, review);
+        }
+      }
+
+      await updateExamQuestionSetStatus(id, "published");
+      setDirty(false);
+
+      router.push(
+        `/teacher/assignment-wizard?contentType=exam-paper&contentId=${encodeURIComponent(id)}`,
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Save failed.",
+      );
+      setSaving(false);
+    }
+  }
+
   function printPaper(includeAnswers: boolean) {
     if (selected.length === 0) return;
 
@@ -497,29 +584,16 @@ const normaliseFilter = (value: string): string =>
         </p>
 
         <h1 className="mt-2 text-3xl font-black">
-          Enhanced Question Bank
+          Question Bank
         </h1>
 
         <p className="mt-3 text-indigo-100">
-          Build, review, save and print examination papers.
+          One place for questions: build papers from the bank, generate new
+          questions or quizzes with AI, print, and assign to your classes.
         </p>
-
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Link
-            href="/teacher/question-bank"
-            className="rounded-xl bg-white px-4 py-2 font-bold text-indigo-900"
-          >
-            Original Question Bank
-          </Link>
-
-          <Link
-            href="/teacher/exam-question-generator"
-            className="rounded-xl border border-white/30 px-4 py-2 font-bold"
-          >
-            Generate Questions
-          </Link>
-        </div>
       </header>
+
+      <QuestionHubTabs />
 
       {message && (
         <p role="status" className="rounded-xl bg-slate-100 p-4">
@@ -557,15 +631,26 @@ const normaliseFilter = (value: string): string =>
                 {set.status}
               </p>
 
-              <button
-                type="button"
-                onClick={() => void openPaper(set)}
-                className="mt-3 rounded-lg border px-3 py-2 text-sm font-bold"
-              >
-                {set.status === "draft"
-                  ? "Open / Edit"
-                  : "Open as Copy"}
-              </button>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void openPaper(set)}
+                  className="rounded-lg border px-3 py-2 text-sm font-bold"
+                >
+                  {set.status === "draft"
+                    ? "Open / Edit"
+                    : "Open as Copy"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={Boolean(assigningId)}
+                  onClick={() => void assignPaper(set)}
+                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  {assigningId === set.id ? "Opening..." : "Assign to class"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -925,6 +1010,15 @@ const normaliseFilter = (value: string): string =>
               : editingId
                 ? "Update Draft"
                 : "Save Paper"}
+          </button>
+
+          <button
+            type="button"
+            disabled={!selected.length || saving || !user}
+            onClick={() => void saveAndAssign()}
+            className="w-full rounded-xl bg-emerald-600 p-3 font-bold text-white disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save and assign to class"}
           </button>
 
           <button

@@ -18,7 +18,11 @@ function escapeHtml(value: unknown): string {
 }
 
 function formatText(value: unknown): string {
-  return escapeHtml(value).replace(/\r?\n/g, "<br>");
+  // Keep line breaks and the indentation of code in printed papers.
+  return escapeHtml(value)
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^ +/, (spaces) => "&nbsp;".repeat(spaces.length)))
+    .join("<br>");
 }
 
 function answerArea(question: GeneratedExamQuestion): string {
