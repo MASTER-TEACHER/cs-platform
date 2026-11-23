@@ -245,7 +245,8 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
   function exportCodes() {
     if (!selected) return;
     const rows = [["Examination", "Subject", "Year group", "Qualification level", "Candidate code", "Student name (optional)"], ...candidates.map(candidate => [selected.title, selected.subject, selected.yearGroup, selected.qualificationLevel ?? "", candidate.code, ""])];
-    const csv = rows.map(row => row.map(cell => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\r\n");
+    // Codes are written as ="0042" so Excel keeps leading zeros (it shows 0042, not 42).
+    const csv = rows.map((row, index) => row.map((cell, column) => index > 0 && column === 4 ? `"=""${cell.replaceAll('"', '')}"""` : `"${cell.replaceAll('"', '""')}"`).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a"); link.href = url; link.download = `candidate-codes-${selected.id}.csv`; link.click(); URL.revokeObjectURL(url);
   }

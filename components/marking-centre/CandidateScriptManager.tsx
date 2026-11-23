@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import BatchScanSplitter from "@/components/marking-centre/BatchScanSplitter";
 
 type Paper = { id: string; title: string };
 type Script = { paperId: string; candidateCode: string; filename: string; size: number; uploadedAt: string | null };
@@ -76,7 +77,7 @@ type QueueRow = { paperId: string; candidateCode: string; filename: string; stat
 type MarkReview = { qualityFlags?: ReviewFlag[]; paperId: string; candidateCode: string; status: string; revision: number; stale?: boolean; total?: number; originalProposalMarks?: { questionId: string; awardedMarks: number }[]; marks: { questionId: string; answerText: string; awardedMarks: number; feedback: string; improvementGuidance?: string; evidence: string; confidence: "high" | "medium" | "low"; needsReview: boolean; teacherJustification?: string }[] };
 type Pending = { id: number; file: File; candidateCode: string; paperId: string; replace: boolean };
 type Props = { examId: string; papers: Paper[]; candidateCodes: string[]; mode?: "scripts" | "marking" | "results"; qualificationLevel?: string };
-const LIMIT = 12 * 1024 * 1024;
+const LIMIT = 25 * 1024 * 1024;
 const BATCH = 20;
 function estimatedBoundaries(level: string, maximum: number) {
   const profile: readonly (readonly [string, number])[] = level.trim().toLowerCase() === "a level"
@@ -171,6 +172,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   const [message, setMessage] = useState("");
   const [nextId, setNextId] = useState(1);
   const endpoint = `/api/marking-centre/exams/${examId}/scripts`;
+  // Set when the browser blocks direct storage uploads (CORS not configured).
+  const directBlocked = useRef(false);
   const refresh = useCallback(async () => {
     if (!user) return;
     const response = await fetch(endpoint, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
@@ -218,7 +221,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     };
   }, [endpoint, user]);
   const existing = useMemo(() => new Set(scripts.map(s => `${s.paperId}_${s.candidateCode}`)), [scripts]);
-  function addFiles(files: FileList | null, selectedPaper: string, selectedCandidate = "") {
+  function addFiles(files: FileList | File[] | null, selectedPaper: string, selectedCandidate = "") {
     if (!files) return;
     const additions = Array.from(files).map((file, index) => ({ id: nextId + index, file, paperId: selectedPaper, candidateCode: selectedCandidate || matchCode(file.name, candidateCodes), replace: false }));
     setNextId(n => n + additions.length);
@@ -241,7 +244,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           item.file.size < 5 ||
           item.file.size > LIMIT ||
           (item.file.type && item.file.type !== "application/pdf")) {
-        setMessage("Only non-empty PDFs up to 12 MB are supported.");
+        setMessage("Only non-empty PDFs up to 25 MB are supported.");
         return;
       }
 
@@ -263,100 +266,41 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       }
     }
 
-    // Respect the backend's existing limits:
-    // maximum 20 files and 100 MB per request.
-    const batches: Pending[][] = [];
-    let current: Pending[] = [];
-    let bytes = 0;
-    const maxBatchBytes = 90 * 1024 * 1024;
-
-    for (const item of pending) {
-      if (current.length >= 10 ||
-          (current.length > 0 &&
-           bytes + item.file.size > maxBatchBytes)) {
-        batches.push(current);
-        current = [];
-        bytes = 0;
-      }
-
-      current.push(item);
-      bytes += item.file.size;
-    }
-
-    if (current.length) batches.push(current);
-
     setBusy(true);
 
     let uploaded = 0;
+    const failed: string[] = [];
 
     try {
       const token = await user.getIdToken();
+      const queue = [...pending];
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex];
-
-        setMessage(
-          `Uploading batch ${batchIndex + 1}/${batches.length}. ` +
-          `${uploaded}/${pending.length} scripts completed.`
-        );
-
-        const form = new FormData();
-
-        form.set(
-          "manifest",
-          JSON.stringify(
-            batch.map(({ paperId, candidateCode, replace }) => ({
-              paperId,
-              candidateCode,
-              replace
-            }))
-          )
-        );
-
-        batch.forEach((item, index) => {
-          form.append(`file_${index}`, item.file);
-        });
-
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: form,
-          cache: "no-store"
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.error ||
-            `Batch ${batchIndex + 1} failed. ` +
-            "Refresh the register before retrying."
-          );
+      // Three uploads at a time, each straight to storage (no size limit
+      // from Vercel). See uploadOne() for the fallback.
+      const run = async () => {
+        for (let item = queue.shift(); item; item = queue.shift()) {
+          try {
+            await uploadOne(item, token);
+            uploaded++;
+            const done = item.id;
+            setPending(old => old.filter(p => p.id !== done));
+          } catch (error) {
+            failed.push(`${item.candidateCode}: ${error instanceof Error ? error.message : "upload failed"}`);
+          }
+          setMessage(`Uploading... ${uploaded}/${pending.length} scripts completed.`);
         }
+      };
+      await Promise.all([run(), run(), run()]);
 
-        uploaded += batch.length;
-
-        // Remove successful files from the staging list.
-        const completedIds = new Set(batch.map(item => item.id));
-
-        setPending(old =>
-          old.filter(item => !completedIds.has(item.id))
-        );
-      }
-
-      await refresh();
+      await refresh().catch(() => undefined);
 
       setMessage(
-        `${uploaded} candidate script(s) uploaded successfully ` +
-        `in ${batches.length} batch(es).`
+        failed.length
+          ? `${uploaded} script(s) uploaded. ${failed.length} failed and are still listed above: ${failed.slice(0, 3).join("; ")}${failed.length > 3 ? "; ..." : ""}`
+          : `${uploaded} candidate script(s) uploaded successfully.`
       );
     } catch (error) {
-      try {
-        await refresh();
-      } catch {
-        // Preserve the original upload error.
-      }
-
+      await refresh().catch(() => undefined);
       setMessage(
         `${uploaded} script(s) confirmed uploaded. ` +
         (error instanceof Error ? error.message : "Upload failed.") +
@@ -365,6 +309,61 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Read a response that should be JSON, without crashing on HTML/text errors. */
+  async function readJson(response: Response): Promise<{ error?: string; url?: string }> {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      if (response.status === 413) return { error: "The file is too large to send through the server." };
+      return { error: `Server error ${response.status}: ${text.slice(0, 80)}` };
+    }
+  }
+
+  async function uploadOne(item: Pending, token: string) {
+    const json = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+    const details = { paperId: item.paperId, candidateCode: item.candidateCode, replace: item.replace };
+
+    if (!directBlocked.current) {
+      const sign = await fetch(`${endpoint}/direct`, {
+        method: "POST", headers: json, cache: "no-store",
+        body: JSON.stringify({ action: "sign", ...details, size: item.file.size }),
+      });
+      const signed = await readJson(sign);
+      if (!sign.ok || !signed.url) throw new Error(signed.error || "Could not start the upload.");
+
+      let put: Response | null = null;
+      try {
+        put = await fetch(signed.url, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: item.file });
+      } catch {
+        // The browser blocked the request: storage CORS is not set up yet.
+        directBlocked.current = true;
+      }
+
+      if (put) {
+        if (!put.ok) throw new Error(`Storage refused the file (${put.status}).`);
+        const complete = await fetch(`${endpoint}/direct`, {
+          method: "POST", headers: json, cache: "no-store",
+          body: JSON.stringify({ action: "complete", ...details, filename: item.file.name }),
+        });
+        const result = await readJson(complete);
+        if (!complete.ok) throw new Error(result.error || "The upload could not be confirmed.");
+        return;
+      }
+    }
+
+    // Fallback through the server: only works under Vercel's ~4.5 MB limit.
+    if (item.file.size > 4 * 1024 * 1024) {
+      throw new Error("over 4 MB and direct storage upload is not set up (storage CORS)");
+    }
+    const form = new FormData();
+    form.set("manifest", JSON.stringify([details]));
+    form.append("file_0", item.file);
+    const response = await fetch(endpoint, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form, cache: "no-store" });
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(data.error || "Upload failed.");
   }
 
   async function previewScript(script: Script) {
@@ -751,6 +750,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       <label className="text-sm">Individual PDF<input className="mt-1 block w-full text-xs" disabled={busy || !candidateCode} type="file" accept=".pdf,application/pdf" onChange={e => { addFiles(e.target.files, paperId, candidateCode); e.target.value = ""; }}/></label>
       <label className="text-sm md:col-span-3">Bulk PDFs for selected paper<input className="mt-1 block w-full text-xs" disabled={busy} type="file" multiple accept=".pdf,application/pdf" onChange={e => { addFiles(e.target.files, paperId); e.target.value = ""; }}/></label>
     </div>
+    <BatchScanSplitter papers={papers} defaultPaperId={paperId} candidateCodes={candidateCodes} existing={existing} disabled={busy} onStage={(files, selectedPaper) => addFiles(files, selectedPaper)} />
     {pending.length > 0 && <div className="space-y-3"><h4 className="font-semibold">Review {pending.length} staged file(s)</h4><div className="max-h-96 space-y-2 overflow-y-auto">{pending.map(item => <div key={item.id} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4"><div className="break-all text-xs">{item.file.name}</div><select aria-label={`Candidate for ${item.file.name}`} value={item.candidateCode} disabled={busy} className="rounded border p-2 text-xs" onChange={e => setPending(old => old.map(p => p.id === item.id ? { ...p, candidateCode: e.target.value } : p))}><option value="">Unmatched — choose candidate</option>{candidateCodes.map(c => <option key={c}value={c}>{c}</option>)}</select><select aria-label={`Paper for ${item.file.name}`} value={item.paperId} disabled={busy} className="rounded border p-2 text-xs" onChange={e => setPending(old => old.map(p => p.id === item.id ? { ...p, paperId: e.target.value } : p))}>{papers.map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select><div className="flex items-center justify-between gap-2"><label className="text-xs"><input type="checkbox" disabled={busy} checked={item.replace} onChange={e => setPending(old => old.map(p => p.id === item.id ? { ...p, replace: e.target.checked } : p))}/> Replace existing</label><button type="button" disabled={busy} onClick={() => setPending(old => old.filter(p => p.id !== item.id))} className="text-xs text-red-700">Remove</button></div></div>)}</div><button type="button" disabled={busy} onClick={() => void submit()} className="rounded-lg bg-indigo-700 px-4 py-2 text-white disabled:opacity-50">{busy ? "Uploading..." : `Confirm upload (${pending.length})`}</button>{pending.length > BATCH && <p className="text-sm text-amber-700">Files will be uploaded automatically in smaller batches.</p>}</div>}
     {message && <p role="status" className="rounded bg-indigo-50 p-3 text-sm">{message}</p>}
     </>}
