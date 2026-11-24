@@ -246,7 +246,8 @@ async function transcribePageAnthropic(tiles: Buffer[], pageNumber: number, key:
       body: JSON.stringify({
         model: visionModel(),
         max_tokens: 16000,
-        system,
+        // Same transcription instructions on every page: cache them.
+        system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
         // Transcription needs careful reading, not long reasoning: low effort by default.
         ...(visionEffortSupported && visionEffort() ? { thinking: { type: "adaptive" }, output_config: { effort: visionEffort() } } : {}),
         messages: [{ role: "user", content: [

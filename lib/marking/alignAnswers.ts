@@ -39,7 +39,7 @@ async function alignWith(model: string, userContent: string): Promise<string> {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST", signal: controller.signal,
         headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-        body: JSON.stringify({ model, max_tokens: 16000, system: `${SYSTEM} Return the JSON object only, with no other text.`, messages: [{ role: "user", content: userContent }] }),
+        body: JSON.stringify({ model, max_tokens: 16000, system: [{ type: "text", text: `${SYSTEM} Return the JSON object only, with no other text.`, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: userContent }] }),
       });
       if (!response.ok) {
         console.error("[Marking Centre] Claude alignment HTTP", response.status, (await response.text()).slice(0, 300));

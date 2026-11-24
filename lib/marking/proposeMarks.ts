@@ -130,7 +130,8 @@ async function callModel(model: string, system: string, user: string, effort: st
         headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json" },
         // Claude reasons before answering; leave room for both the reasoning and the JSON.
         body: JSON.stringify({
-          model, max_tokens: 32000, system, messages: [{ role: "user", content: user }],
+          // The marking rules are identical on every call: cache them (cached reads cost ~10%).
+          model, max_tokens: 32000, system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content: user }],
           ...(withEffort && effort ? { thinking: { type: "adaptive" }, output_config: { effort } } : {}),
         }),
       });

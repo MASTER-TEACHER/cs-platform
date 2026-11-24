@@ -77,12 +77,15 @@ export async function getUsage(uid: string): Promise<UsageSummary> {
  * the request.
  */
 export async function beginUsage(uid: string): Promise<void> {
+  // Enter the scope BEFORE any await. On Node 24 (AsyncContextFrame, used by
+  // Vercel) a store entered after an await inside this function is lost when
+  // it returns, so nothing was recorded and the budget cap never triggered.
+  scope.enterWith({ uid });
   const budget = monthlyBudgetUsd();
   if (budget > 0) {
     const { costUsd } = await getUsage(uid);
     if (costUsd >= budget) throw new Error("CENTRE_BUDGET");
   }
-  scope.enterWith({ uid });
 }
 
 /**
@@ -90,11 +93,11 @@ export async function beginUsage(uid: string): Promise<void> {
  * Returns false (and records nothing) when the pool's cap is reached.
  */
 export async function beginScopedUsage(poolId: string, budgetUsd: number): Promise<boolean> {
+  scope.enterWith({ uid: poolId }); // before any await: see beginUsage
   if (budgetUsd > 0) {
     const costUsd = Number((await usageDoc(poolId).get()).data()?.costUsd) || 0;
     if (costUsd >= budgetUsd) return false;
   }
-  scope.enterWith({ uid: poolId });
   return true;
 }
 
@@ -108,10 +111,14 @@ type TokenUsage = {
 export function recordUsage(model: string, usage: TokenUsage): void {
   const store = scope.getStore();
   if (!store || !usage) return;
-  const input = (usage.input_tokens ?? usage.prompt_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const input = (usage.input_tokens ?? usage.prompt_tokens ?? 0) + cacheWrite + cacheRead;
   const output = usage.output_tokens ?? usage.completion_tokens ?? 0;
   const [inPrice, outPrice] = priceFor(model);
-  const cost = (input * inPrice + output * outPrice) / 1_000_000;
+  // Anthropic prompt caching: writes cost 1.25x, reads 0.1x the input price.
+  const billedInput = (usage.input_tokens ?? usage.prompt_tokens ?? 0) + cacheWrite * 1.25 + cacheRead * 0.1;
+  const cost = (billedInput * inPrice + output * outPrice) / 1_000_000;
   void usageDoc(store.uid).set({
     uid: store.uid,
     month: monthKey(),
