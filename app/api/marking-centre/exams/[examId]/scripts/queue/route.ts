@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { qualityFlags } from "@/lib/marking/reviewFlags";
+import { tieredFlags, watchList, sampleStatus, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
@@ -22,11 +22,19 @@ export async function GET(request: Request, context: Context) {
     ]);
     const reviewByKey = new Map(reviews.docs.map(d => [d.id, d.data()]));
     const questionsByPaper = new Map(structures.docs.map(d => [d.id, Array.isArray(d.data().questions) ? d.data().questions : []]));
+    const allReviews = reviews.docs.map(d => d.data() as ApprovedReview);
+    const watch = watchList(allReviews);
+    const unchanged = (review: { marks?: unknown; originalProposalMarks?: unknown } | undefined) => {
+      const marks = Array.isArray(review?.marks) ? review.marks as { questionId: string; awardedMarks: number }[] : [];
+      const originals = Array.isArray(review?.originalProposalMarks) ? review.originalProposalMarks as { questionId: string; awardedMarks: number }[] : [];
+      return marks.length > 0 && originals.length === marks.length && marks.every(m => originals.some(o => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks));
+    };
     const rows = scripts.docs.map(doc => {
       const script = doc.data();
       const review = reviewByKey.get(`${script.paperId}_${script.candidateCode}`);
       const marks = Array.isArray(review?.marks) ? review.marks : [];
-      const flags = marks.length ? qualityFlags(marks, questionsByPaper.get(script.paperId) || [], Array.isArray(review?.alignmentWarnings) ? review.alignmentWarnings : []) : [];
+      const flags = marks.length ? tieredFlags(script.paperId, marks, questionsByPaper.get(script.paperId) || [], Array.isArray(review?.alignmentWarnings) ? review.alignmentWarnings : [], watch) : [];
+      const checks = flags.filter(f => f.tier === "check").length;
       const approved = review?.status === "approved";
       return {
         paperId: script.paperId, candidateCode: script.candidateCode,
@@ -41,13 +49,19 @@ export async function GET(request: Request, context: Context) {
         bulkEligibleWithFlags: ["proposed", "reviewing"].includes(review?.status) && marks.length > 0 &&
           Array.isArray(review?.originalProposalMarks) && review.originalProposalMarks.length === marks.length &&
           marks.every((m: { questionId: string; awardedMarks: number }) => review.originalProposalMarks.some((o: { questionId: string; awardedMarks: number }) => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks)),
-        flags, flagged: flags.length > 0,
+        // Sample moderation: approvable together once the paper's sample has passed (checked again on approval).
+        sampleReady: ["proposed", "reviewing"].includes(review?.status) && checks === 0 && unchanged(review),
+        aiTotal: marks.reduce((n: number, m: { awardedMarks: number }) => n + (Number(m.awardedMarks) || 0), 0),
+        flags, flagged: flags.length > 0, checks,
         // A hash is checked again by the review endpoint before approval.
         sourceVerificationRequired: true,
       };
     });
-    rows.sort((a, b) => Number(b.flagged) - Number(a.flagged) || (a.status === "approved" ? 1 : 0) - (b.status === "approved" ? 1 : 0) || a.candidateCode.localeCompare(b.candidateCode));
-    return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.flagged && r.status !== "approved").length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length } }, { headers });
+    const samples = [...new Set(rows.map(r => r.paperId))].map(paperId => sampleStatus(paperId, allReviews,
+      rows.filter(r => r.paperId === paperId && ["proposed", "reviewing"].includes(r.status)).map(r => ({ candidateCode: r.candidateCode, aiTotal: r.aiTotal })),
+      rows.filter(r => r.paperId === paperId).length));
+    rows.sort((a, b) => b.checks - a.checks || Number(b.flagged) - Number(a.flagged) || (a.status === "approved" ? 1 : 0) - (b.status === "approved" ? 1 : 0) || a.candidateCode.localeCompare(b.candidateCode));
+    return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.checks > 0 && r.status !== "approved").length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length }, samples, watch }, { headers });
   } catch (error) {
     const result = centreError(error);
     return NextResponse.json({ error: result.error }, { status: result.status, headers });

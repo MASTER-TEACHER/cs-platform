@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import BatchScanSplitter from "@/components/marking-centre/BatchScanSplitter";
 import { announceActivity } from "@/components/auth/IdleSessionGuard";
+import { flagTier, watchFlags, type SampleStatus, type WatchEntry } from "@/lib/marking/reviewPolicy";
 
 type Paper = { id: string; title: string };
 type Script = { paperId: string; candidateCode: string; filename: string; size: number; uploadedAt: string | null };
@@ -31,12 +32,14 @@ type AlignmentResult = {
   teacherReviewRequired: true;
   markingEnabled: false;
 };
-type ReviewFlag = { questionId: string; code: string; detail: string };
+type ReviewFlag = { questionId: string; code: string; detail: string; tier?: "check" | "info" };
 // Short, grouped labels for queue warnings ("Unclear reading: Q2, Q5"). Full detail stays available.
-function flagLabel(flag: { code: string; detail: string }): string {
+function flagLabel(flag: { code: string; detail: string; tier?: "check" | "info" }): string {
   const detail = flag.detail.toLowerCase();
+  if (flag.code === "WATCH_QUESTION") return "AI often differs from you here";
   if (flag.code === "UNCERTAIN") {
-    if (detail.includes("markers disagreed")) return "Markers disagreed";
+    if (detail.includes("markers disagreed")) return flag.tier === "info" ? "Small marker difference (resolved)" : "Markers disagreed";
+    if (flag.tier === "info" && detail.includes("check:")) return "Auto-check corrected mark";
     if (detail.includes("moderation unavailable")) return "One marker only";
     if (detail.includes("could not mark")) return "Not marked by AI";
     if (detail.includes("check:")) return "Auto-check changed mark";
@@ -61,8 +64,8 @@ function flagLabel(flag: { code: string; detail: string }): string {
  * require opening the question.
  */
 const INFO_LABELS = new Set(["Unclear reading", "One marker only", "Missing feedback", "Missing guidance"]);
-function isCheckFlag(flag: { code: string; detail: string }): boolean {
-  return !INFO_LABELS.has(flagLabel(flag));
+function isCheckFlag(flag: { code: string; detail: string; tier?: "check" | "info" }): boolean {
+  return flag.tier ? flag.tier === "check" : !INFO_LABELS.has(flagLabel(flag));
 }
 function groupedFlags(flags: { questionId: string; code: string; detail: string }[]): string {
   const groups = new Map<string, string[]>();
@@ -84,7 +87,7 @@ type AccuracyReport = {
   questions: { questionId: string; compared: number; agreementRate: number; meanAbsoluteDifference: number; aiTooGenerous: number; aiTooHarsh: number }[];
   scripts: { candidateCode: string; aiTotal: number; teacherTotal: number; difference: number; questionsChanged: string[] }[];
 };
-type QueueRow = { paperId: string; candidateCode: string; filename: string; status: string; revision: number; flagged: boolean; bulkEligible?: boolean; bulkEligibleWithFlags?: boolean; flags: ReviewFlag[] };
+type QueueRow = { paperId: string; candidateCode: string; filename: string; status: string; revision: number; flagged: boolean; bulkEligible?: boolean; bulkEligibleWithFlags?: boolean; sampleReady?: boolean; checks?: number; aiTotal?: number; flags: ReviewFlag[] };
 type MarkReview = { qualityFlags?: ReviewFlag[]; paperId: string; candidateCode: string; status: string; revision: number; stale?: boolean; total?: number; originalProposalMarks?: { questionId: string; awardedMarks: number }[]; marks: { questionId: string; answerText: string; awardedMarks: number; feedback: string; improvementGuidance?: string; evidence: string; confidence: "high" | "medium" | "low"; needsReview: boolean; teacherJustification?: string }[] };
 type Pending = { id: number; file: File; candidateCode: string; paperId: string; replace: boolean };
 type Props = { examId: string; papers: Paper[]; candidateCodes: string[]; mode?: "scripts" | "marking" | "results"; qualificationLevel?: string };
@@ -165,6 +168,9 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [moderationNote, setModerationNote] = useState("");
   const [sampleChecked, setSampleChecked] = useState(false);
+  const [samples, setSamples] = useState<SampleStatus[]>([]);
+  const [watch, setWatch] = useState<WatchEntry[]>([]);
+  const [sampleConfirmed, setSampleConfirmed] = useState(false);
   const [includeFlagged, setIncludeFlagged] = useState(false);
   const [focusReview, setFocusReview] = useState(true);
   const eligible = (row: QueueRow) => includeFlagged ? Boolean(row.bulkEligibleWithFlags) : Boolean(row.bulkEligible);
@@ -569,6 +575,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load review queue.");
       setQueue(data.rows);
+      setSamples(Array.isArray(data.samples) ? data.samples : []);
+      setWatch(Array.isArray(data.watch) ? data.watch : []);
       return data.rows as QueueRow[];
     } catch (error) {
       setQueueError(error instanceof Error ? error.message : "Unable to load review queue.");
@@ -601,6 +609,37 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       setTopicRevision(data.revision); setTopicMessage("Topic mappings saved. Download a new QLA to include them.");
     } catch (error) { setTopicMessage(error instanceof Error ? error.message : "Unable to save topics."); }
   }
+  /** Approve every script with nothing to check on papers whose sample has passed. */
+  async function approveSampleModerated() {
+    if (!user || queueBusy) return;
+    const passed = new Set(samples.filter(sample => sample.passed).map(sample => sample.paperId));
+    const selections = queue.filter(row => row.sampleReady && passed.has(row.paperId))
+      .map(row => ({ paperId: row.paperId, candidateCode: row.candidateCode, expectedRevision: row.revision }));
+    if (!selections.length || !sampleConfirmed) return;
+    const note = samples.filter(sample => sample.passed).map(sample => `Paper ${sample.paperId}: ${sample.reviewed} script(s) reviewed individually, ${sample.withinTolerance} within ±2 of the AI total (largest difference ${sample.worst}).`).join(" ")
+      + " Remaining scripts with no questions to check approved under sample moderation.";
+    if (!window.confirm(`Approve ${selections.length} script(s) with nothing to check, based on your sample? Scripts with questions to check are not included. This is recorded in the audit log.`)) return;
+    setQueueBusy(true); setQueueError("");
+    try {
+      let approved = 0, rejected = 0;
+      const reasons: string[] = [];
+      for (let start = 0; start < selections.length; start += 20) {
+        setBatchProgress(`Approving ${Math.min(start + 20, selections.length)} of ${selections.length}...`);
+        const response = await fetch(`${endpoint}/bulk-approve`, { method: "POST", cache: "no-store",
+          headers: { Authorization: `Bearer ${await user.getIdToken()}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ selections: selections.slice(start, start + 20), confirmed: true, moderationNote: note.slice(0, 1000), mode: "sample", sampleConfirmed: true }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Approval failed.");
+        approved += data.approved ?? 0; rejected += data.rejected ?? 0;
+        for (const o of (data.outcomes ?? []) as { candidateCode: string; approved: boolean; reason?: string }[]) if (!o.approved) reasons.push(`${o.candidateCode}: ${o.reason ?? "rejected"}`);
+      }
+      setBatchProgress(`Sample moderation: ${approved} approved, ${rejected} not approved.${reasons.length ? ` Not approved: ${reasons.join("; ")}.` : ""}`);
+      setSampleConfirmed(false);
+      await loadQueue();
+    } catch (error) { setQueueError(error instanceof Error ? error.message : "Approval failed."); }
+    finally { setQueueBusy(false); }
+  }
+
   async function bulkApproveSelected() {
     if (!user || queueBusy) return;
     const selections = queue.filter(row => bulkSelected.includes(`${row.paperId}_${row.candidateCode}`) && eligible(row))
@@ -826,6 +865,11 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { setResultsError(error instanceof Error ? error.message : "Report download failed."); }
   }
+  // Flags for the open review, labelled check / info, plus questions the AI is often wrong on.
+  const panelFlags: ReviewFlag[] = review ? [
+    ...(review.qualityFlags ?? []).map(flag => ({ ...flag, tier: flagTier(flag, preview?.approvedQuestions.find(q => q.id === flag.questionId)?.maxMarks) })),
+    ...watchFlags(review.paperId, review.marks, watch).map(flag => ({ ...flag, tier: "check" as const })),
+  ] : [];
   return <section className="space-y-4 border-t pt-5">
     {mode === "scripts" && <>
     <div><h3 className="text-lg font-semibold">Candidate answer scripts</h3><p className="text-sm text-slate-600">Upload individual PDFs or select your entire cohort at once. Match every file to a candidate and paper before saving. Filename matching uses an existing candidate code.</p></div>
@@ -883,6 +927,26 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           {accuracy.scripts.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Per-script comparison</summary><ul className="mt-1 space-y-1">{accuracy.scripts.map(sc => <li key={sc.candidateCode}>{sc.candidateCode}: AI {sc.aiTotal}, you {sc.teacherTotal} ({sc.difference > 0 ? "+" : ""}{sc.difference}){sc.questionsChanged.length ? `: ${sc.questionsChanged.join(", ")}` : ""}</li>)}</ul></details>}
         </div>}
       </div>
+      {samples.length > 0 && <div className="space-y-2 rounded border-2 border-emerald-300 p-3">
+        <p className="text-sm font-semibold">Sample moderation (quickest)</p>
+        <p className="text-xs text-slate-700">Review a sample of scripts one at a time (at least 3, or 10% of the paper). If your marks agree with the AI (90% of the sample within ±2 marks, none more than 4 out), every script with nothing to check can be approved together. Scripts with questions to check still need opening, but only those questions are shown. Use this for mocks and internal assessment, not for marks you submit to the exam board.</p>
+        {samples.map(sample => {
+          const ready = queue.filter(r => r.paperId === sample.paperId && r.sampleReady).length;
+          const toCheck = queue.filter(r => r.paperId === sample.paperId && r.status !== "approved" && (r.checks ?? 0) > 0).length;
+          return <div key={sample.paperId} className={`rounded p-2 text-sm ${sample.passed ? "bg-emerald-50 text-emerald-900" : sample.failed ? "bg-red-50 text-red-900" : "bg-slate-50"}`}>
+            <p><strong>Paper {sample.paperId}:</strong> {sample.reviewed} of {sample.required} sample scripts reviewed · {sample.withinTolerance} within ±2.{" "}
+              {sample.passed ? `Sample passed: ${ready} script(s) can be approved together, ${toCheck} still have questions to check.`
+                : sample.failed ? `Sample did not pass (${sample.outliers.join(", ") || "large difference"}). Review the remaining scripts individually, or fix the criteria for the questions you changed and re-mark.`
+                : `Review ${sample.required - sample.reviewed} more script(s) to complete the sample.`}</p>
+            {sample.suggested.length > 0 && <p className="mt-1 text-xs">Suggested (spread across low, middle and high AI totals): {sample.suggested.map(code => <button key={code} type="button" className="mr-2 text-indigo-700 underline" disabled={queueBusy} onClick={() => { const row = queue.find(r => r.paperId === sample.paperId && r.candidateCode === code); if (row) void previewScript({ paperId: row.paperId, candidateCode: row.candidateCode, filename: row.filename, size: 0, uploadedAt: null }); }}>{code}</button>)}. Open each one, check every question, correct any mark and approve it.</p>}
+          </div>;
+        })}
+        {watch.length > 0 && <p className="text-xs text-amber-900">Always checked, because the AI differed from you on them: {watch.map(w => `${w.questionId} (${w.agreed}/${w.compared} matched)`).join(", ")}. Tightening the criteria for these questions in step 4 will reduce checking.</p>}
+        {samples.some(sample => sample.passed) && <>
+          <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={sampleConfirmed} onChange={e => setSampleConfirmed(e.target.checked)} /><span>I reviewed the sample scripts against the original papers and mark scheme, and I am satisfied the AI&apos;s marking is consistent with mine for this assessment.</span></label>
+          <button type="button" className="rounded bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-50" disabled={queueBusy || !sampleConfirmed || !queue.some(r => r.sampleReady && samples.some(sample => sample.passed && sample.paperId === r.paperId))} onClick={() => void approveSampleModerated()}>Approve {queue.filter(r => r.sampleReady && samples.some(sample => sample.passed && sample.paperId === r.paperId)).length} script(s) with nothing to check</button>
+        </>}
+      </div>}
       <div className="space-y-2 rounded border border-amber-200 p-3">
         <p className="text-sm font-semibold">Approve eligible scripts together</p>
         <p className="text-xs">Scripts with automated warnings are excluded. Check a suitable sample against the original papers and mark scheme before approval. AI confidence does not guarantee correctness.</p>
@@ -964,12 +1028,12 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           {auditHistory.length > 0 && <div className="max-h-64 overflow-auto rounded border p-3 text-xs" aria-label="Marking audit history">{auditHistory.map(entry => <div key={entry.id} className="border-b py-2"><strong>Revision {entry.revision}: {entry.action}</strong> — {entry.at ?? "Timestamp pending"}<div>Marks: {(entry.marks ?? []).map(m => `${m.questionId}: ${m.awardedMarks}`).join(", ")}</div>{(entry.marks ?? []).filter(m => m.teacherJustification).map(m => <p key={m.questionId}>Question {m.questionId} justification: {m.teacherJustification}</p>)}</div>)}</div>}</div>
           <p className="text-sm">Status: <strong>{review.stale ? "STALE - source changed" : review.status}</strong> · Revision {review.revision} {review.total !== undefined ? `· Total ${review.total}` : ""}</p>
           {(() => {
-            const checkIds = new Set((review.qualityFlags ?? []).filter(isCheckFlag).map(f => f.questionId));
+            const checkIds = new Set(panelFlags.filter(isCheckFlag).map(f => f.questionId));
             const needs = review.marks.filter(m => checkIds.has(m.questionId) || checkIds.has("*")).length;
             return <label className="flex items-start gap-2 rounded bg-indigo-50 p-2 text-sm"><input type="checkbox" className="mt-1" checked={focusReview} onChange={e => setFocusReview(e.target.checked)} /><span><strong>Focus on questions to check</strong> ({needs} of {review.marks.length}). Routine questions are folded: open any of them to check or change the mark.</span></label>;
           })()}
           {review.marks.map((mark, index) => {
-            const checks = (review.qualityFlags ?? []).filter(flag => (flag.questionId === mark.questionId || flag.questionId === "*") && isCheckFlag(flag));
+            const checks = panelFlags.filter(flag => (flag.questionId === mark.questionId || flag.questionId === "*") && isCheckFlag(flag));
             const max = preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks;
             const body = <>
             <p className="font-semibold text-sm">Question {mark.questionId} · Max {preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks}</p>
@@ -989,7 +1053,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
             <label className="block text-sm">Teacher justification (required for changed marks or credit without an answer before approval)
               <textarea className="mt-1 w-full rounded border p-2 text-sm" rows={2} value={mark.teacherJustification ?? ""} disabled={review.status === "approved" || review.stale || reviewBusy} placeholder="Explain the evidence supporting a mark override" onChange={e => setReview(old => old ? { ...old, marks: old.marks.map((m, i) => i === index ? { ...m, teacherJustification: e.target.value } : m) } : old)}/>
             </label>
-            {(review.qualityFlags ?? []).filter(flag => flag.questionId === mark.questionId || flag.questionId === "*").map((flag, flagIndex) => <p key={`${flag.code}_${flagIndex}`} className={`rounded p-2 text-xs ${isCheckFlag(flag) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"}`}>{isCheckFlag(flag) ? "Check" : "For information"} ({flagLabel(flag)}): {flag.detail}</p>)}
+            {panelFlags.filter(flag => flag.questionId === mark.questionId || flag.questionId === "*").map((flag, flagIndex) => <p key={`${flag.code}_${flagIndex}`} className={`rounded p-2 text-xs ${isCheckFlag(flag) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"}`}>{isCheckFlag(flag) ? "Check" : "For information"} ({flagLabel(flag)}): {flag.detail}</p>)}
             <p className="text-xs text-slate-600">Evidence: {mark.evidence || "Not supplied"} · Confidence: {mark.confidence}{mark.needsReview ? " · Requires review" : ""}</p>
             </>;
             if (focusReview && checks.length === 0) return <details key={mark.questionId} className="rounded border p-2"><summary className="cursor-pointer text-sm">Question {mark.questionId} · {mark.awardedMarks}/{max} · <span className="text-slate-600">{(mark.feedback || "").slice(0, 110)}{(mark.feedback || "").length > 110 ? "…" : ""}</span></summary><div className="mt-2 space-y-2">{body}</div></details>;

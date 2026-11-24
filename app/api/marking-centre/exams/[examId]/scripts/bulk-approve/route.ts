@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { loadReviewContext, validateMarks, type ReviewMark } from "@/lib/marking/reviewContext";
 import { qualityFlags, isExplicitNonAnswer, unsupportedWorkingClaim } from "@/lib/marking/reviewFlags";
+import { tieredFlags, watchList, sampleStatus, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, requireCentreTeacher } from "@/lib/marking/centre";
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function POST(request: Request, context: Context) {
     const examRef = centreCollection.doc(examId);
     const exam = await examRef.get();
     if (!exam.exists || exam.data()?.ownerId !== actor.uid) return NextResponse.json({ error: "Examination not found." }, { status: 404, headers });
-    const body = await request.json() as { selections?: Selection[]; confirmed?: boolean; moderationNote?: string; includeFlagged?: boolean; flagsReviewed?: boolean };
+    const body = await request.json() as { selections?: Selection[]; confirmed?: boolean; moderationNote?: string; includeFlagged?: boolean; flagsReviewed?: boolean; mode?: string; sampleConfirmed?: boolean };
     // Flagged scripts may be bulk-approved only when the teacher explicitly confirms they reviewed the flags.
     const withFlags = body.includeFlagged === true && body.flagsReviewed === true;
     if (body.confirmed !== true || !Array.isArray(body.selections) || body.selections.length < 1 || body.selections.length > 20 ||
@@ -29,6 +30,20 @@ export async function POST(request: Request, context: Context) {
     }
     const keys = body.selections.map(s => `${s.paperId}_${s.candidateCode}`);
     if (new Set(keys).size !== keys.length) return NextResponse.json({ error: "Duplicate selections." }, { status: 400, headers });
+    // Sample moderation: scripts with nothing to check may be approved together once the
+    // paper's sample (scripts the teacher approved one at a time) agrees with the AI.
+    const sampleMode = body.mode === "sample" && body.sampleConfirmed === true;
+    let watch: ReturnType<typeof watchList> = [];
+    const passedPapers = new Set<string>();
+    if (sampleMode) {
+      const [reviews, scripts] = await Promise.all([examRef.collection("markingReviews").limit(1000).get(), examRef.collection("candidateScripts").limit(1000).get()]);
+      const all = reviews.docs.map(d => d.data() as ApprovedReview);
+      watch = watchList(all);
+      for (const paperId of new Set(body.selections.map(s => s.paperId))) {
+        const count = scripts.docs.filter(d => d.data().paperId === paperId).length;
+        if (sampleStatus(paperId, all, [], count).passed) passedPapers.add(paperId);
+      }
+    }
     const outcomes: { paperId: string; candidateCode: string; approved: boolean; reason?: string }[] = [];
     // Each script is independently revision-guarded; partial successes are reported explicitly.
     for (const selection of body.selections) {
@@ -42,11 +57,14 @@ export async function POST(request: Request, context: Context) {
           validateMarks(data.marks, ctx.questions);
           const marks = data.marks as ReviewMark[];
           const flags = qualityFlags(marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : []);
-          if (flags.length && !withFlags) throw new Error("Unresolved quality flags");
+          if (sampleMode) {
+            if (!passedPapers.has(selection.paperId)) throw new Error("Sample moderation not passed for this paper");
+            if (tieredFlags(selection.paperId, marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : [], watch).some(f => f.tier === "check")) throw new Error("Unresolved questions to check");
+          } else if (flags.length && !withFlags) throw new Error("Unresolved quality flags");
           // Never bulk-approve credit for a blank answer, or unsupported claims of working, even with flags acknowledged.
           if (marks.some(m => (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
             unsupportedWorkingClaim(m.answerText, [m.feedback, m.evidence, m.improvementGuidance ?? ""].join(" ")))) throw new Error("Manual review required");
-          if (!withFlags && marks.some(m => m.confidence !== "high" || m.needsReview || (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
+          if (!withFlags && !sampleMode && marks.some(m => m.confidence !== "high" || m.needsReview || (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
             unsupportedWorkingClaim(m.answerText, [m.feedback, m.evidence, m.improvementGuidance ?? ""].join(" ")) ||
             (m.teacherJustification ?? "").trim() || !m.feedback.trim() || !m.evidence.trim() ||
             (m.awardedMarks < (ctx.questions.find(q => q.id === m.questionId)?.maxMarks ?? 0) && !m.improvementGuidance?.trim()))) throw new Error("Manual review required");
@@ -54,15 +72,15 @@ export async function POST(request: Request, context: Context) {
           if (!Array.isArray(originals) || originals.length !== marks.length || marks.some(m => originals.find(o => o.questionId === m.questionId)?.awardedMarks !== m.awardedMarks)) throw new Error("Teacher override requires individual approval");
           const total = marks.reduce((sum, m) => sum + m.awardedMarks, 0);
           tx.update(ctx.reviewRef, { status: "approved", total, revision: data.revision + 1, approvedAt: FieldValue.serverTimestamp(), approvedBy: actor.uid,
-            approvalMethod: flags.length ? "teacher_confirmed_bulk_with_flags" : "teacher_confirmed_bulk", moderationNote: body.moderationNote!.trim(), updatedAt: FieldValue.serverTimestamp(), qualityFlags: [],
+            approvalMethod: sampleMode ? "teacher_confirmed_bulk_sample" : flags.length ? "teacher_confirmed_bulk_with_flags" : "teacher_confirmed_bulk", moderationNote: body.moderationNote!.trim(), updatedAt: FieldValue.serverTimestamp(), qualityFlags: [],
             ...(flags.length ? { acknowledgedFlags: flags } : {}) });
-          tx.set(ctx.reviewRef.collection("audit").doc(), { action: flags.length ? "bulk_approve_with_flags" : "bulk_approve", acknowledgedFlags: flags, actorId: actor.uid, at: FieldValue.serverTimestamp(), revision: data.revision + 1,
+          tx.set(ctx.reviewRef.collection("audit").doc(), { action: sampleMode ? "bulk_approve_sample_moderated" : flags.length ? "bulk_approve_with_flags" : "bulk_approve", acknowledgedFlags: flags, actorId: actor.uid, at: FieldValue.serverTimestamp(), revision: data.revision + 1,
             previousMarks: marks, marks, moderationNote: body.moderationNote!.trim(), sourceRevision: data.revision });
         });
         outcomes.push({ paperId: selection.paperId, candidateCode: selection.candidateCode, approved: true });
       } catch (error) {
         outcomes.push({ paperId: selection.paperId, candidateCode: selection.candidateCode, approved: false,
-          reason: error instanceof Error && /^(Stale|Unresolved|Manual|Teacher)/.test(error.message) ? error.message : "Approval validation failed; review individually." });
+          reason: error instanceof Error && /^(Stale|Unresolved|Manual|Teacher|Sample)/.test(error.message) ? error.message : "Approval validation failed; review individually." });
       }
     }
     return NextResponse.json({ outcomes, approved: outcomes.filter(o => o.approved).length, rejected: outcomes.filter(o => !o.approved).length }, { headers });
