@@ -10,8 +10,11 @@ export type ApprovedReview = { paperId?: string; candidateCode?: string; status?
 
 /** An extended-answer question: any disagreement there matters. */
 export const EXTENDED_MARKS = 6;
-/** Questions the AI matched the teacher on less often than this are always checked. */
-export const WATCH_AGREEMENT = 0.8;
+/**
+ * Questions the AI matched the teacher on less often than this are always checked.
+ * Same 90% target as the accuracy report, so every question it names is checked.
+ */
+export const WATCH_AGREEMENT = 0.9;
 export const WATCH_MIN_COMPARED = 3;
 /** A sampled script passes when its total is within this many marks of the AI's. */
 export const SAMPLE_TOLERANCE = 2;
