@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { loadReviewContext, validateMarks, type ReviewMark } from "@/lib/marking/reviewContext";
 import { qualityFlags, isExplicitNonAnswer, unsupportedWorkingClaim } from "@/lib/marking/reviewFlags";
-import { tieredFlags, watchList, sampleStatus, type ApprovedReview } from "@/lib/marking/reviewPolicy";
+import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, requireCentreTeacher } from "@/lib/marking/centre";
 export const runtime = "nodejs";
@@ -59,7 +59,9 @@ export async function POST(request: Request, context: Context) {
           const flags = qualityFlags(marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : []);
           if (sampleMode) {
             if (!passedPapers.has(selection.paperId)) throw new Error("Sample moderation not passed for this paper");
-            if (tieredFlags(selection.paperId, marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : [], watch).some(f => f.tier === "check")) throw new Error("Unresolved questions to check");
+            const checked: string[] = Array.isArray(data.checkedQuestions) ? data.checkedQuestions : [];
+            if (tieredFlags(selection.paperId, marks, ctx.questions, Array.isArray(data.alignmentWarnings) ? data.alignmentWarnings : [], watch, checked).some(f => f.tier === "check")) throw new Error("Unresolved questions to check");
+            if (!onlyCheckedChanges(marks, data.originalProposalMarks, checked)) throw new Error("Teacher override requires individual approval");
           } else if (flags.length && !withFlags) throw new Error("Unresolved quality flags");
           // Never bulk-approve credit for a blank answer, or unsupported claims of working, even with flags acknowledged.
           if (marks.some(m => (isExplicitNonAnswer(m.answerText) && m.awardedMarks > 0) ||
@@ -69,7 +71,7 @@ export async function POST(request: Request, context: Context) {
             (m.teacherJustification ?? "").trim() || !m.feedback.trim() || !m.evidence.trim() ||
             (m.awardedMarks < (ctx.questions.find(q => q.id === m.questionId)?.maxMarks ?? 0) && !m.improvementGuidance?.trim()))) throw new Error("Manual review required");
           const originals = data.originalProposalMarks as { questionId: string; awardedMarks: number }[] | undefined;
-          if (!Array.isArray(originals) || originals.length !== marks.length || marks.some(m => originals.find(o => o.questionId === m.questionId)?.awardedMarks !== m.awardedMarks)) throw new Error("Teacher override requires individual approval");
+          if (!sampleMode && (!Array.isArray(originals) || originals.length !== marks.length || marks.some(m => originals.find(o => o.questionId === m.questionId)?.awardedMarks !== m.awardedMarks))) throw new Error("Teacher override requires individual approval");
           const total = marks.reduce((sum, m) => sum + m.awardedMarks, 0);
           tx.update(ctx.reviewRef, { status: "approved", total, revision: data.revision + 1, approvedAt: FieldValue.serverTimestamp(), approvedBy: actor.uid,
             approvalMethod: sampleMode ? "teacher_confirmed_bulk_sample" : flags.length ? "teacher_confirmed_bulk_with_flags" : "teacher_confirmed_bulk", moderationNote: body.moderationNote!.trim(), updatedAt: FieldValue.serverTimestamp(), qualityFlags: [],

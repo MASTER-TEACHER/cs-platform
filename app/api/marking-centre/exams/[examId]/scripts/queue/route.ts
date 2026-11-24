@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { tieredFlags, watchList, sampleStatus, type ApprovedReview } from "@/lib/marking/reviewPolicy";
+import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
@@ -24,16 +24,12 @@ export async function GET(request: Request, context: Context) {
     const questionsByPaper = new Map(structures.docs.map(d => [d.id, Array.isArray(d.data().questions) ? d.data().questions : []]));
     const allReviews = reviews.docs.map(d => d.data() as ApprovedReview);
     const watch = watchList(allReviews);
-    const unchanged = (review: { marks?: unknown; originalProposalMarks?: unknown } | undefined) => {
-      const marks = Array.isArray(review?.marks) ? review.marks as { questionId: string; awardedMarks: number }[] : [];
-      const originals = Array.isArray(review?.originalProposalMarks) ? review.originalProposalMarks as { questionId: string; awardedMarks: number }[] : [];
-      return marks.length > 0 && originals.length === marks.length && marks.every(m => originals.some(o => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks));
-    };
     const rows = scripts.docs.map(doc => {
       const script = doc.data();
       const review = reviewByKey.get(`${script.paperId}_${script.candidateCode}`);
       const marks = Array.isArray(review?.marks) ? review.marks : [];
-      const flags = marks.length ? tieredFlags(script.paperId, marks, questionsByPaper.get(script.paperId) || [], Array.isArray(review?.alignmentWarnings) ? review.alignmentWarnings : [], watch) : [];
+      const checked: string[] = Array.isArray(review?.checkedQuestions) ? review.checkedQuestions : [];
+      const flags = marks.length ? tieredFlags(script.paperId, marks, questionsByPaper.get(script.paperId) || [], Array.isArray(review?.alignmentWarnings) ? review.alignmentWarnings : [], watch, checked) : [];
       const checks = flags.filter(f => f.tier === "check").length;
       const approved = review?.status === "approved";
       return {
@@ -50,7 +46,7 @@ export async function GET(request: Request, context: Context) {
           Array.isArray(review?.originalProposalMarks) && review.originalProposalMarks.length === marks.length &&
           marks.every((m: { questionId: string; awardedMarks: number }) => review.originalProposalMarks.some((o: { questionId: string; awardedMarks: number }) => o.questionId === m.questionId && o.awardedMarks === m.awardedMarks)),
         // Sample moderation: approvable together once the paper's sample has passed (checked again on approval).
-        sampleReady: ["proposed", "reviewing"].includes(review?.status) && checks === 0 && unchanged(review),
+        sampleReady: ["proposed", "reviewing"].includes(review?.status) && checks === 0 && onlyCheckedChanges(marks, review?.originalProposalMarks, checked),
         aiTotal: marks.reduce((n: number, m: { awardedMarks: number }) => n + (Number(m.awardedMarks) || 0), 0),
         flags, flagged: flags.length > 0, checks,
         // A hash is checked again by the review endpoint before approval.

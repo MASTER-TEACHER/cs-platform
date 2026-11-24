@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import BatchScanSplitter from "@/components/marking-centre/BatchScanSplitter";
+import QuestionCheckPanel from "@/components/marking-centre/QuestionCheckPanel";
 import { announceActivity } from "@/components/auth/IdleSessionGuard";
 import { flagTier, watchFlags, type SampleStatus, type WatchEntry } from "@/lib/marking/reviewPolicy";
 
@@ -88,7 +89,7 @@ type AccuracyReport = {
   scripts: { candidateCode: string; aiTotal: number; teacherTotal: number; difference: number; questionsChanged: string[] }[];
 };
 type QueueRow = { paperId: string; candidateCode: string; filename: string; status: string; revision: number; flagged: boolean; bulkEligible?: boolean; bulkEligibleWithFlags?: boolean; sampleReady?: boolean; checks?: number; aiTotal?: number; flags: ReviewFlag[] };
-type MarkReview = { qualityFlags?: ReviewFlag[]; paperId: string; candidateCode: string; status: string; revision: number; stale?: boolean; total?: number; originalProposalMarks?: { questionId: string; awardedMarks: number }[]; marks: { questionId: string; answerText: string; awardedMarks: number; feedback: string; improvementGuidance?: string; evidence: string; confidence: "high" | "medium" | "low"; needsReview: boolean; teacherJustification?: string }[] };
+type MarkReview = { checkedQuestions?: string[]; qualityFlags?: ReviewFlag[]; paperId: string; candidateCode: string; status: string; revision: number; stale?: boolean; total?: number; originalProposalMarks?: { questionId: string; awardedMarks: number }[]; marks: { questionId: string; answerText: string; awardedMarks: number; feedback: string; improvementGuidance?: string; evidence: string; confidence: "high" | "medium" | "low"; needsReview: boolean; teacherJustification?: string }[] };
 type Pending = { id: number; file: File; candidateCode: string; paperId: string; replace: boolean };
 type Props = { examId: string; papers: Paper[]; candidateCodes: string[]; mode?: "scripts" | "marking" | "results"; qualificationLevel?: string };
 const LIMIT = 25 * 1024 * 1024;
@@ -867,8 +868,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   }
   // Flags for the open review, labelled check / info, plus questions the AI is often wrong on.
   const panelFlags: ReviewFlag[] = review ? [
-    ...(review.qualityFlags ?? []).map(flag => ({ ...flag, tier: flagTier(flag, preview?.approvedQuestions.find(q => q.id === flag.questionId)?.maxMarks) })),
-    ...watchFlags(review.paperId, review.marks, watch).map(flag => ({ ...flag, tier: "check" as const })),
+    ...(review.qualityFlags ?? []).map(flag => ({ ...flag, tier: review.checkedQuestions?.includes(flag.questionId) ? "info" as const : flagTier(flag, preview?.approvedQuestions.find(q => q.id === flag.questionId)?.maxMarks) })),
+    ...watchFlags(review.paperId, review.marks, watch).map(flag => ({ ...flag, tier: review.checkedQuestions?.includes(flag.questionId) ? "info" as const : "check" as const })),
   ] : [];
   return <section className="space-y-4 border-t pt-5">
     {mode === "scripts" && <>
@@ -927,6 +928,13 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           {accuracy.scripts.length > 0 && <details className="text-xs"><summary className="cursor-pointer">Per-script comparison</summary><ul className="mt-1 space-y-1">{accuracy.scripts.map(sc => <li key={sc.candidateCode}>{sc.candidateCode}: AI {sc.aiTotal}, you {sc.teacherTotal} ({sc.difference > 0 ? "+" : ""}{sc.difference}){sc.questionsChanged.length ? `: ${sc.questionsChanged.join(", ")}` : ""}</li>)}</ul></details>}
         </div>}
       </div>
+      {user && queue.some(r => r.status !== "approved" && r.status !== "unprocessed") && <QuestionCheckPanel
+        endpoint={endpoint}
+        paperIds={[...new Set(queue.filter(r => r.status !== "approved").map(r => r.paperId))]}
+        getToken={() => user.getIdToken()}
+        onSaved={loadQueue}
+        openScript={(paperId, candidateCode) => { const row = queue.find(r => r.paperId === paperId && r.candidateCode === candidateCode); void previewScript({ paperId, candidateCode, filename: row?.filename ?? "Candidate script", size: 0, uploadedAt: null }); }}
+      />}
       {samples.length > 0 && <div className="space-y-2 rounded border-2 border-emerald-300 p-3">
         <p className="text-sm font-semibold">Sample moderation (quickest)</p>
         <p className="text-xs text-slate-700">Review a sample of scripts one at a time (at least 3, or 10% of the paper). If your marks agree with the AI (90% of the sample within ±2 marks, none more than 4 out), every script with nothing to check can be approved together. Scripts with questions to check still need opening, but only those questions are shown. Use this for mocks and internal assessment, not for marks you submit to the exam board.</p>

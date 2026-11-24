@@ -131,8 +131,24 @@ export function sampleStatus(
 
 export type TieredFlag = PolicyFlag & { tier: "check" | "info" };
 
-/** Quality flags plus watched-question flags, each labelled check or info. */
-export function tieredFlags(paperId: string, marks: FlagMark[], questions: FlagQuestion[], alignmentWarnings: string[], watch: WatchEntry[]): TieredFlag[] {
+/**
+ * Quality flags plus watched-question flags, each labelled check or info.
+ * Questions the teacher has already checked (in "Check by question") become info.
+ */
+export function tieredFlags(paperId: string, marks: FlagMark[], questions: FlagQuestion[], alignmentWarnings: string[], watch: WatchEntry[], checked: string[] = []): TieredFlag[] {
   const flags = [...qualityFlags(marks, questions, alignmentWarnings), ...watchFlags(paperId, marks, watch)];
-  return flags.map(flag => ({ ...flag, tier: flag.code === "WATCH_QUESTION" ? "check" : flagTier(flag, questions.find(q => q.id === flag.questionId)?.maxMarks) }));
+  return flags.map(flag => ({ ...flag, tier: checked.includes(flag.questionId) ? "info" : flag.code === "WATCH_QUESTION" ? "check" : flagTier(flag, questions.find(q => q.id === flag.questionId)?.maxMarks) }));
+}
+
+/**
+ * Marks still match the AI's proposal, except on questions the teacher checked and
+ * changed with a recorded reason. Anything else changed needs individual approval.
+ */
+export function onlyCheckedChanges(marks: { questionId: string; awardedMarks: number; teacherJustification?: string }[], originals: unknown, checked: string[] = []): boolean {
+  if (!Array.isArray(originals) || !marks.length || originals.length !== marks.length) return false;
+  return marks.every(m => {
+    const original = (originals as { questionId: string; awardedMarks: number }[]).find(o => o.questionId === m.questionId);
+    if (!original) return false;
+    return original.awardedMarks === m.awardedMarks || (checked.includes(m.questionId) && Boolean(m.teacherJustification?.trim()));
+  });
 }
