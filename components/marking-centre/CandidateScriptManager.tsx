@@ -464,8 +464,30 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
         ...(action === "load" ? {} : { body: JSON.stringify({ paperId: preview.paperId, candidateCode: preview.candidateCode, action, marks: action === "propose" ? review?.marks : prepared, expectedRevision: revision }) }),
       });
       const idToken = await user.getIdToken();
-      let response = await send(review?.revision);
-      let result = await response.json();
+      let response: Response;
+      try {
+        response = await send(review?.revision);
+      } catch (networkError) {
+        if (action !== "propose") throw networkError;
+        setReviewMessage("Connection dropped while marking. Checking whether the server finished (up to 6 minutes)...");
+        // Wait for a NEW proposal: the saved review's revision must change
+        // (a regenerated script already has an older proposal).
+        const before = review?.revision ?? -1;
+        let found: Response | null = null;
+        for (let attempt = 0; attempt < 24 && !found; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 15000));
+          try {
+            const check = await fetch(`${url}?${query}`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+            const latest = check.ok ? await check.clone().json() : null;
+            if (latest?.review && (latest.review.revision ?? -1) !== before) found = check;
+          } catch {
+            // Still offline: keep waiting.
+          }
+        }
+        if (!found) throw new Error("No result after 6 minutes. Try again, or check the Vercel logs.");
+        response = found;
+      }
+      let result = await proposalResult(response) as Awaited<ReturnType<typeof response.json>>;
       // The script was updated in the background (e.g. by "Re-check flags"): fetch the latest
       // revision and send the teacher's marks again, once.
       if (response.status === 409 && (action === "approve" || action === "save")) {
@@ -624,6 +646,39 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       return data;
     } catch { return null; }
   }
+  /**
+   * AI proposals for long handwritten scripts can take several minutes, and
+   * some networks drop a request that is open that long ("Failed to fetch")
+   * while the server carries on and saves the proposal. After a dropped
+   * connection, check the queue every 15 seconds (up to 6 minutes, longer
+   * than the server's 5-minute limit) until this script is no longer
+   * unprocessed.
+   */
+  async function waitForProposal(paperId: string, candidateCode: string): Promise<boolean> {
+    if (!user) return false;
+    for (let attempt = 0; attempt < 24; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 15000));
+      try {
+        const response = await fetch(`${endpoint}/queue`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
+        if (!response.ok) continue;
+        const data = await response.json() as { rows?: QueueRow[] };
+        const row = data.rows?.find(r => r.paperId === paperId && r.candidateCode === candidateCode);
+        if (row && row.status !== "unprocessed") return true;
+      } catch {
+        // Still offline: keep waiting.
+      }
+    }
+    return false;
+  }
+
+  /** Parse a JSON response; a Vercel timeout returns an HTML/text page instead. */
+  async function proposalResult(response: Response): Promise<{ error?: string }> {
+    const text = await response.text();
+    try { return JSON.parse(text); } catch {
+      return { error: response.status === 504 ? "Marking took longer than 5 minutes and timed out. Try this script again." : `Server error ${response.status}.` };
+    }
+  }
+
   async function proposeBatch() {
     if (!user || queueBusy) return;
     const latestQueue = await loadQueue();
@@ -637,17 +692,23 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       : "";
     if (!window.confirm(`Mark all ${todo.length} remaining scripts with AI? This does not approve any marks. Keep this tab open until the batch finishes.${costLine}`)) return;
     setQueueBusy(true); setQueueError("");
-    const token = await user.getIdToken();
     let completed = 0, failed = 0;
     for (const item of todo) {
       setBatchProgress(`Processing ${completed + failed + 1}/${todo.length}: ${item.candidateCode}`);
       try {
-        const response = await fetch(`${endpoint}/review`, {
-          method: "POST", cache: "no-store",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "propose", paperId: item.paperId, candidateCode: item.candidateCode }),
-        });
-        const data = await response.json();
+        let response: Response | null = null;
+        try {
+          response = await fetch(`${endpoint}/review`, {
+            method: "POST", cache: "no-store",
+            headers: { Authorization: `Bearer ${await user.getIdToken()}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "propose", paperId: item.paperId, candidateCode: item.candidateCode }),
+          });
+        } catch {
+          setBatchProgress(`Connection dropped on ${item.candidateCode}: checking whether the server finished it...`);
+          if (await waitForProposal(item.paperId, item.candidateCode)) { completed++; continue; }
+          throw new Error("No result after 6 minutes. Try this script on its own.");
+        }
+        const data = await proposalResult(response);
         if (!response.ok) throw new Error(data.error || "Proposal failed.");
         completed++;
       } catch (error) {
