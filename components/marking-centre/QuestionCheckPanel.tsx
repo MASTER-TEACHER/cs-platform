@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { announceActivity } from "@/components/auth/IdleSessionGuard";
 
 type Summary = { questionId: string; scripts: number; maxMarks: number };
@@ -10,6 +10,7 @@ type Item = {
 };
 type Detail = { question: { id: string; maxMarks: number; criteria: string; notes: string }; items: Item[] };
 type Edit = { marks: number; reason: string };
+type View = { url: string; page: number; pages: number | null };
 
 type Props = {
   endpoint: string;
@@ -32,6 +33,11 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // Side panel: the candidate being viewed, their script link and the page shown.
+  const [viewing, setViewing] = useState<string | null>(null);
+  const [views, setViews] = useState<Record<string, View>>({});
+  const [page, setPage] = useState(1);
+  const [viewError, setViewError] = useState("");
 
   async function call(url: string, init?: RequestInit) {
     const response = await fetch(url, { ...init, cache: "no-store", headers: { Authorization: `Bearer ${await getToken()}`, "Content-Type": "application/json" } });
@@ -61,6 +67,57 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
     finally { setBusy(false); }
   }
 
+  async function fetchView(code: string, questionId: string): Promise<View | null> {
+    const key = `${code}:${questionId}`;
+    if (views[key]) return views[key];
+    try {
+      const data = await call(`${endpoint}/view?${new URLSearchParams({ paperId, candidateCode: code, questionId })}`) as View;
+      setViews(old => ({ ...old, [key]: data }));
+      return data;
+    } catch (e) { setViewError(e instanceof Error ? e.message : "Unable to open the script."); return null; }
+  }
+
+  async function show(code: string) {
+    if (!detail) return;
+    setViewError("");
+    setViewing(code);
+    announceActivity();
+    const view = await fetchView(code, detail.question.id);
+    if (view) setPage(view.page);
+    // Get the next candidate's link ready, so moving on is instant.
+    const index = detail.items.findIndex(i => i.candidateCode === code);
+    const next = detail.items[index + 1];
+    if (next) void fetchView(next.candidateCode, detail.question.id);
+  }
+
+  function step(direction: 1 | -1) {
+    if (!detail || !viewing) return;
+    const index = detail.items.findIndex(i => i.candidateCode === viewing);
+    const target = detail.items[index + direction];
+    if (target) void show(target.candidateCode);
+  }
+
+  function setMark(code: string, marks: number) {
+    setEdits(old => ({ ...old, [code]: { reason: old[code]?.reason ?? "", marks } }));
+  }
+
+  // Keyboard: 0-9 set the mark, N / right arrow next, P / left arrow previous, Esc closes.
+  useEffect(() => {
+    if (!viewing || !detail) return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (event.key === "Escape") setViewing(null);
+      else if (event.key === "ArrowRight" || event.key.toLowerCase() === "n") step(1);
+      else if (event.key === "ArrowLeft" || event.key.toLowerCase() === "p") step(-1);
+      else if (/^\d$/.test(event.key) && Number(event.key) <= detail.question.maxMarks) setMark(viewing, Number(event.key));
+      else return;
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   async function save() {
     if (!detail) return;
     setBusy(true); setError(""); setMessage("");
@@ -73,6 +130,7 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
       const data = await call(`${endpoint}/by-question`, { method: "POST", body: JSON.stringify({ paperId, questionId: detail.question.id, decisions }) });
       const failed = (data.outcomes as { candidateCode: string; saved: boolean; reason?: string }[]).filter(o => !o.saved);
       const changed = decisions.filter(d => d.awardedMarks !== detail.items.find(i => i.candidateCode === d.candidateCode)?.awardedMarks).length;
+      setViewing(null);
       setMessage(`Question ${detail.question.id}: ${data.saved} script(s) checked${changed ? `, ${changed} mark(s) changed` : ""}.${failed.length ? ` Not saved: ${failed.map(f => `${f.candidateCode} (${f.reason})`).join("; ")}.` : ""}`);
       await onSaved();
       await loadSummary();
@@ -131,7 +189,7 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
                     <p><strong>AI: {item.aiMarks}/{detail.question.maxMarks}</strong>{item.awardedMarks !== item.aiMarks && ` · current ${item.awardedMarks}`}. {item.feedback}</p>
                     {item.reasons.length > 0 && <p className="mt-1 text-amber-900">{item.reasons.join(" · ")}</p>}
                     <details className="mt-1"><summary className="cursor-pointer text-slate-600">AI evidence</summary><p className="whitespace-pre-wrap text-slate-600">{item.evidence}</p></details>
-                    <button type="button" className="mt-1 text-indigo-700 underline" onClick={() => openScript(paperId, item.candidateCode)}>Open full script</button>
+                    <button type="button" className="mt-1 text-indigo-700 underline" onClick={() => void show(item.candidateCode)}>View script</button>
                   </div>
                   <div className="space-y-1 md:w-48">
                     <div className="flex flex-wrap gap-1" role="group" aria-label={`Mark for ${item.candidateCode}`}>
@@ -154,6 +212,64 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
           <p className="text-xs text-slate-600">Marks you leave unchanged are recorded as checked and kept. Changed marks replace the AI feedback with a short teacher note, which you can edit when you open the script.</p>
         </div>
       )}
+      {detail && viewing && (() => {
+        const index = detail.items.findIndex(i => i.candidateCode === viewing);
+        const item = detail.items[index];
+        if (!item) return null;
+        const edit = edits[item.candidateCode] ?? { marks: item.awardedMarks, reason: "" };
+        const view = views[`${item.candidateCode}:${detail.question.id}`];
+        const changed = edit.marks !== item.awardedMarks;
+        return (
+          <aside role="dialog" aria-label={`Script ${item.candidateCode}, question ${detail.question.id}`}
+            className="fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l-2 border-indigo-300 bg-white shadow-2xl md:w-[58vw]">
+            <div className="flex flex-wrap items-center gap-2 border-b bg-indigo-50 p-2 text-sm">
+              <strong>Q{detail.question.id} · {item.candidateCode}</strong>
+              <span className="text-xs text-slate-600">{index + 1} of {detail.items.length}</span>
+              <div className="ml-auto flex gap-1">
+                <button type="button" className="rounded border bg-white px-2 py-1 text-xs" disabled={index === 0} onClick={() => step(-1)}>← Previous</button>
+                <button type="button" className="rounded border bg-white px-2 py-1 text-xs" disabled={index === detail.items.length - 1} onClick={() => step(1)}>Next →</button>
+                <button type="button" className="rounded border bg-white px-2 py-1 text-xs" onClick={() => openScript(paperId, item.candidateCode)}>Whole review</button>
+                <button type="button" aria-label="Close" className="rounded border bg-white px-2 py-1 text-xs" onClick={() => setViewing(null)}>✕</button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 border-b px-2 py-1 text-xs">
+              <button type="button" className="rounded border px-2" disabled={page <= 1} onClick={() => setPage(n => Math.max(1, n - 1))}>◀</button>
+              <span>Page {page}{view?.pages ? ` of ${view.pages}` : ""}{view && page === view.page ? " (answer found here)" : ""}</span>
+              <button type="button" className="rounded border px-2" disabled={Boolean(view?.pages && page >= view.pages)} onClick={() => setPage(n => n + 1)}>▶</button>
+              {view && page !== view.page && <button type="button" className="text-indigo-700 underline" onClick={() => setPage(view.page)}>Back to answer page</button>}
+            </div>
+            <div className="min-h-0 flex-1 bg-slate-100">
+              {view
+                ? <iframe key={`${item.candidateCode}-${page}`} title={`Script ${item.candidateCode}`} src={`${view.url}#page=${page}&view=FitH&toolbar=0&navpanes=0`} className="h-full w-full" />
+                : <p className="p-4 text-sm">{viewError || "Opening script..."}</p>}
+            </div>
+
+            <div className="space-y-2 border-t bg-white p-3 text-xs">
+              <details>
+                <summary className="cursor-pointer text-slate-600">AI reading of the answer</summary>
+                <p className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-1">{item.answerText || "No answer"}</p>
+              </details>
+              <p><strong>AI: {item.aiMarks}/{detail.question.maxMarks}.</strong> {item.feedback}</p>
+              {item.reasons.length > 0 && <p className="text-amber-900">{item.reasons.join(" · ")}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">Your mark:</span>
+                {Array.from({ length: detail.question.maxMarks + 1 }, (_, n) => (
+                  <button key={n} type="button" aria-pressed={edit.marks === n}
+                    className={`min-w-9 rounded border px-3 py-2 text-sm ${edit.marks === n ? "border-indigo-700 bg-indigo-700 text-white" : "bg-white"}`}
+                    onClick={() => setMark(item.candidateCode, n)}>{n}</button>
+                ))}
+                {changed && <input className="min-w-40 flex-1 rounded border p-1" placeholder="Reason (optional)" value={edit.reason} maxLength={1500}
+                  onChange={e => setEdits(old => ({ ...old, [item.candidateCode]: { ...edit, reason: e.target.value } }))} />}
+                <button type="button" className="ml-auto rounded bg-indigo-700 px-3 py-2 text-sm text-white" onClick={() => index === detail.items.length - 1 ? setViewing(null) : step(1)}>
+                  {index === detail.items.length - 1 ? "Done: back to list" : "Next candidate →"}
+                </button>
+              </div>
+              <p className="text-slate-500">Keys: 0–{Math.min(9, detail.question.maxMarks)} set the mark · N or → next · P or ← previous · Esc close. Nothing is saved until you click Save under the list.</p>
+            </div>
+          </aside>
+        );
+      })()}
       {message && <p role="status" className="text-sm text-emerald-900">{message}</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </div>

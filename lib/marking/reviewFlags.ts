@@ -106,6 +106,9 @@ export function qualityFlags(marks: FlagMark[], questions: FlagQuestion[], align
     const aiText = [mark.feedback, mark.improvementGuidance || '', mark.evidence].join(' ');
     const equations = aiText.matchAll(/(^|[^\w.])(-?\d+(?:\s*[+*×÷/−-]\s*-?\d+){1,6})\s*=\s*(-?\d+(?:\.\d+)?)(?![\w.])/gm);
     for (const match of equations) {
+      // Binary sums (01101011 + 00001111 = 01111010) are not decimal arithmetic.
+      const numbers = [...match[2].matchAll(/\d+/g)].map(n => n[0]).concat(match[3]);
+      if (numbers.every(n => /^[01]+$/.test(n)) && numbers.some(n => n.length >= 4)) continue;
       const actual = numericExpression(match[2]);
       const claimed = Number(match[3]);
       if (actual !== null && Math.abs(actual - claimed) > 1e-8) add('ARITHMETIC_CONFLICT', `AI text says ${match[2]} = ${match[3]}, but arithmetic gives ${actual}.`);

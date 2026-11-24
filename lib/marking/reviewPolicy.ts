@@ -26,9 +26,10 @@ export function individuallyApproved(review: ApprovedReview): boolean {
     && review.marks.length > 0 && review.marks.length === review.originalProposalMarks.length;
 }
 
-function totals(review: ApprovedReview) {
+function totals(review: ApprovedReview, skip: string[] = []) {
   let ai = 0, teacher = 0;
   for (const mark of review.marks ?? []) {
+    if (skip.includes(mark.questionId)) continue;
     const original = review.originalProposalMarks?.find(o => o.questionId === mark.questionId);
     if (!original) continue;
     ai += Number(original.awardedMarks) || 0;
@@ -108,9 +109,13 @@ export function sampleStatus(
   reviews: ApprovedReview[],
   pending: { candidateCode: string; aiTotal: number }[],
   scriptCount: number,
+  watch: WatchEntry[] = [],
 ): SampleStatus {
+  // Questions that are always checked by the teacher are left out: the sample tests the
+  // AI only on the questions that will be approved without being looked at.
+  const skip = watch.filter(w => w.paperId === paperId).map(w => w.questionId);
   const sampled = reviews.filter(r => r.paperId === paperId && individuallyApproved(r));
-  const differences = sampled.map(r => ({ code: r.candidateCode ?? "", diff: Math.abs(totals(r).difference) }));
+  const differences = sampled.map(r => ({ code: r.candidateCode ?? "", diff: Math.abs(totals(r, skip).difference) }));
   const within = differences.filter(d => d.diff <= SAMPLE_TOLERANCE).length;
   const worst = differences.reduce((n, d) => Math.max(n, d.diff), 0);
   const required = sampleSize(scriptCount);

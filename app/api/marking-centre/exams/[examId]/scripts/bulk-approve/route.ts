@@ -41,7 +41,7 @@ export async function POST(request: Request, context: Context) {
       watch = watchList(all);
       for (const paperId of new Set(body.selections.map(s => s.paperId))) {
         const count = scripts.docs.filter(d => d.data().paperId === paperId).length;
-        if (sampleStatus(paperId, all, [], count).passed) passedPapers.add(paperId);
+        if (sampleStatus(paperId, all, [], count, watch).passed) passedPapers.add(paperId);
       }
     }
     const outcomes: { paperId: string; candidateCode: string; approved: boolean; reason?: string }[] = [];

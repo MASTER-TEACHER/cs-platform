@@ -942,7 +942,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           const ready = queue.filter(r => r.paperId === sample.paperId && r.sampleReady).length;
           const toCheck = queue.filter(r => r.paperId === sample.paperId && r.status !== "approved" && (r.checks ?? 0) > 0).length;
           return <div key={sample.paperId} className={`rounded p-2 text-sm ${sample.passed ? "bg-emerald-50 text-emerald-900" : sample.failed ? "bg-red-50 text-red-900" : "bg-slate-50"}`}>
-            <p><strong>Paper {sample.paperId}:</strong> {sample.reviewed} of {sample.required} sample scripts reviewed · {sample.withinTolerance} within ±2.{" "}
+            <p><strong>Paper {sample.paperId}:</strong> {sample.reviewed} of {sample.required} sample scripts reviewed · {sample.withinTolerance} within ±2{watch.some(w => w.paperId === sample.paperId) ? " (not counting the always-checked questions)" : ""}.{" "}
               {sample.passed ? `Sample passed: ${ready} script(s) can be approved together, ${toCheck} still have questions to check.`
                 : sample.failed ? `Sample did not pass (${sample.outliers.join(", ") || "large difference"}). Review the remaining scripts individually, or fix the criteria for the questions you changed and re-mark.`
                 : `Review ${sample.required - sample.reviewed} more script(s) to complete the sample.`}</p>

@@ -55,7 +55,7 @@ export async function GET(request: Request, context: Context) {
     });
     const samples = [...new Set(rows.map(r => r.paperId))].map(paperId => sampleStatus(paperId, allReviews,
       rows.filter(r => r.paperId === paperId && ["proposed", "reviewing"].includes(r.status)).map(r => ({ candidateCode: r.candidateCode, aiTotal: r.aiTotal })),
-      rows.filter(r => r.paperId === paperId).length));
+      rows.filter(r => r.paperId === paperId).length, watch));
     rows.sort((a, b) => b.checks - a.checks || Number(b.flagged) - Number(a.flagged) || (a.status === "approved" ? 1 : 0) - (b.status === "approved" ? 1 : 0) || a.candidateCode.localeCompare(b.candidateCode));
     return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.checks > 0 && r.status !== "approved").length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length }, samples, watch }, { headers });
   } catch (error) {
