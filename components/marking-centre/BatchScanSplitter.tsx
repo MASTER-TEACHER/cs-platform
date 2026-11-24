@@ -466,6 +466,25 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
     }
   }
 
+  /** A new PDF of the given pages, rendered at 200 dpi as JPEG images. */
+  async function rasterise(range: number[]): Promise<Uint8Array> {
+    const { PDFDocument } = await import("pdf-lib");
+    const pdf = pdfRef.current;
+    if (!pdf) throw new Error("The scan is no longer open. Choose the batch PDF again.");
+    const output = await PDFDocument.create();
+    for (const index of range) {
+      const page = await pdf.getPage(index + 1);
+      const size = page.getViewport({ scale: 1 });
+      const canvas = await renderPage(pdf, index + 1, 200 / 72);
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob) throw new Error("A page could not be converted.");
+      const image = await output.embedJpg(await blob.arrayBuffer());
+      output.addPage([size.width, size.height]).drawImage(image, { x: 0, y: 0, width: size.width, height: size.height });
+      canvas.width = canvas.height = 0;
+    }
+    return output.save();
+  }
+
   async function stage() {
     if (!bytesRef.current || blocking || !confirmed || running) return;
     setRunning(true);
@@ -481,7 +500,17 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
         const range = Array.from({ length: pageList(segment) }, (_, i) => segment.start - 1 + i);
         const pages = await output.copyPages(source, range);
         pages.forEach((page) => output.addPage(page));
-        const data = await output.save();
+        let data = await output.save();
+
+        // Some scanners put every page's image in one shared store, so a
+        // copied page drags the whole batch with it (each script ends up as
+        // big as the batch). If this script is far bigger than its share,
+        // rebuild it from the page images alone.
+        const share = ((bytesRef.current?.byteLength ?? 0) * range.length) / Math.max(1, pageCount);
+        if (data.length > Math.max(share * 3, 4 * 1024 * 1024)) {
+          setStatus(`Rebuilding ${segment.code} from page images (the scan stores images in a shared block)...`);
+          data = await rasterise(range);
+        }
         files.push(new File([data.slice().buffer as ArrayBuffer], `${normaliseCode(segment.code!)}.pdf`, { type: "application/pdf" }));
         setProgress(Math.round(((index + 1) / checked.length) * 100));
       }

@@ -244,7 +244,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           item.file.size < 5 ||
           item.file.size > LIMIT ||
           (item.file.type && item.file.type !== "application/pdf")) {
-        setMessage("Only non-empty PDFs up to 25 MB are supported.");
+        const mb = (item.file.size / 1024 / 1024).toFixed(1);
+        setMessage(`${item.file.name} (${mb} MB) cannot be uploaded: only non-empty PDFs up to 25 MB are supported. Remove it, or split the batch again.`);
         return;
       }
 
