@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import BatchScanSplitter from "@/components/marking-centre/BatchScanSplitter";
+import { announceActivity } from "@/components/auth/IdleSessionGuard";
 
 type Paper = { id: string; title: string };
 type Script = { paperId: string; candidateCode: string; filename: string; size: number; uploadedAt: string | null };
@@ -52,6 +53,16 @@ function flagLabel(flag: { code: string; detail: string }): string {
     ALIGNMENT: "Answer location",
   };
   return labels[flag.code] ?? flag.code.replace(/_/g, " ").toLowerCase();
+}
+/**
+ * Two tiers of review flag. "Check" flags often mean a wrong mark and need the
+ * teacher's eye. "Info" flags (an unclear reading the AI already resolved, one
+ * marker only, missing feedback text) are shown for transparency but do not
+ * require opening the question.
+ */
+const INFO_LABELS = new Set(["Unclear reading", "One marker only", "Missing feedback", "Missing guidance"]);
+function isCheckFlag(flag: { code: string; detail: string }): boolean {
+  return !INFO_LABELS.has(flagLabel(flag));
 }
 function groupedFlags(flags: { questionId: string; code: string; detail: string }[]): string {
   const groups = new Map<string, string[]>();
@@ -155,6 +166,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   const [moderationNote, setModerationNote] = useState("");
   const [sampleChecked, setSampleChecked] = useState(false);
   const [includeFlagged, setIncludeFlagged] = useState(false);
+  const [focusReview, setFocusReview] = useState(true);
   const eligible = (row: QueueRow) => includeFlagged ? Boolean(row.bulkEligibleWithFlags) : Boolean(row.bulkEligible);
   const [showAdvancedQla, setShowAdvancedQla] = useState(false);
   const [topicText, setTopicText] = useState("");
@@ -289,6 +301,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
             failed.push(`${item.candidateCode}: ${error instanceof Error ? error.message : "upload failed"}`);
           }
           setMessage(`Uploading... ${uploaded}/${pending.length} scripts completed.`);
+          announceActivity();
         }
       };
       await Promise.all([run(), run(), run()]);
@@ -477,6 +490,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
         let found: Response | null = null;
         for (let attempt = 0; attempt < 24 && !found; attempt++) {
           await new Promise(resolve => setTimeout(resolve, 15000));
+          announceActivity();
           try {
             const check = await fetch(`${url}?${query}`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
             const latest = check.ok ? await check.clone().json() : null;
@@ -659,6 +673,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     if (!user) return false;
     for (let attempt = 0; attempt < 24; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 15000));
+      announceActivity();
       try {
         const response = await fetch(`${endpoint}/queue`, { headers: { Authorization: `Bearer ${await user.getIdToken()}` }, cache: "no-store" });
         if (!response.ok) continue;
@@ -694,6 +709,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
     if (!window.confirm(`Mark all ${todo.length} remaining scripts with AI? This does not approve any marks. Keep this tab open until the batch finishes.${costLine}`)) return;
     setQueueBusy(true); setQueueError("");
     let completed = 0, failed = 0;
+    // A proposal can take minutes with no clicks: keep the session active while the batch runs.
+    const keepAlive = window.setInterval(announceActivity, 60000);
     for (const item of todo) {
       setBatchProgress(`Processing ${completed + failed + 1}/${todo.length}: ${item.candidateCode}`);
       try {
@@ -706,6 +723,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           });
         } catch {
           setBatchProgress(`Connection dropped on ${item.candidateCode}: checking whether the server finished it...`);
+          announceActivity();
           if (await waitForProposal(item.paperId, item.candidateCode)) { completed++; continue; }
           throw new Error("No result after 6 minutes. Try this script on its own.");
         }
@@ -718,7 +736,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       }
     }
     setBatchProgress(`Finished: ${completed} proposed, ${failed} failed. No marks were approved.`);
-    setQueueBusy(false);
+    window.clearInterval(keepAlive); setQueueBusy(false);
     void loadUsage();
     await loadQueue();
   }
@@ -869,7 +887,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
         <p className="text-sm font-semibold">Approve eligible scripts together</p>
         <p className="text-xs">Scripts with automated warnings are excluded. Check a suitable sample against the original papers and mark scheme before approval. AI confidence does not guarantee correctness.</p>
         <button type="button" className="rounded border px-3 py-1 text-sm" disabled={queueBusy} onClick={() => setBulkSelected(queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`))}>Select all ready for approval</button>
-        <label className="flex items-start gap-2 rounded bg-amber-50 p-2 text-sm"><input type="checkbox" checked={includeFlagged} onChange={e => { setIncludeFlagged(e.target.checked); setBulkSelected([]); }} /><span><strong>Include flagged scripts.</strong> I have opened these scripts and reviewed every flagged question (the reason is shown in the table). My acceptance of each flag is recorded.</span></label>
+        <label className="flex items-start gap-2 rounded bg-amber-50 p-2 text-sm"><input type="checkbox" checked={includeFlagged} onChange={e => { setIncludeFlagged(e.target.checked); setBulkSelected([]); }} /><span><strong>Include flagged scripts.</strong> I have opened these scripts and reviewed every question marked <em>Check</em> (the reason is shown in the table). Information-only flags were left as the AI resolved them. My acceptance of each flag is recorded.</span></label>
         <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={sampleChecked} onChange={e => setSampleChecked(e.target.checked)} />I have checked an appropriate sample against the original scripts and approved mark scheme.</label>
         <label className="block text-xs">Moderation record (editable)
           <textarea className="mt-1 w-full rounded border p-2 text-sm" value={moderationNote} onChange={e => setModerationNote(e.target.value)} maxLength={1000} rows={2} placeholder="For example: Checked a sample of high, middle and low scoring scripts against the approved mark scheme; reviewed automated exceptions." />
@@ -879,8 +897,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       </div>
       {batchProgress && <p role="status" className="text-sm">{batchProgress}</p>}
       {queueError && <p role="alert" className="text-sm text-red-700">{queueError}</p>}
-      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.flagged && r.status !== "approved").length} flagged awaiting review · {queue.filter(r => r.status === "unprocessed").length} unprocessed</p>
-        <div className="max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr><th className="border p-2"><label className="flex items-center gap-1"><input type="checkbox" aria-label="Select all eligible scripts" disabled={queueBusy || !queue.some(r => eligible(r))} checked={queue.some(r => eligible(r)) && queue.filter(r => eligible(r)).every(r => bulkSelected.includes(`${r.paperId}_${r.candidateCode}`))} onChange={e => setBulkSelected(e.target.checked ? queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`) : [])} />All</label></th><th className="border p-2">Candidate</th><th className="border p-2">Paper</th><th className="border p-2">Status</th><th className="border p-2">Review warnings</th><th className="border p-2">Open</th></tr></thead><tbody>{queue.map(item => <tr key={`${item.paperId}_${item.candidateCode}`}><td className="border p-2"><input type="checkbox" aria-label={`Select ${item.candidateCode} ${item.paperId} for bulk approval`} disabled={!eligible(item) || queueBusy} checked={bulkSelected.includes(`${item.paperId}_${item.candidateCode}`)} onChange={e => setBulkSelected(old => e.target.checked ? [...old, `${item.paperId}_${item.candidateCode}`].slice(0, 20) : old.filter(k => k !== `${item.paperId}_${item.candidateCode}`))} /></td><td className="border p-2">{item.candidateCode}</td><td className="border p-2">{item.paperId}</td><td className="border p-2">{item.status}</td><td className="border p-2">{item.flags.length ? <details><summary className={`cursor-pointer ${item.status === "approved" ? "text-slate-500" : ""}`}>{item.status === "approved" ? `Approved · ${groupedFlags(item.flags)}` : groupedFlags(item.flags)}</summary><ul className="mt-1 list-disc pl-4 text-slate-600">{item.flags.map((f, i) => <li key={i}>Q{f.questionId}: {f.code === "UNCERTAIN" ? f.detail : f.detail || f.code}</li>)}</ul></details> : "No automated flags (teacher verification still required)"}</td><td className="border p-2"><button type="button" className="text-indigo-700 underline" disabled={queueBusy} onClick={() => void previewScript({ paperId: item.paperId, candidateCode: item.candidateCode, filename: item.filename, size: 0, uploadedAt: null })}>Review</button></td></tr>)}</tbody></table></div>
+      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.status !== "approved" && r.flags.some(isCheckFlag)).length} with questions to check · {queue.filter(r => r.status !== "approved" && r.status !== "unprocessed" && !r.flags.some(isCheckFlag)).length} with nothing to check · {queue.filter(r => r.status === "unprocessed").length} unprocessed</p>
+        <div className="max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr><th className="border p-2"><label className="flex items-center gap-1"><input type="checkbox" aria-label="Select all eligible scripts" disabled={queueBusy || !queue.some(r => eligible(r))} checked={queue.some(r => eligible(r)) && queue.filter(r => eligible(r)).every(r => bulkSelected.includes(`${r.paperId}_${r.candidateCode}`))} onChange={e => setBulkSelected(e.target.checked ? queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`) : [])} />All</label></th><th className="border p-2">Candidate</th><th className="border p-2">Paper</th><th className="border p-2">Status</th><th className="border p-2">Review warnings</th><th className="border p-2">Open</th></tr></thead><tbody>{queue.map(item => <tr key={`${item.paperId}_${item.candidateCode}`}><td className="border p-2"><input type="checkbox" aria-label={`Select ${item.candidateCode} ${item.paperId} for bulk approval`} disabled={!eligible(item) || queueBusy} checked={bulkSelected.includes(`${item.paperId}_${item.candidateCode}`)} onChange={e => setBulkSelected(old => e.target.checked ? [...old, `${item.paperId}_${item.candidateCode}`].slice(0, 20) : old.filter(k => k !== `${item.paperId}_${item.candidateCode}`))} /></td><td className="border p-2">{item.candidateCode}</td><td className="border p-2">{item.paperId}</td><td className="border p-2">{item.status}</td><td className="border p-2">{item.flags.length ? <details><summary className={`cursor-pointer ${item.status === "approved" ? "text-slate-500" : ""}`}>{item.status === "approved" ? `Approved · ${groupedFlags(item.flags)}` : <>{item.flags.some(isCheckFlag) ? <strong className="text-amber-900">Check: {groupedFlags(item.flags.filter(isCheckFlag))}</strong> : <span className="text-emerald-800">Nothing to check</span>}{item.flags.some(f => !isCheckFlag(f)) && <span className="block text-slate-500">For information: {groupedFlags(item.flags.filter(f => !isCheckFlag(f)))}</span>}</>}</summary><ul className="mt-1 list-disc pl-4 text-slate-600">{item.flags.map((f, i) => <li key={i}>Q{f.questionId}: {f.code === "UNCERTAIN" ? f.detail : f.detail || f.code}</li>)}</ul></details> : "No automated flags (teacher verification still required)"}</td><td className="border p-2"><button type="button" className="text-indigo-700 underline" disabled={queueBusy} onClick={() => void previewScript({ paperId: item.paperId, candidateCode: item.candidateCode, filename: item.filename, size: 0, uploadedAt: null })}>Review</button></td></tr>)}</tbody></table></div>
       </>}
     </div>}
     {mode === "marking" && <div className="space-y-2 rounded-lg border p-4">
@@ -945,7 +963,15 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
           <div className="space-y-2"><button type="button" className="rounded border px-3 py-2 text-sm" disabled={reviewBusy} onClick={() => void loadAudit()}>View marking audit history</button>
           {auditHistory.length > 0 && <div className="max-h-64 overflow-auto rounded border p-3 text-xs" aria-label="Marking audit history">{auditHistory.map(entry => <div key={entry.id} className="border-b py-2"><strong>Revision {entry.revision}: {entry.action}</strong> — {entry.at ?? "Timestamp pending"}<div>Marks: {(entry.marks ?? []).map(m => `${m.questionId}: ${m.awardedMarks}`).join(", ")}</div>{(entry.marks ?? []).filter(m => m.teacherJustification).map(m => <p key={m.questionId}>Question {m.questionId} justification: {m.teacherJustification}</p>)}</div>)}</div>}</div>
           <p className="text-sm">Status: <strong>{review.stale ? "STALE - source changed" : review.status}</strong> · Revision {review.revision} {review.total !== undefined ? `· Total ${review.total}` : ""}</p>
-          {review.marks.map((mark, index) => <div key={mark.questionId} className="space-y-2 rounded border p-3">
+          {(() => {
+            const checkIds = new Set((review.qualityFlags ?? []).filter(isCheckFlag).map(f => f.questionId));
+            const needs = review.marks.filter(m => checkIds.has(m.questionId) || checkIds.has("*")).length;
+            return <label className="flex items-start gap-2 rounded bg-indigo-50 p-2 text-sm"><input type="checkbox" className="mt-1" checked={focusReview} onChange={e => setFocusReview(e.target.checked)} /><span><strong>Focus on questions to check</strong> ({needs} of {review.marks.length}). Routine questions are folded: open any of them to check or change the mark.</span></label>;
+          })()}
+          {review.marks.map((mark, index) => {
+            const checks = (review.qualityFlags ?? []).filter(flag => (flag.questionId === mark.questionId || flag.questionId === "*") && isCheckFlag(flag));
+            const max = preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks;
+            const body = <>
             <p className="font-semibold text-sm">Question {mark.questionId} · Max {preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks}</p>
             <pre className="whitespace-pre-wrap text-xs">{mark.answerText || "No answer identified"}</pre>
             <label className="block text-sm">Teacher mark
@@ -963,9 +989,12 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
             <label className="block text-sm">Teacher justification (required for changed marks or credit without an answer before approval)
               <textarea className="mt-1 w-full rounded border p-2 text-sm" rows={2} value={mark.teacherJustification ?? ""} disabled={review.status === "approved" || review.stale || reviewBusy} placeholder="Explain the evidence supporting a mark override" onChange={e => setReview(old => old ? { ...old, marks: old.marks.map((m, i) => i === index ? { ...m, teacherJustification: e.target.value } : m) } : old)}/>
             </label>
-            {(review.qualityFlags ?? []).filter(flag => flag.questionId === mark.questionId || flag.questionId === "*").map((flag, flagIndex) => <p key={`${flag.code}_${flagIndex}`} className="rounded bg-amber-50 p-2 text-xs text-amber-900">Review warning ({flag.code}): {flag.detail}</p>)}
+            {(review.qualityFlags ?? []).filter(flag => flag.questionId === mark.questionId || flag.questionId === "*").map((flag, flagIndex) => <p key={`${flag.code}_${flagIndex}`} className={`rounded p-2 text-xs ${isCheckFlag(flag) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-600"}`}>{isCheckFlag(flag) ? "Check" : "For information"} ({flagLabel(flag)}): {flag.detail}</p>)}
             <p className="text-xs text-slate-600">Evidence: {mark.evidence || "Not supplied"} · Confidence: {mark.confidence}{mark.needsReview ? " · Requires review" : ""}</p>
-          </div>)}
+            </>;
+            if (focusReview && checks.length === 0) return <details key={mark.questionId} className="rounded border p-2"><summary className="cursor-pointer text-sm">Question {mark.questionId} · {mark.awardedMarks}/{max} · <span className="text-slate-600">{(mark.feedback || "").slice(0, 110)}{(mark.feedback || "").length > 110 ? "…" : ""}</span></summary><div className="mt-2 space-y-2">{body}</div></details>;
+            return <div key={mark.questionId} className={`space-y-2 rounded border p-3 ${checks.length ? "border-2 border-amber-400" : ""}`}>{body}</div>;
+          })}
           {review.status !== "approved" && !review.stale && <div className="flex flex-wrap gap-2">
             <button type="button" disabled={reviewBusy} className="rounded border px-3 py-2 text-sm" onClick={() => void reviewAction("save")}>Save teacher edits</button>
             <button type="button" disabled={reviewBusy} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white" onClick={() => { if (window.confirm("Confirm you checked the original script, every mark, feedback and improvement guidance? Approval locks this review.")) void reviewAction("approve"); }}>Approve final marks</button>

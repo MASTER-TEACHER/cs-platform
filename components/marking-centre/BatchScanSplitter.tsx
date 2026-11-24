@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { announceActivity } from "@/components/auth/IdleSessionGuard";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 import {
@@ -51,6 +52,17 @@ type Ocr = {
 };
 
 type Band = { top: number; bottom: number };
+/** A name area to black out on every cover, as fractions of the page. */
+type Box = { x0: number; y0: number; x1: number; y1: number };
+const REDACT_KEY = "csmaster:redactBoxes";
+
+function drawBoxes(canvas: HTMLCanvasElement, boxes: Box[]) {
+  const context = canvas.getContext("2d")!;
+  context.fillStyle = "#000000";
+  for (const b of boxes) {
+    context.fillRect(b.x0 * canvas.width, b.y0 * canvas.height, (b.x1 - b.x0) * canvas.width, (b.y1 - b.y0) * canvas.height);
+  }
+}
 
 const RENDER_SCALE = 2.5;
 const LARGE_FILE = 300 * 1024 * 1024;
@@ -257,12 +269,27 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [boxes, setBoxes] = useState<Box[]>([]);
+  const [marking, setMarking] = useState(false);
+  const [page1Url, setPage1Url] = useState("");
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragBox, setDragBox] = useState<Box | null>(null);
+  const bandRef = useRef<Band | null>(null);
+  const coverStarts = useMemo(() => new Set(segments.map(s => s.start)), [segments]);
 
   const bytesRef = useRef<ArrayBuffer | null>(null);
   const pdfRef = useRef<PDFDocumentProxy | null>(null);
   const cancelRef = useRef(false);
 
   useEffect(() => setPaperId((current) => current || defaultPaperId), [defaultPaperId]);
+
+  // Reuse the name areas marked last time (cover layouts rarely change).
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(REDACT_KEY) || "[]");
+      if (Array.isArray(saved)) setBoxes(saved.filter((b: Box) => [b.x0, b.y0, b.x1, b.y1].every(v => typeof v === "number")));
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(
     () => () => {
@@ -333,6 +360,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
       }
 
       const { band } = located;
+      bandRef.current = band;
       // Printed words around the code on page 1 (e.g. "Candidate number",
       // "INSTRUCTIONS TO CANDIDATES"): short codes only count on pages
       // that look like this cover. Page 1 itself is read from the same band.
@@ -361,6 +389,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
           readings[n - 1] = list;
           if (list.some(hasEvidence)) strips[n] = strip;
           setProgress(Math.round((Object.keys(readings).length / total) * 85));
+          announceActivity();
           setStatus(`Reading page ${Object.keys(readings).length} of ${total}...`);
         })();
         inflight.push(job);
@@ -388,6 +417,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
           done++;
           setProgress(85 + Math.round((done / extra.length) * 15));
           setStatus(`Checking ${unsure.length} unclear cover(s) more closely...`);
+          announceActivity();
         }
         decisions = readings.map((list, i) => decide(i + 1, list));
       }
@@ -460,14 +490,38 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
     setPreviewPage(page);
     try {
       const canvas = await renderPage(pdfRef.current, page, 0.8);
+      if (boxes.length && coverStarts.has(page)) drawBoxes(canvas, boxes);
       setPreviewUrl(canvas.toDataURL("image/jpeg", 0.8));
     } catch {
       setPreviewUrl("");
     }
   }
 
+  async function startMarking() {
+    if (!pdfRef.current) return;
+    const canvas = await renderPage(pdfRef.current, 1, 1);
+    setPage1Url(canvas.toDataURL("image/jpeg", 0.85));
+    setMarking(true);
+  }
+
+  function pointer(event: import("react").PointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+    };
+  }
+
+  function saveBoxes(next: Box[]) {
+    setBoxes(next);
+    setConfirmed(false);
+    try { window.localStorage.setItem(REDACT_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
+
+  const overlapsCode = boxes.some(b => bandRef.current !== null && b.y1 > bandRef.current.top && b.y0 < bandRef.current.bottom);
+
   /** A new PDF of the given pages, rendered at 200 dpi as JPEG images. */
-  async function rasterise(range: number[]): Promise<Uint8Array> {
+  async function rasterise(range: number[], redactFirst = false): Promise<Uint8Array> {
     const { PDFDocument } = await import("pdf-lib");
     const pdf = pdfRef.current;
     if (!pdf) throw new Error("The scan is no longer open. Choose the batch PDF again.");
@@ -476,6 +530,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
       const page = await pdf.getPage(index + 1);
       const size = page.getViewport({ scale: 1 });
       const canvas = await renderPage(pdf, index + 1, 200 / 72);
+      if (redactFirst && index === range[0]) drawBoxes(canvas, boxes);
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
       if (!blob) throw new Error("A page could not be converted.");
       const image = await output.embedJpg(await blob.arrayBuffer());
@@ -496,10 +551,24 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
       const files: File[] = [];
 
       for (const [index, segment] of checked.entries()) {
-        const output = await PDFDocument.create();
         const range = Array.from({ length: pageList(segment) }, (_, i) => segment.start - 1 + i);
-        const pages = await output.copyPages(source, range);
-        pages.forEach((page) => output.addPage(page));
+        const redact = boxes.length > 0;
+        announceActivity();
+
+        // With name areas marked, the cover is rebuilt as an image with the
+        // areas blacked out (so the names are removed, not just covered);
+        // the other pages are copied unchanged.
+        const output = await PDFDocument.create();
+        if (redact) {
+          const cover = await PDFDocument.load(await rasterise([range[0]], true));
+          const [first] = await output.copyPages(cover, [0]);
+          output.addPage(first);
+        }
+        const rest = redact ? range.slice(1) : range;
+        if (rest.length) {
+          const pages = await output.copyPages(source, rest);
+          pages.forEach((page) => output.addPage(page));
+        }
         let data = await output.save();
 
         // Some scanners put every page's image in one shared store, so a
@@ -509,7 +578,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
         const share = ((bytesRef.current?.byteLength ?? 0) * range.length) / Math.max(1, pageCount);
         if (data.length > Math.max(share * 3, 4 * 1024 * 1024)) {
           setStatus(`Rebuilding ${segment.code} from page images (the scan stores images in a shared block)...`);
-          data = await rasterise(range);
+          data = await rasterise(range, redact);
         }
         files.push(new File([data.slice().buffer as ArrayBuffer], `${normaliseCode(segment.code!)}.pdf`, { type: "application/pdf" }));
         setProgress(Math.round(((index + 1) / checked.length) * 100));
@@ -672,6 +741,45 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
                   })}
                 </tbody>
               </table>
+            </div>
+
+            <div className="space-y-2 rounded border border-slate-300 p-3">
+              <p className="text-sm font-semibold">Hide names on cover pages</p>
+              <p className="text-xs text-slate-600">
+                Mark where students write their names on the cover. Those areas are blacked out on every cover before upload, so names never reach CS Master or the AI. The candidate code is read separately and is not affected.
+              </p>
+              <p className="text-xs">{boxes.length ? `${boxes.length} name area(s) will be blacked out on every cover.` : <span className="font-semibold text-amber-900">No name areas marked: covers will be uploaded as scanned.</span>}</p>
+              {overlapsCode && <p className="text-xs font-semibold text-amber-900">A name area overlaps the row where the candidate code was read. Check the preview to make sure the code is still visible.</p>}
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="rounded border px-3 py-1 text-xs" disabled={running} onClick={() => void startMarking()}>{boxes.length ? "Change name areas" : "Mark name areas"}</button>
+                {boxes.length > 0 && <button type="button" className="rounded border px-3 py-1 text-xs" disabled={running} onClick={() => saveBoxes([])}>Remove all areas</button>}
+              </div>
+              {marking && page1Url && (
+                <div className="space-y-2">
+                  <p className="text-xs">Drag a box over each name area on page 1 (first name, last name, signature). Click a black box to remove it.</p>
+                  <div
+                    className="relative w-full max-w-xl cursor-crosshair touch-none select-none border"
+                    onPointerDown={(e) => { const p = pointer(e); setDragStart(p); setDragBox({ x0: p.x, y0: p.y, x1: p.x, y1: p.y }); e.currentTarget.setPointerCapture(e.pointerId); }}
+                    onPointerMove={(e) => { if (!dragStart) return; const p = pointer(e); setDragBox({ x0: Math.min(dragStart.x, p.x), y0: Math.min(dragStart.y, p.y), x1: Math.max(dragStart.x, p.x), y1: Math.max(dragStart.y, p.y) }); }}
+                    onPointerUp={() => { if (dragBox && dragBox.x1 - dragBox.x0 > 0.01 && dragBox.y1 - dragBox.y0 > 0.005) saveBoxes([...boxes, dragBox]); setDragStart(null); setDragBox(null); }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={page1Url} alt="Page 1 of the batch" className="block w-full" draggable={false} />
+                    {[...boxes, ...(dragBox ? [dragBox] : [])].map((b, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        aria-label={i < boxes.length ? `Remove name area ${i + 1}` : "New name area"}
+                        className="absolute bg-black/80"
+                        style={{ left: `${b.x0 * 100}%`, top: `${b.y0 * 100}%`, width: `${(b.x1 - b.x0) * 100}%`, height: `${(b.y1 - b.y0) * 100}%` }}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => { if (i < boxes.length) saveBoxes(boxes.filter((_, k) => k !== i)); }}
+                      />
+                    ))}
+                  </div>
+                  <button type="button" className="rounded bg-indigo-700 px-3 py-1 text-xs text-white" onClick={() => { setMarking(false); void showPage(1); }}>Done</button>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-end gap-2">
