@@ -444,6 +444,12 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
         const changed = original !== undefined && original.awardedMarks !== mark.awardedMarks;
         return {
           ...mark,
+          // A changed mark with the AI feedback cleared would leave the student with no feedback.
+          feedback: changed && !(mark.feedback ?? "").trim()
+            ? (mark.awardedMarks >= max && max > 0
+              ? `Your teacher reviewed this answer and awarded full marks (${mark.awardedMarks}/${max}).`
+              : `Your teacher reviewed this answer and awarded ${mark.awardedMarks} out of ${max} marks.`)
+            : mark.feedback,
           teacherJustification: changed && !(mark.teacherJustification ?? "").trim()
             ? `Teacher changed the mark from ${original!.awardedMarks} to ${mark.awardedMarks} after checking the script against the mark scheme.`
             : mark.teacherJustification,
