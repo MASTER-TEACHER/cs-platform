@@ -3,6 +3,7 @@ import { isExplicitNonAnswer, isMaterialUncertainty, unsupportedWorkingClaim } f
 import { alignAnswers } from "@/lib/marking/alignAnswers";
 import { studentFacing } from "@/lib/marking/studentText";
 import { recordUsage } from "@/lib/marking/usage";
+import { rulesFor, type QualificationContext } from "@/lib/marking/markingRules";
 import { validateMarks, type MarkQuestion, type ReviewMark } from "@/lib/marking/reviewContext";
 
 // RIGOROUS MARKING (Nov 2026)
@@ -56,7 +57,8 @@ const RULES = `MARKING RULES (apply all of them strictly):
 15. "Max N if only stating features/identifying" means those answers still earn marks up to N; explanations or application are needed only for marks above N.
 16. Where the guidance says to award descriptions rather than key words (e.g. "very strong" for durable, "fits in a pocket" for portable/small physical size), credit an accurate description even without the exact term.
 17. For each credited point give acceptedAnswer (the exact mark scheme answer or alternative it matches) and candidateWords (only the candidate's own words that earn it, e.g. the word written in a gap).
-18. Never penalise the candidate for a doubt that comes from reading the handwriting rather than from the answer itself: the exact position or alignment of handwritten digits, carries or ticks; punctuation the transcription may have misread (":" vs ";", "." vs ","); spacing; or stray marks. If the answer is otherwise correct and the required working or symbols are present, credit it, record the doubt in uncertainties and set needsReview true so the teacher checks the original. Withhold a mark only when the doubt is about the substance (which word, digit, value or term was written) and a plausible reading would not earn it.`;
+18. Never penalise the candidate for a doubt that comes from reading the handwriting rather than from the answer itself: the exact position or alignment of handwritten digits, carries or ticks; punctuation the transcription may have misread (":" vs ";", "." vs ","); spacing; or stray marks. If the answer is otherwise correct and the required working or symbols are present, credit it, record the doubt in uncertainties and set needsReview true so the teacher checks the original. Withhold a mark only when the doubt is about the substance (which word, digit, value or term was written) and a plausible reading would not earn it.
+19. markingConventions, when supplied, are established examiner conventions for this type of question (how working, follow-through, vague answers etc. are normally treated). Apply them when the approved criteria and guidance are silent; if they conflict, the approved criteria and guidance always win.`;
 
 const EXAMINER = `You are a senior UK GCSE examiner marking one question rigorously and consistently against an approved mark scheme.
 ${RULES}
@@ -371,11 +373,13 @@ function evidenceText(exam: Examination, issues: string[], moderation: string): 
   return text.length > 2990 ? `${text.slice(0, 2987)}...` : text;
 }
 
-async function markQuestion(model: string, moderationMode: "auto" | "on" | "off", question: MarkQuestion, answerText: string): Promise<ReviewMark & { flagged: boolean }> {
+async function markQuestion(model: string, moderationMode: "auto" | "on" | "off", question: MarkQuestion, answerText: string, context: QualificationContext = {}): Promise<ReviewMark & { flagged: boolean }> {
+  const conventions = rulesFor(question, context);
   const payload = JSON.stringify({
     question: { id: question.id, maxMarks: question.maxMarks },
     approvedCriteria: question.criteria,
     guidance: question.notes || "(no additional guidance)",
+    ...(conventions.length ? { markingConventions: conventions.map(r => `${r.id} ${r.title}: ${r.rule}`) } : {}),
     candidateAnswer: answerText,
   });
   const first = parseExamination(await callWithRetry(model, EXAMINER, payload, effortFor("examiner")), question.maxMarks);
@@ -441,14 +445,14 @@ async function markQuestion(model: string, moderationMode: "auto" | "on" | "off"
     awardedMarks: final.awardedMarks,
     feedback: studentFacing(final.feedback) || (final.awardedMarks === question.maxMarks ? "Full marks." : "Some mark scheme points were not met; see the improvement guidance."),
     improvementGuidance: final.awardedMarks === question.maxMarks ? "" : (studentFacing(final.improvementGuidance) || fallbackGuidance),
-    evidence: evidenceText(final, issues, moderation),
+    evidence: ((conventions.length ? `Conventions: ${conventions.map(r => r.id).join(", ")} | ` : "") + evidenceText(final, issues, moderation)).slice(0, 2990),
     confidence: flagged ? "low" : "high",
     needsReview: flagged,
     flagged,
   };
 }
 
-export async function proposeMarks(text: string, questions: MarkQuestion[]): Promise<{ marks: ReviewMark[]; model: string; alignmentWarnings: string[] }> {
+export async function proposeMarks(text: string, questions: MarkQuestion[], context: QualificationContext = {}): Promise<{ marks: ReviewMark[]; model: string; alignmentWarnings: string[] }> {
   const model = process.env.MARKING_CENTRE_MARKING_MODEL?.trim() || "gpt-4.1";
   const keyName = provider(model) === "anthropic" ? "ANTHROPIC_API_KEY" : "OPENAI_API_KEY";
   if (!process.env[keyName]?.trim()) throw new Error("MARK_NO_KEY");
@@ -480,11 +484,11 @@ export async function proposeMarks(text: string, questions: MarkQuestion[]): Pro
         }
         let mark: ReviewMark & { flagged: boolean };
         try {
-          mark = await markQuestion(model, moderate, question, answerText);
+          mark = await markQuestion(model, moderate, question, answerText, context);
         } catch (firstError) {
           if (firstError instanceof Error && firstError.message === "MARK_NO_KEY") throw firstError;
           try {
-            mark = await markQuestion(model, moderate, question, answerText);
+            mark = await markQuestion(model, moderate, question, answerText, context);
           } catch (secondError) {
             if (secondError instanceof Error && secondError.message === "MARK_NO_KEY") throw secondError;
             // One question must never block the whole script: hand it to the teacher instead.

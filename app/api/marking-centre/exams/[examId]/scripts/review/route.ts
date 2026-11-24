@@ -59,7 +59,7 @@ export async function POST(request: Request, params: Context) {
     if (body.action === "propose") {
       await beginUsage(ctx.actor.uid);
       const text = await extractReviewText(ctx);
-      const result = await proposeMarks(text, ctx.questions);
+      const result = await proposeMarks(text, ctx.questions, ctx.qualification);
       noteScriptMarked(ctx.actor.uid);
       // Handwritten (vision) scripts are now the normal case: they are no longer blanket-flagged.
       // Individual questions are flagged only for objective reasons (see proposeMarks), and the

@@ -38,7 +38,9 @@ export async function loadReviewContext(request: Request, examId: string, paperI
   const [bytes] = await storageClient().bucket(bucketName).file(expectedPath).download();
   const scriptHash = createHash("sha256").update(bytes).digest("hex");
   const structureHash = createHash("sha256").update(JSON.stringify(questions)).digest("hex");
-  return { actor, examRef, paperId, candidateCode, questions, bytes, scriptHash, structureHash,
+  // Subject and qualification select the marking conventions (lib/marking/markingRules.ts).
+  const qualification = { subject: String(exam.data()?.subject ?? ""), level: String(exam.data()?.qualificationLevel ?? "") };
+  return { actor, examRef, paperId, candidateCode, questions, bytes, scriptHash, structureHash, qualification,
     reviewRef: examRef.collection("markingReviews").doc(`${paperId}_${candidateCode}`) };
 }
 export async function extractReviewText(ctx: ReviewContext) {

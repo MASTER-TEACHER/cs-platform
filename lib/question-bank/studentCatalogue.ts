@@ -8,6 +8,7 @@ import { batch4Questions } from "./staticCatalogueBatch4";
 import { batch5Questions } from "./staticCatalogueBatch5";
 import { batch6Questions } from "./staticCatalogueBatch6";
 import { batch7Questions } from "./staticCatalogueBatch7";
+import { batch8Questions } from "./staticCatalogueBatch8";
 import { isRetiredQuestion } from "./retiredQuestions";
 import { imediaCatalogueQuestions } from "./imediaCatalogue";
 import { imediaBatch2Questions } from "./imediaCatalogueBatch2";
@@ -34,6 +35,7 @@ const source: BankQuestion[] = [
   ...batch5Questions,
   ...batch6Questions,
   ...batch7Questions,
+  ...batch8Questions,
   ...imediaCatalogueQuestions,
   ...imediaBatch2Questions,
 ];

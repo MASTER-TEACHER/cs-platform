@@ -35,6 +35,7 @@ import { batch4Questions } from "@/lib/question-bank/staticCatalogueBatch4";
 import { batch5Questions } from "@/lib/question-bank/staticCatalogueBatch5";
 import { batch6Questions } from "@/lib/question-bank/staticCatalogueBatch6";
 import { batch7Questions } from "@/lib/question-bank/staticCatalogueBatch7";
+import { batch8Questions } from "@/lib/question-bank/staticCatalogueBatch8";
 import { isRetiredQuestion } from "@/lib/question-bank/retiredQuestions";
 import { specReference } from "@/lib/question-bank/specReferences";
 import { imediaCatalogueQuestions } from "@/lib/question-bank/imediaCatalogue";
@@ -120,6 +121,7 @@ const teacherId = user?.uid ?? "";
           ...batch5Questions,
           ...batch6Questions,
           ...batch7Questions,
+          ...batch8Questions,
           ...imediaCatalogueQuestions,
           ...imediaBatch2Questions,
           ...flattenQuestionSets(sets),
