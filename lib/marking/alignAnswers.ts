@@ -34,7 +34,7 @@ async function alignWith(model: string, userContent: string): Promise<string> {
     const key = process.env.ANTHROPIC_API_KEY?.trim();
     if (!key) throw new Error("ALIGN_NO_KEY");
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const timeout = setTimeout(() => controller.abort(), 170000);
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST", signal: controller.signal,
@@ -76,12 +76,33 @@ async function alignWith(model: string, userContent: string): Promise<string> {
   } catch { throw new Error("ALIGN_FORMAT"); }
 }
 
+/**
+ * Long papers (A Level: 30+ questions, long written answers) are aligned in parallel
+ * halves: each reply copies out only its own questions' answers, so it stays well
+ * inside the reply length and time limits. Every question is still answered once.
+ */
+const CHUNK = 20;
 export async function alignAnswers(text: string, questions: Question[]) {
-  if (!text.trim() || text.length > 85000 || questions.length < 1 || questions.length > 150) throw new Error("ALIGN_INVALID");
+  if (!text.trim() || text.length > 150000 || questions.length < 1 || questions.length > 150) throw new Error("ALIGN_INVALID");
+  if (questions.length <= CHUNK) return alignChunk(text, questions, []);
+  const parts = Math.ceil(questions.length / CHUNK);
+  const size = Math.ceil(questions.length / parts);
+  const chunks = Array.from({ length: parts }, (_, i) => questions.slice(i * size, (i + 1) * size));
+  const results = await Promise.all(chunks.map(chunk => alignChunk(text, chunk, questions.filter(q => !chunk.includes(q)).map(q => q.id))));
+  return {
+    answers: results.flatMap(r => r.answers),
+    warnings: [...new Set(results.flatMap(r => r.warnings))].slice(0, 20),
+    model: results[0].model, teacherReviewRequired: true as const, markingEnabled: false as const,
+  };
+}
+
+async function alignChunk(text: string, questions: Question[], otherQuestionIds: string[]) {
   const model = process.env.MARKING_CENTRE_ALIGNMENT_MODEL?.trim() || "gpt-4.1-mini";
   // If the alignment provider fails (bad key, no credit, outage), use the marking model instead.
   const fallback = process.env.MARKING_CENTRE_MARKING_MODEL?.trim() || "";
-  const userContent = JSON.stringify({ approvedQuestions: questions, candidatePdfText: text });
+  const userContent = JSON.stringify(otherQuestionIds.length
+    ? { approvedQuestions: questions, otherQuestionsOnThePaper: otherQuestionIds, note: "Return answers ONLY for approvedQuestions. The other question IDs are listed so you know where each answer ends; do not include them.", candidatePdfText: text }
+    : { approvedQuestions: questions, candidatePdfText: text });
   let content: string;
   try {
     content = await alignWith(model, userContent);
@@ -125,5 +146,5 @@ export async function alignAnswers(text: string, questions: Question[]) {
     ? root.warnings.filter((w): w is string => typeof w === "string")
         .map(w => cleanWarning(w.slice(0, 500))).filter(Boolean).slice(0, 20)
     : [];
-  return { answers: questions.map(q => safeAnswers.find(a => a.questionId === q.id)!), warnings, model, teacherReviewRequired: true, markingEnabled: false };
+  return { answers: questions.map(q => safeAnswers.find(a => a.questionId === q.id)!), warnings, model, teacherReviewRequired: true as const, markingEnabled: false as const };
 }

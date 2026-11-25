@@ -20,6 +20,10 @@ CENTRE_STORAGE_UNAVAILABLE: [503, "Storage unavailable."],
     MARK_NO_KEY: [503, "AI marking not configured."], MARK_PROVIDER: [502, "AI marking service unavailable."], MARK_FORMAT: [422, "AI marking response failed validation."],
     CENTRE_STALE: [409, "Script or approved structure changed. Generate a new proposal."], CENTRE_FINAL: [409, "Approved marks are locked."], CENTRE_GUIDANCE: [422, "Add specific improvement guidance for each question with lost marks, or explain why guidance cannot be provided."], CENTRE_JUSTIFICATION: [422, "Add a teacher justification for changed marks or credit without an answer before approval."], CENTRE_EVIDENCE: [422, "Feedback claims working not evident in the extracted answer. Correct the feedback and verify the original script before approval."],
     CENTRE_BUDGET: [402, "This month's AI marking budget has been reached. Raise MARKING_MONTHLY_BUDGET_USD in Vercel (or wait until next month) to continue. Approving and exporting still work."],
+    ALIGN_FORMAT: [502, "The AI could not separate this script's answers into questions (reply incomplete). Try again; if it keeps failing, the script may contain two candidates or unreadable pages."],
+    ALIGN_PROVIDER: [502, "The AI service timed out or was unavailable while reading this script's answers. Try again in a minute."],
+    ALIGN_INVALID: [422, "This script's transcript is empty or too long to mark. Check it is one candidate's script."],
+    ALIGN_NO_KEY: [503, "AI marking not configured."],
     CENTRE_FORBIDDEN: [403, "Teacher access required."], AUTH_REQUIRED: [401, "Sign in again."], AUTH_INVALID: [401, "Sign in again."],
   };
   const code = error instanceof Error ? error.message : "";
