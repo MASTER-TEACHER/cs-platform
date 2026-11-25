@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import BatchScanSplitter from "@/components/marking-centre/BatchScanSplitter";
 import QuestionCheckPanel from "@/components/marking-centre/QuestionCheckPanel";
+import ScriptSidePanel from "@/components/marking-centre/ScriptSidePanel";
 import { announceActivity } from "@/components/auth/IdleSessionGuard";
 import { flagTier, watchFlags, type SampleStatus, type WatchEntry } from "@/lib/marking/reviewPolicy";
 
@@ -174,6 +175,8 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   const [sampleConfirmed, setSampleConfirmed] = useState(false);
   const [includeFlagged, setIncludeFlagged] = useState(false);
   const [focusReview, setFocusReview] = useState(true);
+  // Question whose answer page is open in the side panel (single-script review).
+  const [viewQuestion, setViewQuestion] = useState<string | null>(null);
   const eligible = (row: QueueRow) => includeFlagged ? Boolean(row.bulkEligibleWithFlags) : Boolean(row.bulkEligible);
   const [showAdvancedQla, setShowAdvancedQla] = useState(false);
   const [topicText, setTopicText] = useState("");
@@ -1046,7 +1049,11 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
             const checks = panelFlags.filter(flag => (flag.questionId === mark.questionId || flag.questionId === "*") && isCheckFlag(flag));
             const max = preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks;
             const body = <>
-            <p className="font-semibold text-sm">Question {mark.questionId} · Max {preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-semibold text-sm">Question {mark.questionId} · Max {preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks}</p>
+              {review.checkedQuestions?.includes(mark.questionId) && <span className="rounded bg-emerald-50 px-2 text-xs text-emerald-800">✓ checked by question</span>}
+              <button type="button" className="ml-auto rounded border border-indigo-300 px-2 py-1 text-xs text-indigo-800" onClick={() => setViewQuestion(mark.questionId)}>View script</button>
+            </div>
             <pre className="whitespace-pre-wrap text-xs">{mark.answerText || "No answer identified"}</pre>
             <label className="block text-sm">Teacher mark
               <input type="number" min={0} max={preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks ?? 0} step={1} className="ml-2 w-20 rounded border p-1" value={mark.awardedMarks} disabled={review.status === "approved" || review.stale || reviewBusy}
@@ -1069,6 +1076,37 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
             if (focusReview && checks.length === 0) return <details key={mark.questionId} className="rounded border p-2"><summary className="cursor-pointer text-sm">Question {mark.questionId} · {mark.awardedMarks}/{max} · <span className="text-slate-600">{(mark.feedback || "").slice(0, 110)}{(mark.feedback || "").length > 110 ? "…" : ""}</span></summary><div className="mt-2 space-y-2">{body}</div></details>;
             return <div key={mark.questionId} className={`space-y-2 rounded border p-3 ${checks.length ? "border-2 border-amber-400" : ""}`}>{body}</div>;
           })}
+          {user && viewQuestion && (() => {
+            const index = review.marks.findIndex(m => m.questionId === viewQuestion);
+            const mark = review.marks[index];
+            if (!mark) return null;
+            const max = preview.approvedQuestions.find(q => q.id === mark.questionId)?.maxMarks ?? 0;
+            const original = review.originalProposalMarks?.find(o => o.questionId === mark.questionId)?.awardedMarks;
+            const editable = review.status !== "approved" && !review.stale && !reviewBusy;
+            const setMarkAt = (value: number) => editable && setReview(old => old ? { ...old, marks: old.marks.map((m, i) => i === index ? { ...m, awardedMarks: value } : m) } : old);
+            const go = (step: number) => { const next = review.marks[index + step]; if (next) setViewQuestion(next.questionId); };
+            const flags = panelFlags.filter(flag => flag.questionId === mark.questionId);
+            return <ScriptSidePanel
+              endpoint={endpoint} getToken={() => user.getIdToken()}
+              paperId={review.paperId} candidateCode={review.candidateCode} questionId={mark.questionId}
+              title={`${review.candidateCode} · Question ${mark.questionId}`} position={`${index + 1} of ${review.marks.length}`}
+              onPrevious={index > 0 ? () => go(-1) : undefined} onNext={index < review.marks.length - 1 ? () => go(1) : undefined}
+              onClose={() => setViewQuestion(null)} onMarkKey={editable ? setMarkAt : undefined} maxMarks={max}>
+              {review.checkedQuestions?.includes(mark.questionId) && <p className="font-semibold text-emerald-800">✓ Already checked by question: no need to check again.</p>}
+              <details><summary className="cursor-pointer text-slate-600">AI reading of the answer</summary><p className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap rounded bg-slate-50 p-1">{mark.answerText || "No answer identified"}</p></details>
+              <p><strong>AI: {original ?? mark.awardedMarks}/{max}.</strong> {mark.feedback}</p>
+              {flags.length > 0 && <p className="text-amber-900">{flags.map(f => f.detail).join(" · ")}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">Your mark:</span>
+                {Array.from({ length: max + 1 }, (_, n) => <button key={n} type="button" disabled={!editable} aria-pressed={mark.awardedMarks === n} className={`min-w-9 rounded border px-3 py-2 text-sm ${mark.awardedMarks === n ? "border-indigo-700 bg-indigo-700 text-white" : "bg-white"}`} onClick={() => setMarkAt(n)}>{n}</button>)}
+                <button type="button" className="ml-auto rounded bg-indigo-700 px-3 py-2 text-sm text-white" onClick={() => index < review.marks.length - 1 ? go(1) : setViewQuestion(null)}>{index < review.marks.length - 1 ? "Next question →" : "Done"}</button>
+              </div>
+              {original !== undefined && mark.awardedMarks !== original && <label className="block">Reason for changing the mark (required to approve)
+                <textarea className="mt-1 w-full rounded border p-1" rows={2} value={mark.teacherJustification ?? ""} disabled={!editable} onChange={e => setReview(old => old ? { ...old, marks: old.marks.map((m, i) => i === index ? { ...m, teacherJustification: e.target.value } : m) } : old)} />
+              </label>}
+              <p className="text-slate-500">Keys: 0–{Math.min(9, max)} set the mark · N or → next question · P or ← previous · Esc close. Changes are kept in the review below: click Save teacher edits or Approve when finished. Feedback for changed marks can be edited in the question box.</p>
+            </ScriptSidePanel>;
+          })()}
           {review.status !== "approved" && !review.stale && <div className="flex flex-wrap gap-2">
             <button type="button" disabled={reviewBusy} className="rounded border px-3 py-2 text-sm" onClick={() => void reviewAction("save")}>Save teacher edits</button>
             <button type="button" disabled={reviewBusy} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white" onClick={() => { if (window.confirm("Confirm you checked the original script, every mark, feedback and improvement guidance? Approval locks this review.")) void reviewAction("approve"); }}>Approve final marks</button>
