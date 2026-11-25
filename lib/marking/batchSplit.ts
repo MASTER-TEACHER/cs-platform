@@ -50,6 +50,9 @@ const CONFUSABLE: Record<string, string> = {
   "5": "5S",
   "6": "6G",
   "8": "8B",
+  "4": "4A",
+  "7": "7T",
+  "9": "9GQ",
   B: "B8",
   D: "D0",
   O: "O0",
@@ -69,6 +72,11 @@ function charClass(char: string): string {
   return options.length > 1 ? `[${escaped}]` : escaped;
 }
 
+// A handwritten leading zero is often read as a letter or bracket ("0969" as
+// "U969" or "(969"). Only leading zeros get this wider set; no digits are
+// included, so "6969" or "9969" never match 0969.
+const LEADING_ZERO = "[0OQDUCGVØ()\\[\\]{}@]";
+
 export type Matcher = { code: string; pattern: RegExp; length: number };
 
 export function buildMatchers(candidateCodes: string[]): Matcher[] {
@@ -81,7 +89,7 @@ export function buildMatchers(candidateCodes: string[]): Matcher[] {
       const core = /^\d+$/.test(compact) ? compact.replace(/^0+(?=\d)/, "") : compact;
       const zeros = compact.length - core.length;
       const body =
-        (zeros ? `(?:${charClass("0")}${SEPARATOR}){0,${zeros}}` : "") +
+        (zeros ? `(?:${LEADING_ZERO}${SEPARATOR}){0,${zeros}}` : "") +
         Array.from(core).map(charClass).join(SEPARATOR);
       // OCR often glues a stray letter onto "EX" ("~JEX-..."). The EX
       // prefix plus 16 characters is distinctive enough without a
@@ -184,6 +192,17 @@ export function readText(text: string, matchers: Matcher[], anchors: string[] = 
 
   const known = new Set(matches.map(normaliseCode));
   const unknown = exReadings(upper).filter((value) => !known.has(value));
+
+  // On a cover with no match, keep number readings one character away from a
+  // candidate code ("0959" for 0969), so the review table can suggest it.
+  // They are never applied automatically.
+  if (!matches.length && (marker || cover === true)) {
+    const codes = matchers.map((m) => normaliseCode(m.code)).filter((c) => /^\d{3,8}$/.test(c));
+    for (const token of upper.replace(/[OQD]/g, "0").match(/\d{3,8}/g) ?? []) {
+      const close = codes.some((code) => distance(token, code) <= 1 || distance(token, code.replace(/^0+(?=\d)/, "")) === 0);
+      if (close && !unknown.includes(token)) unknown.push(token);
+    }
+  }
 
   return { matches, unknown, marker, rejected };
 }
