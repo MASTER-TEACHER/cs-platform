@@ -4,10 +4,20 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 type Paper = { id: string; title: string };
-type Question = { id: string; maxMarks: number; criteria: string; notes: string };
-type Suggestion = { questions: Question[]; warnings: string[]; model: string; source: string; sourceHash: string; generatedAt?: string };
+type Question = { id: string; maxMarks: number; criteria: string; notes: string; needsCriteria?: boolean };
+type Suggestion = { questions: Question[]; warnings: string[]; declaredTotal?: number | null; model: string; source: string; sourceHash: string; generatedAt?: string };
 type Structure = { status: "draft" | "approved"; questionText?: string; markSchemeText?: string; questionPages?: number; markSchemePages?: number; questionTextTruncated?: boolean; markSchemeTextTruncated?: boolean; questions?: Question[]; totalMarks?: number; criteriaProvenance?: string; schemeSource?: "uploaded" | "no_uploaded_scheme" | "teacher_entered" };
 const empty = (): Question => ({ id: "", maxMarks: 1, criteria: "", notes: "" });
+type Review = { warnings: string[]; declaredTotal: number | null };
+
+/** Warnings that mention this question ID (not part of a longer number or ID). */
+function warningsFor(id: string, warnings: string[]): string[] {
+  const clean = id.trim();
+  if (!clean) return [];
+  const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?<![\\w(])${escaped}(?![\\w(])`, "i");
+  return warnings.filter(w => pattern.test(w));
+}
 export default function PaperStructureManager({ examId, papers }: { examId: string; papers: Paper[] }) {
   const { user } = useAuth();
   const [paperId, setPaperId] = useState(papers[0]?.id ?? "");
@@ -19,6 +29,16 @@ export default function PaperStructureManager({ examId, papers }: { examId: stri
     "manual" | "ai-assisted"
   >("manual");
   const [message, setMessage] = useState("");
+  // The AI's warnings and the paper's printed total stay with the editor (and this
+  // browser) after the proposal is applied, so the red and amber boxes remain.
+  const [review, setReview] = useState<Review>({ warnings: [], declaredTotal: null });
+  const reviewKey = `csmaster:structureReview:${examId}:${paperId}`;
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(reviewKey) || "null");
+      setReview(saved && Array.isArray(saved.warnings) ? saved : { warnings: [], declaredTotal: null });
+    } catch { setReview({ warnings: [], declaredTotal: null }); }
+  }, [reviewKey]);
   const endpoint = `/api/marking-centre/exams/${examId}/papers/${paperId}/structure`;
   const call = useCallback(async (method: string, payload?: unknown) => {
     if (!user) throw new Error("Please sign in.");
@@ -59,6 +79,9 @@ export default function PaperStructureManager({ examId, papers }: { examId: stri
     if (!window.confirm("Replace the unsaved form with the AI proposal? Saved draft data will not change until you click Save draft.")) return;
     setQuestions(suggestion.questions);
     setCriteriaOrigin("ai-assisted");
+    const next = { warnings: suggestion.warnings, declaredTotal: suggestion.declaredTotal ?? null };
+    setReview(next);
+    try { window.localStorage.setItem(reviewKey, JSON.stringify(next)); } catch { /* ignore */ }
     setMessage("AI suggestions copied into the editor. Check the source PDFs and save the draft when satisfied.");
   }
   async function perform(method: "POST" | "PUT", approve = false) {
@@ -120,7 +143,7 @@ export default function PaperStructureManager({ examId, papers }: { examId: stri
           {suggestion.questions.map((question, index) => (
             <div
               key={`${question.id}-${index}`}
-              className="rounded border border-amber-200 bg-white p-3"
+              className={`rounded bg-white p-3 ${question.criteria.trim() ? "border border-amber-200" : "border-2 border-red-600"}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h6 className="font-semibold">
@@ -138,9 +161,9 @@ export default function PaperStructureManager({ examId, papers }: { examId: stri
                   Proposed marking criteria
                 </p>
 
-                <div className="mt-1 whitespace-pre-wrap break-words rounded bg-slate-50 p-3 leading-relaxed">
-                  {question.criteria}
-                </div>
+                {question.criteria.trim()
+                  ? <div className="mt-1 whitespace-pre-wrap break-words rounded bg-slate-50 p-3 leading-relaxed">{question.criteria}</div>
+                  : <div className="mt-1 rounded bg-red-50 p-3 font-semibold text-red-800">Criteria needed: the mark scheme answer for this question could not be read. Apply the proposal, then type the criteria in the red box.</div>}
               </div>
 
               {question.notes.trim() && (
@@ -178,8 +201,29 @@ export default function PaperStructureManager({ examId, papers }: { examId: stri
     {message && <p role="status" className="rounded bg-indigo-50 p-3 text-sm">{message}</p>}
     {structure && <div className="grid gap-3 md:grid-cols-2">{([{ title: "Question paper", text: structure.questionText, pages: structure.questionPages, truncated: structure.questionTextTruncated }, { title: "Mark scheme", text: structure.markSchemeText, pages: structure.markSchemePages, truncated: structure.markSchemeTextTruncated }]).map(item => <div key={item.title} className="rounded border p-3"><h4 className="font-semibold">{item.title} — {item.pages ?? "?"} page(s)</h4>{item.truncated && <p className="text-xs text-amber-700">Text truncated for review. Check the original PDF.</p>}{!item.text?.trim() && <p className="text-xs text-amber-700">No selectable text detected. Scanned PDFs need manual transcription or future visual extraction.</p>}<pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words bg-slate-50 p-2 text-xs">{item.text || "No extracted text."}</pre></div>)}</div>}
     <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h4 className="font-semibold">Verified question structure — {total} total marks</h4><button type="button" disabled={busy || locked || questions.length >= 150} onClick={() => setQuestions(previous => [...previous, empty()])} className="rounded border px-3 py-1 text-sm disabled:opacity-40">+ Add question</button></div><p className="text-xs text-slate-600">Review question IDs, maximum marks, answers and partial-credit rules before approval. Where a mark scheme was uploaded, compare against that document. Otherwise, independently verify the unofficial AI draft against the question paper. Manual editing is available until approval.</p>
-      {questions.map((q, i) => <div key={i} className="grid gap-2 rounded border p-3 md:grid-cols-5"><label className="text-xs">Question ID<input disabled={busy || locked} value={q.id} onChange={event => update(i, { id: event.target.value })} placeholder="1a" className="mt-1 w-full rounded border p-2"/></label><label className="text-xs">Max marks<input disabled={busy || locked} type="number" min={1} max={100} value={q.maxMarks} onChange={event => update(i, { maxMarks: Number(event.target.value) })} className="mt-1 w-full rounded border p-2"/></label><label className="text-xs md:col-span-2">Marking criteria<textarea disabled={busy || locked} rows={8} maxLength={6000} value={q.criteria} onChange={event => update(i, { criteria: event.target.value })} className="mt-1 w-full rounded border p-2" placeholder="Accepted answers, partial-credit rules and marking points"/></label><div className="space-y-2"><label className="block text-xs">Teacher notes<textarea disabled={busy || locked} rows={5} maxLength={4000} value={q.notes} onChange={event => update(i, { notes: event.target.value })} className="mt-1 w-full rounded border p-2"/></label><button type="button" disabled={busy || locked || questions.length === 1} onClick={() => setQuestions(previous => previous.filter((_, j) => j !== i))} className="text-xs text-red-700 disabled:opacity-40">Remove</button></div></div>)}
+      {(() => {
+        const needs = questions.filter(q => q.id.trim() && !q.criteria.trim());
+        const checks = questions.filter(q => q.criteria.trim() && warningsFor(q.id, review.warnings).length);
+        const offTotal = review.declaredTotal !== null && review.declaredTotal !== total;
+        if (locked || (!needs.length && !checks.length && !offTotal)) return null;
+        const jump = (id: string) => document.getElementById(`structure-q-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return <div className="space-y-2">
+          {(needs.length > 0 || offTotal) && <div role="alert" className="rounded border-2 border-red-600 bg-red-50 p-3 text-sm text-red-900">
+            <p className="font-semibold">You need to add something before approving</p>
+            {offTotal && <p>The question paper says <strong>{review.declaredTotal} marks</strong>, but these questions add up to <strong>{total}</strong>. {total < (review.declaredTotal ?? 0) ? "Add the missing question(s) with + Add question." : "Check for a duplicated question or wrong marks."}</p>}
+            {needs.length > 0 && <p>Criteria needed for: {needs.map(q => <button key={q.id} type="button" className="mr-2 font-semibold underline" onClick={() => jump(q.id)}>{q.id} ({q.maxMarks})</button>)}</p>}
+          </div>}
+          {checks.length > 0 && <div className="rounded border-2 border-amber-500 bg-amber-50 p-3 text-sm text-amber-950">
+            <p className="font-semibold">Check against the mark scheme (the AI raised a warning)</p>
+            <p>{checks.map(q => <button key={q.id} type="button" className="mr-2 underline" onClick={() => jump(q.id)}>{q.id}</button>)}</p>
+          </div>}
+        </div>;
+      })()}
+      {questions.map((q, i) => { const missing = !locked && Boolean(q.id.trim()) && !q.criteria.trim(); const warned = !locked && !missing ? warningsFor(q.id, review.warnings) : []; return <div key={i} id={`structure-q-${q.id.trim()}`} className={`grid gap-2 rounded p-3 md:grid-cols-5 ${missing ? "border-2 border-red-600 bg-red-50" : warned.length ? "border-2 border-amber-500" : "border"}`}>
+        {missing && <p className="text-sm font-semibold text-red-800 md:col-span-5">Criteria needed: the AI could read the question and its {q.maxMarks} mark(s), but not the mark scheme answer. Type the accepted answers and how marks are given.</p>}
+        {warned.length > 0 && <p className="text-xs text-amber-900 md:col-span-5"><strong>Check:</strong> {warned.join(" · ")}</p>}<label className="text-xs">Question ID<input disabled={busy || locked} value={q.id} onChange={event => update(i, { id: event.target.value })} placeholder="1a" className="mt-1 w-full rounded border p-2"/></label><label className="text-xs">Max marks<input disabled={busy || locked} type="number" min={1} max={100} value={q.maxMarks} onChange={event => update(i, { maxMarks: Number(event.target.value) })} className="mt-1 w-full rounded border p-2"/></label><label className="text-xs md:col-span-2">Marking criteria<textarea disabled={busy || locked} rows={8} maxLength={6000} value={q.criteria} onChange={event => update(i, { criteria: event.target.value })} className={`mt-1 w-full rounded p-2 ${missing ? "border-2 border-red-600 bg-white" : "border"}`} placeholder="Accepted answers, partial-credit rules and marking points"/></label><div className="space-y-2"><label className="block text-xs">Teacher notes<textarea disabled={busy || locked} rows={5} maxLength={4000} value={q.notes} onChange={event => update(i, { notes: event.target.value })} className="mt-1 w-full rounded border p-2"/></label><button type="button" disabled={busy || locked || questions.length === 1} onClick={() => setQuestions(previous => previous.filter((_, j) => j !== i))} className="text-xs text-red-700 disabled:opacity-40">Remove</button></div></div>; })}
       <div className="flex flex-wrap gap-3"><button type="button" disabled={busy || locked} onClick={() => void perform("PUT")} className="rounded border px-4 py-2 text-sm disabled:opacity-40">Save draft</button><button type="button" disabled={busy || locked || !structure?.questionText?.trim() || questions.some(q => !q.id.trim() || !q.criteria.trim() || !Number.isInteger(q.maxMarks) || q.maxMarks < 1)} onClick={() => void perform("PUT", true)} className="rounded bg-indigo-700 px-4 py-2 text-sm text-white disabled:opacity-40">Approve and lock</button></div>
+      {!locked && questions.some(q => !q.id.trim() || !q.criteria.trim()) && <p className="text-sm font-semibold text-red-800">Approve and lock is unavailable until every question has an ID and criteria (see the red boxes). Save draft keeps your work in the meantime.</p>}
       {locked && <p className="text-sm text-green-800">Teacher-approved question structure saved. Marking is not enabled yet.</p>}
     </div>
   </section>;
