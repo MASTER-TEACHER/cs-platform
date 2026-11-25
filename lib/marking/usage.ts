@@ -76,11 +76,16 @@ export async function getUsage(uid: string): Promise<UsageSummary> {
  * teacher has reached this month's cap, then records usage for the rest of
  * the request.
  */
-export async function beginUsage(uid: string): Promise<void> {
+export async function beginUsage(uid: string, enforce = true): Promise<void> {
   // Enter the scope BEFORE any await. On Node 24 (AsyncContextFrame, used by
   // Vercel) a store entered after an await inside this function is lost when
   // it returns, so nothing was recorded and the budget cap never triggered.
   scope.enterWith({ uid });
+  if (enforce) await enforceBudget(uid);
+}
+
+/** Throws CENTRE_BUDGET when this month's AI spend has reached the cap. */
+export async function enforceBudget(uid: string): Promise<void> {
   const budget = monthlyBudgetUsd();
   if (budget > 0) {
     const { costUsd } = await getUsage(uid);

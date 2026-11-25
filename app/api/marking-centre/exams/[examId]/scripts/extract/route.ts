@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Storage } from "@google-cloud/storage";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { beginUsage } from "@/lib/marking/usage";
+import { beginUsage, enforceBudget } from "@/lib/marking/usage";
 import { extractCandidatePdf, VISION_ERROR_MESSAGES } from "@/lib/marking/visionPdf";
 import { transcriptCache } from "@/lib/marking/transcriptCache";
 
@@ -49,7 +49,9 @@ export async function GET(request: Request, context: Context) {
   try {
     const actor = await requireAuthenticatedUser(request);
     requireCentreTeacher(actor);
-    await beginUsage(actor.uid);
+    // Opening a script whose handwriting was already read costs nothing, so the
+    // budget is only enforced when a new AI reading is needed (below).
+    await beginUsage(actor.uid, false);
     const { examId } = await context.params;
     const url = new URL(request.url);
     const paperId = url.searchParams.get("paperId") ?? "";
@@ -81,7 +83,9 @@ export async function GET(request: Request, context: Context) {
     const bucketName = process.env.FIREBASE_ADMIN_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
     if (!bucketName) throw new Error("CENTRE_STORAGE_UNAVAILABLE");
     const [bytes] = await storageClient().bucket(bucketName).file(expectedPath).download();
-    const extracted = await extractCandidatePdf(bytes, transcriptCache(examRef, paperId, candidateCode, bytes));
+    const cache = transcriptCache(examRef, paperId, candidateCode, bytes);
+    if (!(await cache.get())) await enforceBudget(actor.uid);
+    const extracted = await extractCandidatePdf(bytes, cache);
     const text = extracted.text.trim();
     const hasSelectableText = text.length > 0;
     return NextResponse.json({
