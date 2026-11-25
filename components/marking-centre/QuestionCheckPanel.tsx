@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { announceActivity } from "@/components/auth/IdleSessionGuard";
 
 type Summary = { questionId: string; scripts: number; maxMarks: number };
+type AnyQuestion = { questionId: string; maxMarks: number; checked: number; open: number };
 type Item = {
   candidateCode: string; revision: number; answerText: string; awardedMarks: number; aiMarks: number;
   feedback: string; improvementGuidance: string; evidence: string; checked: boolean; needsCheck: boolean; reasons: string[];
@@ -28,6 +29,7 @@ type Props = {
 export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSaved, openScript }: Props) {
   const [paperId, setPaperId] = useState(paperIds[0] ?? "");
   const [summary, setSummary] = useState<Summary[] | null>(null);
+  const [allQuestions, setAllQuestions] = useState<AnyQuestion[]>([]);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [busy, setBusy] = useState(false);
@@ -51,6 +53,7 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
     try {
       const data = await call(`${endpoint}/by-question?${new URLSearchParams({ paperId: paper })}`);
       setSummary(data.questions);
+      setAllQuestions(Array.isArray(data.all) ? data.all : []);
       setDetail(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to load."); }
     finally { setBusy(false); }
@@ -163,6 +166,16 @@ export default function QuestionCheckPanel({ endpoint, paperIds, getToken, onSav
             <button key={q.questionId} type="button" className="rounded border border-amber-400 bg-amber-50 px-3 py-1 text-sm" disabled={busy} onClick={() => void openQuestion(q.questionId)}>
               Q{q.questionId} <span className="text-xs text-slate-600">· {q.scripts} script(s) · {q.maxMarks} mark(s)</span>
             </button>))}</div>)}
+      {summary && !detail && allQuestions.length > 0 && (
+        <details className="text-sm">
+          <summary className="cursor-pointer">Any question (check a question the AI got wrong on your sample, on every script)</summary>
+          <div className="mt-2 flex flex-wrap gap-1">{allQuestions.map(q => (
+            <button key={q.questionId} type="button" disabled={busy} onClick={() => void openQuestion(q.questionId)}
+              className={`rounded border px-2 py-1 text-xs ${q.open && q.checked === q.open ? "border-emerald-500 bg-emerald-50" : "bg-white"}`}>
+              Q{q.questionId}{q.open && q.checked === q.open ? " ✓" : q.checked ? ` (${q.checked}/${q.open})` : ""}
+            </button>))}</div>
+        </details>
+      )}
 
       {detail && (
         <div className="space-y-2">

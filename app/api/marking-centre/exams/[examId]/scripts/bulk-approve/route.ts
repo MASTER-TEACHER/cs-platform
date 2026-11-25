@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { loadReviewContext, validateMarks, type ReviewMark } from "@/lib/marking/reviewContext";
 import { qualityFlags, isExplicitNonAnswer, unsupportedWorkingClaim } from "@/lib/marking/reviewFlags";
-import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, type ApprovedReview } from "@/lib/marking/reviewPolicy";
+import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, fullyChecked, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, requireCentreTeacher } from "@/lib/marking/centre";
 export const runtime = "nodejs";
@@ -41,7 +41,10 @@ export async function POST(request: Request, context: Context) {
       watch = watchList(all);
       for (const paperId of new Set(body.selections.map(s => s.paperId))) {
         const count = scripts.docs.filter(d => d.data().paperId === paperId).length;
-        if (sampleStatus(paperId, all, [], count, watch).passed) passedPapers.add(paperId);
+        const structure = await examRef.collection("paperStructures").doc(paperId).get();
+        const total = ((structure.data()?.questions ?? []) as { maxMarks: number }[]).reduce((n, q) => n + (Number(q.maxMarks) || 0), 0);
+        const open = reviews.docs.map(d => d.data()).filter(r => r.paperId === paperId && ["proposed", "reviewing"].includes(r.status));
+        if (sampleStatus(paperId, all, [], count, watch, total, fullyChecked(open)).passed) passedPapers.add(paperId);
       }
     }
     const outcomes: { paperId: string; candidateCode: string; approved: boolean; reason?: string }[] = [];

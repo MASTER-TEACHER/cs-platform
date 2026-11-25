@@ -57,8 +57,10 @@ export async function GET(request: Request, context: Context) {
         for (const id of new Set(flagsFor(review).filter(f => f.tier === "check" && f.questionId !== "*").map(f => f.questionId))) counts.set(id, (counts.get(id) ?? 0) + 1);
       }
       const order = new Map(questions.map((q, i) => [q.id, i]));
+      // Any question can be checked across all scripts; how many already have it checked is shown.
+      const all = questions.map(q => ({ questionId: q.id, maxMarks: q.maxMarks, checked: open.filter(r => Array.isArray(r.checkedQuestions) && (r.checkedQuestions as string[]).includes(q.id)).length, open: open.length }));
       return NextResponse.json({ questions: [...counts.entries()].map(([id, scripts]) => ({ questionId: id, scripts, maxMarks: questions.find(q => q.id === id)?.maxMarks ?? 0 }))
-        .sort((a, b) => (order.get(a.questionId) ?? 999) - (order.get(b.questionId) ?? 999)) }, { headers });
+        .sort((a, b) => (order.get(a.questionId) ?? 999) - (order.get(b.questionId) ?? 999)), all }, { headers });
     }
 
     if (!safe(questionId, QUESTION)) throw new Error("CENTRE_NOT_FOUND");

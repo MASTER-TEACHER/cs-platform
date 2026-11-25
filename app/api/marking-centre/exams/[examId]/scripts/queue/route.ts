@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
-import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, type ApprovedReview } from "@/lib/marking/reviewPolicy";
+import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, fullyChecked, type ApprovedReview } from "@/lib/marking/reviewPolicy";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const headers = { "Cache-Control": "private, no-store" };
@@ -63,7 +63,9 @@ export async function GET(request: Request, context: Context) {
     });
     const samples = [...new Set(rows.map(r => r.paperId))].map(paperId => sampleStatus(paperId, allReviews,
       rows.filter(r => r.paperId === paperId && ["proposed", "reviewing"].includes(r.status)).map(r => ({ candidateCode: r.candidateCode, aiTotal: r.aiTotal })),
-      rows.filter(r => r.paperId === paperId).length, watch));
+      rows.filter(r => r.paperId === paperId).length, watch,
+      (questionsByPaper.get(paperId) as { maxMarks: number }[] ?? []).reduce((n, q) => n + (Number(q.maxMarks) || 0), 0),
+      fullyChecked(rows.filter(r => r.paperId === paperId && ["proposed", "reviewing"].includes(r.status)).map(r => reviewByKey.get(`${paperId}_${r.candidateCode}`) ?? {}))));
     rows.sort((a, b) => b.checks - a.checks || Number(b.flagged) - Number(a.flagged) || (a.status === "approved" ? 1 : 0) - (b.status === "approved" ? 1 : 0) || a.candidateCode.localeCompare(b.candidateCode));
     return NextResponse.json({ rows, summary: { uploaded: rows.length, approved: rows.filter(r => r.status === "approved").length, flagged: rows.filter(r => r.checks > 0 && r.status !== "approved").length, awaitingProposal: rows.filter(r => r.status === "unprocessed").length }, samples, watch }, { headers });
   } catch (error) {

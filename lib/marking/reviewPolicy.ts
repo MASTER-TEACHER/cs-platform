@@ -19,6 +19,17 @@ export const WATCH_MIN_COMPARED = 3;
 /** A sampled script passes when its total is within this many marks of the AI's. */
 export const SAMPLE_TOLERANCE = 2;
 export const SAMPLE_HARD_LIMIT = 4;
+/** Tolerances grow with the paper: ±2% of the total (min 2), never more than 5% out (min 4). */
+export function tolerances(paperTotal = 0) {
+  return { tolerance: Math.max(SAMPLE_TOLERANCE, Math.ceil(paperTotal * 0.02)), hard: Math.max(SAMPLE_HARD_LIMIT, Math.ceil(paperTotal * 0.05)) };
+}
+
+/** Questions the teacher has checked (Check by question) on every script still to approve. */
+export function fullyChecked(open: { checkedQuestions?: unknown }[]): string[] {
+  if (!open.length) return [];
+  const lists = open.map(r => Array.isArray(r.checkedQuestions) ? r.checkedQuestions as string[] : []);
+  return lists[0].filter(id => lists.every(list => list.includes(id)));
+}
 
 export type WatchEntry = { paperId: string; questionId: string; compared: number; agreed: number };
 
@@ -95,6 +106,8 @@ export type SampleStatus = {
   failed: boolean;
   outliers: string[];
   suggested: string[];
+  tolerance: number;
+  hard: number;
 };
 
 /** Sample size: 10% of the scripts on the paper, at least 3. */
@@ -113,17 +126,21 @@ export function sampleStatus(
   pending: { candidateCode: string; aiTotal: number }[],
   scriptCount: number,
   watch: WatchEntry[] = [],
+  paperTotal = 0,
+  checkedEverywhere: string[] = [],
 ): SampleStatus {
+  const { tolerance, hard } = tolerances(paperTotal);
   // Questions that are always checked by the teacher are left out: the sample tests the
   // AI only on the questions that will be approved without being looked at.
-  const skip = watch.filter(w => w.paperId === paperId).map(w => w.questionId);
+  // Questions checked by the teacher on every remaining script are not approved unseen either.
+  const skip = [...watch.filter(w => w.paperId === paperId).map(w => w.questionId), ...checkedEverywhere];
   const sampled = reviews.filter(r => r.paperId === paperId && individuallyApproved(r));
   const differences = sampled.map(r => ({ code: r.candidateCode ?? "", diff: Math.abs(totals(r, skip).difference) }));
-  const within = differences.filter(d => d.diff <= SAMPLE_TOLERANCE).length;
+  const within = differences.filter(d => d.diff <= tolerance).length;
   const worst = differences.reduce((n, d) => Math.max(n, d.diff), 0);
   const required = sampleSize(scriptCount);
   const enough = sampled.length >= required;
-  const failed = sampled.length > 0 && (worst > SAMPLE_HARD_LIMIT || (enough && within / sampled.length < 0.9));
+  const failed = sampled.length > 0 && (worst > hard || (enough && within / sampled.length < 0.9));
   const passed = enough && !failed;
   // Evenly spaced across the AI totals, so low, middle and high scripts are all checked.
   const sorted = [...pending].sort((a, b) => a.aiTotal - b.aiTotal || a.candidateCode.localeCompare(b.candidateCode));
@@ -132,7 +149,8 @@ export function sampleStatus(
   return {
     paperId, scripts: scriptCount, required, reviewed: sampled.length, withinTolerance: within, worst,
     passed, failed,
-    outliers: differences.filter(d => d.diff > SAMPLE_TOLERANCE).map(d => d.code),
+    outliers: differences.filter(d => d.diff > tolerance).map(d => d.code),
+    tolerance, hard,
     suggested,
   };
 }
