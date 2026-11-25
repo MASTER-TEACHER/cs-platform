@@ -521,7 +521,7 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
   const overlapsCode = boxes.some(b => bandRef.current !== null && b.y1 > bandRef.current.top && b.y0 < bandRef.current.bottom);
 
   /** A new PDF of the given pages, rendered at 200 dpi as JPEG images. */
-  async function rasterise(range: number[], redactFirst = false): Promise<Uint8Array> {
+  async function rasterise(range: number[], redactFirst = false, dpi = 200, quality = 0.85): Promise<Uint8Array> {
     const { PDFDocument } = await import("pdf-lib");
     const pdf = pdfRef.current;
     if (!pdf) throw new Error("The scan is no longer open. Choose the batch PDF again.");
@@ -529,9 +529,9 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
     for (const index of range) {
       const page = await pdf.getPage(index + 1);
       const size = page.getViewport({ scale: 1 });
-      const canvas = await renderPage(pdf, index + 1, 200 / 72);
+      const canvas = await renderPage(pdf, index + 1, dpi / 72);
       if (redactFirst && index === range[0]) drawBoxes(canvas, boxes);
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
       if (!blob) throw new Error("A page could not be converted.");
       const image = await output.embedJpg(await blob.arrayBuffer());
       output.addPage([size.width, size.height]).drawImage(image, { x: 0, y: 0, width: size.width, height: size.height });
@@ -576,9 +576,19 @@ export default function BatchScanSplitter({ papers, defaultPaperId, candidateCod
         // big as the batch). If this script is far bigger than its share,
         // rebuild it from the page images alone.
         const share = ((bytesRef.current?.byteLength ?? 0) * range.length) / Math.max(1, pageCount);
-        if (data.length > Math.max(share * 3, 4 * 1024 * 1024)) {
-          setStatus(`Rebuilding ${segment.code} from page images (the scan stores images in a shared block)...`);
-          data = await rasterise(range, redact);
+        // Uploads are limited to 25 MB: anything over 20 MB is rebuilt too,
+        // stepping down image quality until it fits (still clear for marking).
+        const FIT = 20 * 1024 * 1024;
+        if (data.length > Math.max(share * 3, 4 * 1024 * 1024) || data.length > FIT) {
+          for (const [dpi, quality] of [[200, 0.85], [150, 0.75], [120, 0.65], [100, 0.55]] as const) {
+            setStatus(`Making ${segment.code} smaller for upload (${dpi} dpi)...`);
+            announceActivity();
+            data = await rasterise(range, redact, dpi, quality);
+            if (data.length <= FIT) break;
+          }
+          if (data.length > 25 * 1024 * 1024) {
+            throw new Error(`${segment.code} is still ${(data.length / 1048576).toFixed(1)} MB after compressing (${range.length} pages). Check for a missed cover: this script may contain two candidates.`);
+          }
         }
         files.push(new File([data.slice().buffer as ArrayBuffer], `${normaliseCode(segment.code!)}.pdf`, { type: "application/pdf" }));
         setProgress(Math.round(((index + 1) / checked.length) * 100));
