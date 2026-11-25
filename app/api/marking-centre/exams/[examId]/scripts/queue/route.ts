@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { requireAuthenticatedUser } from "@/lib/auth/requireUser";
 import { centreCollection, centreError, requireCentreTeacher } from "@/lib/marking/centre";
 import { tieredFlags, watchList, sampleStatus, onlyCheckedChanges, type ApprovedReview } from "@/lib/marking/reviewPolicy";
@@ -22,7 +23,12 @@ export async function GET(request: Request, context: Context) {
     ]);
     const reviewByKey = new Map(reviews.docs.map(d => [d.id, d.data()]));
     const questionsByPaper = new Map(structures.docs.map(d => [d.id, Array.isArray(d.data().questions) ? d.data().questions : []]));
-    const allReviews = reviews.docs.map(d => d.data() as ApprovedReview);
+    // Same fingerprint the review route uses: a script marked against an older version
+    // of the paper's questions (e.g. before missing questions were added) is out of date.
+    const hashByPaper = new Map(structures.docs.filter(d => d.data().status === "approved" && Array.isArray(d.data().questions))
+      .map(d => [d.id, createHash("sha256").update(JSON.stringify(d.data().questions)).digest("hex")]));
+    // Out-of-date reviews say nothing about the current questions: leave them out of the sample.
+    const allReviews = reviews.docs.map(d => d.data()).filter(r => !hashByPaper.get(r.paperId) || !r.structureHash || r.structureHash === hashByPaper.get(r.paperId)) as ApprovedReview[];
     const watch = watchList(allReviews);
     const rows = scripts.docs.map(doc => {
       const script = doc.data();
@@ -31,11 +37,13 @@ export async function GET(request: Request, context: Context) {
       const checked: string[] = Array.isArray(review?.checkedQuestions) ? review.checkedQuestions : [];
       const flags = marks.length ? tieredFlags(script.paperId, marks, questionsByPaper.get(script.paperId) || [], Array.isArray(review?.alignmentWarnings) ? review.alignmentWarnings : [], watch, checked) : [];
       const checks = flags.filter(f => f.tier === "check").length;
-      const approved = review?.status === "approved";
+      const current = hashByPaper.get(script.paperId);
+      const outdated = Boolean(review && current && review.structureHash && review.structureHash !== current);
+      const approved = review?.status === "approved" && !outdated;
       return {
         paperId: script.paperId, candidateCode: script.candidateCode,
         filename: script.originalName || "Candidate script",
-        status: approved ? "approved" : review?.status || "unprocessed",
+        status: outdated ? "outdated" : approved ? "approved" : review?.status || "unprocessed",
         revision: Number(review?.revision) || 0,
         bulkEligible: review?.status === "proposed" && flags.length === 0 && marks.length > 0 &&
           marks.every((m: { confidence?: string; needsReview?: boolean; teacherJustification?: string }) => m.confidence === "high" && !m.needsReview && !m.teacherJustification) &&

@@ -719,7 +719,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
         if (!response.ok) continue;
         const data = await response.json() as { rows?: QueueRow[] };
         const row = data.rows?.find(r => r.paperId === paperId && r.candidateCode === candidateCode);
-        if (row && row.status !== "unprocessed") return true;
+        if (row && row.status !== "unprocessed" && row.status !== "outdated") return true;
       } catch {
         // Still offline: keep waiting.
       }
@@ -738,8 +738,10 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
   async function proposeBatch() {
     if (!user || queueBusy) return;
     const latestQueue = await loadQueue();
-    const todo = latestQueue.filter(row => row.status === "unprocessed");
-    if (!todo.length) { setQueueError("No unprocessed scripts in the current queue. Refresh the queue first."); return; }
+    // Includes scripts marked before the paper's questions changed: they are re-marked
+    // against the current questions (the handwriting is not re-read, so this is cheaper).
+    const todo = latestQueue.filter(row => row.status === "unprocessed" || row.status === "outdated");
+    if (!todo.length) { setQueueError("No unprocessed or out-of-date scripts in the current queue. Refresh the queue first."); return; }
     const spend = await loadUsage();
     const estimate = spend ? todo.length * spend.averageCostPerScriptUsd : null;
     const costLine = spend && estimate !== null
@@ -969,7 +971,7 @@ export default function CandidateScriptManager({ examId, papers, candidateCodes,
       </div>
       {batchProgress && <p role="status" className="text-sm">{batchProgress}</p>}
       {queueError && <p role="alert" className="text-sm text-red-700">{queueError}</p>}
-      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.status !== "approved" && r.flags.some(isCheckFlag)).length} with questions to check · {queue.filter(r => r.status !== "approved" && r.status !== "unprocessed" && !r.flags.some(isCheckFlag)).length} with nothing to check · {queue.filter(r => r.status === "unprocessed").length} unprocessed</p>
+      {queue.length > 0 && <><p className="text-sm">{queue.length} uploaded · {queue.filter(r => r.status === "approved").length} approved · {queue.filter(r => r.status !== "approved" && r.flags.some(isCheckFlag)).length} with questions to check · {queue.filter(r => r.status !== "approved" && r.status !== "unprocessed" && r.status !== "outdated" && !r.flags.some(isCheckFlag)).length} with nothing to check · {queue.filter(r => r.status === "unprocessed").length} unprocessed{queue.some(r => r.status === "outdated") ? ` · ${queue.filter(r => r.status === "outdated").length} out of date (the paper's questions changed after marking: click Mark all remaining scripts to re-mark them)` : ""}</p>
         <div className="max-h-72 overflow-auto"><table className="w-full text-left text-xs"><thead><tr><th className="border p-2"><label className="flex items-center gap-1"><input type="checkbox" aria-label="Select all eligible scripts" disabled={queueBusy || !queue.some(r => eligible(r))} checked={queue.some(r => eligible(r)) && queue.filter(r => eligible(r)).every(r => bulkSelected.includes(`${r.paperId}_${r.candidateCode}`))} onChange={e => setBulkSelected(e.target.checked ? queue.filter(r => eligible(r)).map(r => `${r.paperId}_${r.candidateCode}`) : [])} />All</label></th><th className="border p-2">Candidate</th><th className="border p-2">Paper</th><th className="border p-2">Status</th><th className="border p-2">Review warnings</th><th className="border p-2">Open</th></tr></thead><tbody>{queue.map(item => <tr key={`${item.paperId}_${item.candidateCode}`}><td className="border p-2"><input type="checkbox" aria-label={`Select ${item.candidateCode} ${item.paperId} for bulk approval`} disabled={!eligible(item) || queueBusy} checked={bulkSelected.includes(`${item.paperId}_${item.candidateCode}`)} onChange={e => setBulkSelected(old => e.target.checked ? [...old, `${item.paperId}_${item.candidateCode}`].slice(0, 20) : old.filter(k => k !== `${item.paperId}_${item.candidateCode}`))} /></td><td className="border p-2">{item.candidateCode}</td><td className="border p-2">{item.paperId}</td><td className="border p-2">{item.status}</td><td className="border p-2">{item.flags.length ? <details><summary className={`cursor-pointer ${item.status === "approved" ? "text-slate-500" : ""}`}>{item.status === "approved" ? `Approved · ${groupedFlags(item.flags)}` : <>{item.flags.some(isCheckFlag) ? <strong className="text-amber-900">Check: {groupedFlags(item.flags.filter(isCheckFlag))}</strong> : <span className="text-emerald-800">Nothing to check</span>}{item.flags.some(f => !isCheckFlag(f)) && <span className="block text-slate-500">For information: {groupedFlags(item.flags.filter(f => !isCheckFlag(f)))}</span>}</>}</summary><ul className="mt-1 list-disc pl-4 text-slate-600">{item.flags.map((f, i) => <li key={i}>Q{f.questionId}: {f.code === "UNCERTAIN" ? f.detail : f.detail || f.code}</li>)}</ul></details> : "No automated flags (teacher verification still required)"}</td><td className="border p-2"><button type="button" className="text-indigo-700 underline" disabled={queueBusy} onClick={() => void previewScript({ paperId: item.paperId, candidateCode: item.candidateCode, filename: item.filename, size: 0, uploadedAt: null })}>Review</button></td></tr>)}</tbody></table></div>
       </>}
     </div>}
