@@ -26,6 +26,24 @@ export async function PATCH(request: Request, context: Context) {
     const input: unknown = await request.json();
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("CENTRE_INVALID");
     const data = input as Record<string, unknown>;
+
+    // Add another paper to an existing exam (e.g. Paper 2 after Paper 1 was marked).
+    // Existing papers, candidate codes, scripts and marks are untouched.
+    if (data.addPaper && typeof data.addPaper === "object" && !Array.isArray(data.addPaper)) {
+      const paperTitle = cleanText((data.addPaper as Record<string, unknown>).title, 120);
+      if (!paperTitle) throw new Error("CENTRE_INVALID");
+      const paper = await ref.firestore.runTransaction(async tx => {
+        const snap = await tx.get(ref);
+        const papers = (Array.isArray(snap.data()?.papers) ? snap.data()!.papers : []) as { id: string }[];
+        if (papers.length >= 12) throw new Error("CENTRE_INVALID");
+        const next = papers.reduce((n, p) => Math.max(n, Number(/^paper-(\d+)$/.exec(p.id)?.[1] ?? 0)), 0) + 1;
+        const added = { id: `paper-${next}`, title: paperTitle, status: "awaiting_documents", questions: [], totalMarks: null, gradeBoundaries: null };
+        tx.update(ref, { papers: [...papers, added], updatedAt: FieldValue.serverTimestamp() });
+        return added;
+      });
+      return NextResponse.json({ ok: true, paper }, { headers });
+    }
+
     const title = cleanText(data.title, 140);
     const subject = cleanText(data.subject, 80);
     const yearGroup = cleanText(data.yearGroup, 40);

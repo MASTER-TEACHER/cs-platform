@@ -51,6 +51,20 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
     if (!response.ok) throw new Error(data.error || "Request failed.");
     return data;
   }, [user]);
+
+  async function addPaper() {
+    if (!selected) return;
+    const title = window.prompt("Name of the new paper", `Paper ${(selected.papers?.length ?? 0) + 1}`);
+    if (!title?.trim()) return;
+    setBusy(true);
+    try {
+      await call(`/api/marking-centre/exams/${selected.id}`, "PATCH", { addPaper: { title: title.trim() } });
+      const updated = await refresh();
+      setSelected(updated.find(e => e.id === selected.id) ?? selected);
+      setMessage(`${title.trim()} added. Upload its question paper and mark scheme below.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not add the paper."); }
+    finally { setBusy(false); }
+  }
   const refresh = useCallback(async () => {
     const data = await call("/api/marking-centre/exams");
     setExams(data.exams);
@@ -291,6 +305,10 @@ export default function MarkingCentreWorkspace({ section, initialExamId }: { sec
           {selected && <section className="space-y-5 rounded-xl border bg-white p-5"><h2 className="text-lg font-semibold">{selected.title} — paper documents</h2>
       {selected.papers?.map(paper => <div key={paper.id} className="space-y-3 rounded-lg border p-4"><h3 className="font-semibold">{paper.title}</h3>{paperLocks[paper.id] === true && <p className="text-sm font-semibold text-amber-800">Approved or unavailable - documents locked</p>}<div className="grid gap-4 md:grid-cols-3">{documentTypes.map((doc, index) => <div key={doc.kind} className="rounded-xl border-2 border-slate-200 bg-slate-50 p-4"><div className="mb-2 text-sm font-bold">{index + 1}. {doc.label}</div><p className="mb-3 text-xs text-slate-600">{doc.kind === "questionPaper" ? "Examination questions (required)" : doc.kind === "markScheme" ? "Official marking criteria (optional; AI draft available)" : "Official or school grade thresholds (optional)"}</p><label className="block text-xs font-semibold">Select PDF<input disabled={busy || (doc.kind !== "gradeBoundaries" && paperLocks[paper.id] !== false)} type="file" accept=".pdf,application/pdf" onChange={event => { void upload(paper.id, doc.kind, event.target.files?.[0]); event.target.value = ""; }} className="mt-2 block w-full text-xs"/></label><p className="mt-3 break-words text-xs" role="status">{uploading === `${paper.id}_${doc.kind}` ? "Uploading..." : documents[paper.id]?.[doc.kind] ? `Uploaded: ${documents[paper.id][doc.kind]}` : "No file uploaded"}</p></div>)}</div></div>)}
 
+      <div className="rounded-lg border border-dashed p-4">
+        <p className="text-sm text-slate-600">Forgot a paper? Add it here. It uses the same candidate codes, and paper 1&apos;s scripts and marks are kept.</p>
+        <button type="button" disabled={busy || !user || (selected.papers?.length ?? 0) >= 12} className="mt-2 rounded-lg border border-indigo-700 px-4 py-2 text-sm font-medium text-indigo-800 disabled:opacity-50" onClick={() => void addPaper()}>+ Add a paper</button>
+      </div>
           </section>}
         </div>}
         {section === "candidates" && (selected ? <section className="space-y-5 rounded-xl border bg-white p-5"><h2 className="text-lg font-semibold">Candidate registration and uploads</h2>
