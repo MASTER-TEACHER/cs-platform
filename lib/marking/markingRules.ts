@@ -205,13 +205,13 @@ export const MARKING_RULES: MarkingRule[] = [
   {
     id: "E1", title: "GCSE 8-mark extended response", level: "GCSE", priority: 10, match: /mark band|level|band|discuss|evaluat|recommend/,
     when: q => q.maxMarks === 8,
-    rule: "8-mark levels question (bands 6-8, 3-5, 1-2, 0). Top band: accurate, detailed knowledge applied consistently to the scenario, weighing both sides and covering every element the question requires (and a justified recommendation if one is asked for), with clear structure. Bullet points or headings are acceptable; an essay is not required. A list of facts without application stays in the low or mid band. Indicative content is not exhaustive: credit other valid points.",
+    rule: "8-mark levels question (bands 6-8, 3-5, 1-2, 0). Top band: accurate, detailed knowledge applied consistently to the scenario, weighing both sides and covering every element the question requires (and a justified recommendation if one is asked for), with clear structure. Bullet points or headings are acceptable; an essay is not required. A list of facts without application stays in the low or mid band. Indicative content is not exhaustive: credit other valid points, and never mark down for indicative points that are absent. Within a band, start at the middle mark and move up or down by how well the descriptors are met.",
     sources: ["J277/01 2022 Q4", "J277/01 2023 Q6", "J277/01 2024 Q4", "J277/01 2025 Q3", "J277/01 2026 Q8", "J277/01 Specimen Q11"],
   },
   {
     id: "E2", title: "A Level 9/12-mark extended response", level: "A Level", priority: 10, match: /mark band|level|band|discuss|evaluat|recommend|ao3/,
     when: q => q.maxMarks === 9 || q.maxMarks === 12,
-    rule: "A Level levels question (12 marks: bands 9-12, 5-8, 1-4; 9 marks: 7-9, 4-6, 1-3). AO1 knowledge, AO2 application to the context, AO3 evaluation. The top band needs a balanced, applied discussion and a clear conclusion justified by the points made; either conclusion is acceptable if justified. Generic answers without the context cannot reach the top band.",
+    rule: "A Level levels question (12 marks: bands 9-12, 5-8, 1-4; 9 marks: 7-9, 4-6, 1-3). AO1 knowledge, AO2 application to the context, AO3 evaluation. The top band needs a balanced, applied discussion and a clear conclusion justified by the points made; either conclusion is acceptable if justified. Generic answers without the context cannot reach the top band. Indicative content is not a checklist: do not lower the band or mark because particular points (e.g. named Acts) are missing. Within a band, start at the middle mark; an answer with accurate, applied points covering AO1-AO3 and a conclusion sits at the middle or top of its band even if brief.",
     sources: ["H446/01 2023 Q7", "H446/01 2025 Q4", "H446/02 2025 Q2(a), Q4", "H446/01 2023 Q6(b)"],
   },
 
