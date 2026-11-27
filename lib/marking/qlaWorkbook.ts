@@ -285,7 +285,7 @@ export function buildQlaModel(input: QlaInput): { sheets: QlaSheet[]; working: b
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Writes the model with ExcelJS (passed in, so this module has no dependency). */
-export async function writeQlaWorkbook(model: { sheets: QlaSheet[] }, ExcelJS: any): Promise<Uint8Array> {
+export async function writeQlaWorkbook(model: { sheets: QlaSheet[] }, ExcelJS: any): Promise<Uint8Array<ArrayBuffer>> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "CS Master";
   // Formulas are written without cached results: ask Excel to calculate on open.
@@ -327,5 +327,8 @@ export async function writeQlaWorkbook(model: { sheets: QlaSheet[] }, ExcelJS: a
     if (s.cells.H3?.s === "topic") ws.getRow(3).height = 90;
   }
   const bytes = await wb.xlsx.writeBuffer();
-  return new Uint8Array(bytes);
+  // Copy into a plain ArrayBuffer-backed array: Response() only accepts that type.
+  const out = new Uint8Array(bytes.byteLength);
+  out.set(new Uint8Array(bytes));
+  return out;
 }
