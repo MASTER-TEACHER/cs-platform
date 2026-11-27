@@ -127,73 +127,30 @@ export async function GET(request: Request, context: Context) {
       return new Response(body, { headers: { ...headers, "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": 'attachment; filename="csmaster-detailed-feedback.csv"' } });
     }
     if (format === "qla-xlsx") {
-      const wb = new ExcelJS.Workbook(); wb.creator = "CS Master";
-      const approvedRows = result.rows.filter(r => r.status === "approved" && r.total !== null);
+      // Tracker-style QLA: editable boundaries driving live grade formulas, a sheet per
+      // paper with heat map and topic priorities, and a combined overview.
       const examData = exam.data() ?? {};
       const mappings = (examData.qlaTopicMappings && typeof examData.qlaTopicMappings === "object" ? examData.qlaTopicMappings : {}) as Record<string, string>;
       const boundaries = Array.isArray(examData.gradingBoundaries) ? examData.gradingBoundaries as { grade: string; minimum: number }[] : [];
-      const sorted = [...boundaries].sort((a, b) => a.minimum - b.minimum);
-      const gradeNext = (score: number | null) => {
-        if (score === null) return ["Pending", "", ""];
-        const next = sorted.find(b => b.minimum > score);
-        return [result.grading.mode === "official" ? "Official" : "Internal estimate", next?.grade ?? "Highest", next ? next.minimum - score : 0];
-      };
       const detailMap = new Map(details.map(d => [`${d.paperId}::${d.candidateCode}::${d.question}`, d]));
-      const paperTotals = papers.map((p, i) => ({ paper: p, questions: (structures[i].data()?.questions ?? []) as { id: string; maxMarks: number }[] }));
-      const topicSheet = wb.addWorksheet("Topic mapping");
-      topicSheet.addRow(["Paper", "Question", "Maximum", "Curriculum topic (edit for planning)", "Topic mapping source"]);
-      for (const item of paperTotals) for (const q of item.questions) topicSheet.addRow([item.paper.title || item.paper.id, q.id, q.maxMarks, mappings[`${item.paper.id}::${q.id}`] || "Unmapped - enter topic", mappings[`${item.paper.id}::${q.id}`] ? "Teacher saved" : "Editable workbook label"]);
-      const combined = wb.addWorksheet("Combined Overview");
-      combined.addRow(["Candidate code", ...papers.map(p => p.title || p.id), "Total", "Maximum", "Percentage", "Grade", "Grade mode", "Next grade", "Marks to next grade", "RAG"]);
-      for (const r of result.rows) {
-        const pct = r.total === null || !result.maximum ? null : r.total / result.maximum;
-        const [mode, next, delta] = gradeNext(r.total);
-        combined.addRow([r.candidateCode, ...papers.map(p => r.paperScores[p.id] ?? "Pending"), r.total ?? "Pending", result.maximum, pct ?? "", r.grade ?? "Pending", mode, next, delta, pct === null ? "Pending" : pct >= .7 ? "Green" : pct >= .4 ? "Amber" : "Red"]);
-      }
-      combined.getColumn(papers.length + 4).numFmt = "0.0%";
-      for (const item of paperTotals) {
-        const sheet = wb.addWorksheet((item.paper.title || item.paper.id).slice(0, 25) + " QLA");
-        const qs = item.questions;
-        const paperMax = qs.reduce((n, q) => n + q.maxMarks, 0);
-        sheet.addRow(["Candidate code", ...qs.map(q => `Q${q.id} /${q.maxMarks}`), "Total", "Maximum", "Percentage", "RAG"]);
-        sheet.addRow(["Curriculum topic", ...qs.map(q => mappings[`${item.paper.id}::${q.id}`] || "Unmapped"), "", "", "", ""]);
-        for (const r of result.rows) {
-          const score = r.paperScores[item.paper.id];
-          const pct = score === null || paperMax === 0 ? null : score / paperMax;
-          sheet.addRow([r.candidateCode, ...qs.map(q => detailMap.get(`${item.paper.id}::${r.candidateCode}::${q.id}`)?.awarded ?? "Pending"), score ?? "Pending", paperMax, pct ?? "", pct === null ? "Pending" : pct >= .7 ? "Green" : pct >= .4 ? "Amber" : "Red"]);
-        }
-        const start = 3, end = 2 + result.rows.length;
-        sheet.addRow(["Class average", ...qs.map(q => {
-          const scores = approvedRows.map(r => detailMap.get(`${item.paper.id}::${r.candidateCode}::${q.id}`)?.awarded).filter((n): n is number => typeof n === "number");
-          return scores.length ? Math.round(scores.reduce((a,b) => a+b,0) * 100 / scores.length) / 100 : "";
-        }), "", "", "", ""]);
-        sheet.addRow(["Success rate", ...qs.map(q => {
-          const scores = approvedRows.map(r => detailMap.get(`${item.paper.id}::${r.candidateCode}::${q.id}`)?.awarded).filter((n): n is number => typeof n === "number");
-          return scores.length && q.maxMarks ? scores.reduce((a,b) => a+b,0) / (scores.length * q.maxMarks) : "";
-        }), "", "", "", ""]);
-        sheet.getRow(end + 2).numFmt = "0.0%";
-        sheet.getColumn(qs.length + 4).numFmt = "0.0%";
-        sheet.views = [{ state: "frozen", ySplit: 2, xSplit: 1 }];
-        sheet.getRow(2).font = { italic: true, color: { argb: "FF3730A3" } };
-        sheet.getRow(2).height = 30;
-        sheet.getRow(2).alignment = { wrapText: true };
-      }
-      const boundarySheet = wb.addWorksheet("Grade Boundaries");
-      boundarySheet.addRow(["Grade", "Minimum mark", "Maximum available", "Source", "Qualification"]);
-      for (const b of [...boundaries].sort((a,b) => b.minimum - a.minimum)) boundarySheet.addRow([b.grade, b.minimum, result.maximum, result.grading.sourceNote, String(examData.qualificationLevel ?? "")]);
-      boundarySheet.addRow(["U / ungraded", 0, result.maximum, "Below lowest threshold where applicable", ""]);
-      const notes = wb.addWorksheet("QLA Notes");
-      notes.addRows([["Status", "Teacher-only report using approved marks only"], ["Grading", result.grading.sourceNote], ["Topics", "Unmapped labels are intentionally blank of assumed curriculum meaning. Edit Topic mapping sheet or save topic mappings in CS Master."], ["RAG thresholds", "Green >=70%; Amber >=40%; Red <40%. These are configurable in a future settings update; currently report defaults."], ["Incomplete scripts", "Pending marks are excluded from class-average calculations"], ["Privacy", "Pseudonymous candidate codes only"], ["Quality", "Review teacher-approved feedback before distribution; QLA is for diagnostic use"]]);
-      for (const sheet of wb.worksheets) {
-        sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-        sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF3730A3" } };
-        sheet.columns.forEach((col, i) => { col.width = i === 0 ? 24 : 19; });
-        if (sheet.name !== "QLA Notes") sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: sheet.columnCount } };
-      }
-      topicSheet.getColumn(4).width = 50;
-      boundarySheet.getColumn(4).width = 65;
-      const bytes = await wb.xlsx.writeBuffer();
-      return new Response(new Uint8Array(bytes), { headers: { ...headers, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": 'attachment; filename="csmaster-subject-qla.xlsx"' } });
+      const qlaPapers = papers.map((p, i) => ({
+        id: p.id, title: p.title || p.id,
+        questions: ((structures[i].data()?.questions ?? []) as { id: string; maxMarks: number }[]).map(q => ({ id: q.id, maxMarks: q.maxMarks, topic: mappings[`${p.id}::${q.id}`] || undefined })),
+      }));
+      const candidates = result.rows.map(r => ({
+        code: r.candidateCode,
+        scores: Object.fromEntries(qlaPapers.map(p => {
+          const marks = p.questions.map(q => [q.id, detailMap.get(`${p.id}::${r.candidateCode}::${q.id}`)?.awarded] as const).filter((e): e is readonly [string, number] => typeof e[1] === "number");
+          return [p.id, marks.length ? Object.fromEntries(marks) : null];
+        })),
+      }));
+      const { buildQlaModel, writeQlaWorkbook } = await import("@/lib/marking/qlaWorkbook");
+      const model = buildQlaModel({
+        examTitle: String(examData.title ?? "Exam"), qualification: String(examData.qualificationLevel ?? ""),
+        papers: qlaPapers, candidates, boundaries, boundarySource: result.grading.sourceNote,
+      });
+      const bytes = await writeQlaWorkbook(model, ExcelJS);
+      return new Response(bytes, { headers: { ...headers, "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": 'attachment; filename="csmaster-subject-qla.xlsx"' } });
     }
     if (format === "xlsx") {
       const wb = new ExcelJS.Workbook(); wb.creator = "CS Master";
